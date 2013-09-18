@@ -117,7 +117,7 @@ func GenMockPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = MakeMock(src, dst, "")
+	err = MakeMock(src, dst)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func MockStandard(srcRoot, dstRoot, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = MakeMock(src, dst, "")
+	err = MakeMock(src, dst)
 	if err != nil {
 		return "", err
 	}

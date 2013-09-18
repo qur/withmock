@@ -142,7 +142,7 @@ func exprString(exp ast.Expr) string {
 	}
 }
 
-func MakeMock(srcPath, dstPath, prefix string) error {
+func MakeMock(srcPath, dstPath string) error {
 	isGoFile := func(info os.FileInfo) bool {
 		if info.IsDir() {
 			return false
@@ -164,13 +164,13 @@ func MakeMock(srcPath, dstPath, prefix string) error {
 
 		for path, file := range pkg.Files {
 			name := filepath.Base(path)
-			err := mockFile(dstPath, name, prefix, file, recorders)
+			err := mockFile(dstPath, name, file, recorders)
 			if err != nil {
 				return err
 			}
 		}
 
-		err := mockPkg(dstPath, name, prefix, recorders)
+		err := mockPkg(dstPath, name, recorders)
 		if err != nil {
 			return err
 		}
@@ -188,7 +188,7 @@ func fixup(filename string) {
 	}
 }
 
-func mockPkg(dstPath, name, prefix string, recorders map[string]string) (err error) {
+func mockPkg(dstPath, name string, recorders map[string]string) (err error) {
 	filename := filepath.Join(dstPath, name+"_mock.go")
 	defer func() {
 		if err != nil {
@@ -208,7 +208,7 @@ func mockPkg(dstPath, name, prefix string, recorders map[string]string) (err err
 	}
 	defer out.Close()
 
-	fmt.Fprintf(out, "package %s%s\n\n", prefix, name)
+	fmt.Fprintf(out, "package %s\n\n", name)
 
 	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
 
@@ -274,7 +274,7 @@ func getPackageName(impPath string) (string, error) {
 	return name, nil
 }
 
-func mockFile(dstPath, name, prefix string, f *ast.File, recorders map[string]string) (err error) {
+func mockFile(dstPath, name string, f *ast.File, recorders map[string]string) (err error) {
 	filename := filepath.Join(dstPath, name)
 	defer func() {
 		if err != nil {
@@ -304,7 +304,7 @@ func mockFile(dstPath, name, prefix string, f *ast.File, recorders map[string]st
 		}
 	}
 
-	fmt.Fprintf(out, "package %s%s\n\n", prefix, f.Name)
+	fmt.Fprintf(out, "package %s\n\n", f.Name)
 
 	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
 
