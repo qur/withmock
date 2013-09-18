@@ -13,6 +13,9 @@ As you might expect:
 
     go get github.com/qur/withmock
 
+You will also need to install goimports (github.com/bradfitz/goimports), and
+gomock (code.google.com/p/gomock/gomock).
+
 How do I use it?
 ----------------
 
