@@ -24,4 +24,6 @@ then run "go test" via the withmock tool:
 
     withmock go test
 
-Check out the example for more information.
+For more info see the documentation: http://godoc.org/github.com/qur/withmock
+
+You can also check out the example.
