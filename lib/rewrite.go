@@ -38,7 +38,11 @@ func (r *rewriter) flushLines() error {
 		line, err = r.buf.ReadBytes('\n')
 	}
 
-	r.buf = bytes.NewBuffer(r.buf.Bytes())
+	// Rebuild the buffer without any data that we have processed, but including
+	// any data we have read out, but not yet processed.
+	buf := bytes.NewBuffer(line)
+	buf.Write(r.buf.Bytes())
+	r.buf = buf
 
 	if err != io.EOF {
 		return err
