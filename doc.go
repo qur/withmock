@@ -94,7 +94,11 @@ UsefulType instance:
  // And now, call the code under test
  importantFunction(ut)
 
-And gomock will do the rest for us ... :D
+And now we just need to wrap our call to "go test", so we run:
+
+ withmock go test
+
+and gomock and the Go testing framework will do the rest for us ... :D
 
 */
 package main
