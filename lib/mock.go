@@ -15,6 +15,45 @@ import (
 	"strings"
 )
 
+// MakeMock writes a mock version of the package found at srcPath into dstPath.
+// If dstPath already exists, bad things will probably happen.
+func MakeMock(srcPath, dstPath string) error {
+	isGoFile := func(info os.FileInfo) bool {
+		if info.IsDir() {
+			return false
+		}
+		if strings.HasSuffix(info.Name(), "_test.go") {
+			return false
+		}
+		return strings.HasSuffix(info.Name(), ".go")
+	}
+
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, srcPath, isGoFile, parser.ParseComments)
+	if err != nil {
+		return err
+	}
+
+	for name, pkg := range pkgs {
+		recorders := make(map[string]string)
+
+		for path, file := range pkg.Files {
+			name := filepath.Base(path)
+			err := mockFile(dstPath, name, file, recorders)
+			if err != nil {
+				return err
+			}
+		}
+
+		err := mockPkg(dstPath, name, recorders)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func exprString(exp ast.Expr) string {
 	switch v := exp.(type) {
 	case *ast.BasicLit:
@@ -140,43 +179,6 @@ func exprString(exp ast.Expr) string {
 	default:
 		panic(fmt.Sprintf("Can't convert (%v)%T to string in exprString", exp, exp))
 	}
-}
-
-func MakeMock(srcPath, dstPath string) error {
-	isGoFile := func(info os.FileInfo) bool {
-		if info.IsDir() {
-			return false
-		}
-		if strings.HasSuffix(info.Name(), "_test.go") {
-			return false
-		}
-		return strings.HasSuffix(info.Name(), ".go")
-	}
-
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, srcPath, isGoFile, parser.ParseComments)
-	if err != nil {
-		return err
-	}
-
-	for name, pkg := range pkgs {
-		recorders := make(map[string]string)
-
-		for path, file := range pkg.Files {
-			name := filepath.Base(path)
-			err := mockFile(dstPath, name, file, recorders)
-			if err != nil {
-				return err
-			}
-		}
-
-		err := mockPkg(dstPath, name, recorders)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func fixup(filename string) {
