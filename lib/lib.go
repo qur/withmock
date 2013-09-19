@@ -68,7 +68,17 @@ func GetImports(path string, tests bool) (map[string]bool, error) {
 func GetRootImports(path string) (map[string]bool, error) {
 	imports := make(map[string]bool)
 
-	root := filepath.Join(path, "pkg/linux_amd64")
+	goOs, err := GetOutput("go", "env", "GOOS")
+	if err != nil {
+		return nil, err
+	}
+
+	goArch, err := GetOutput("go", "env", "GOARCH")
+	if err != nil {
+		return nil, err
+	}
+
+	root := filepath.Join(path, "pkg", goOs + "_" + goArch)
 
 	// Add in some "magic" packages that we want to ignore
 	imports["C"] = true
@@ -88,7 +98,7 @@ func GetRootImports(path string) (map[string]bool, error) {
 		return nil
 	}
 
-	err := filepath.Walk(root, fn)
+	err = filepath.Walk(root, fn)
 	if err != nil {
 		return nil, err
 	}
