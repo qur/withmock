@@ -115,32 +115,40 @@ func exprString(exp ast.Expr) string {
 		} else {
 			s := "interface {\n"
 			for _, field := range v.Methods.List {
-				f := field.Type.(*ast.FuncType)
-				s += "\t" + field.Names[0].Name
-				s += "("
-				if f.Params != nil {
-					for i, param := range f.Params.List {
-						if i > 0 {
-							s += ", "
+				switch v := field.Type.(type) {
+				case *ast.FuncType:
+					s += "\t" + field.Names[0].Name
+					s += "("
+					if v.Params != nil {
+						for i, param := range v.Params.List {
+							if i > 0 {
+								s += ", "
+							}
+							s += exprString(param.Type)
 						}
-						s += exprString(param.Type)
 					}
-				}
-				s += ")"
-				if f.Results != nil {
-					s += " "
-					if len(f.Results.List) > 1 {
-						s += "("
-					}
-					for i, result := range f.Results.List {
-						if i > 0 {
-							s += ", "
+					s += ")"
+					if v.Results != nil {
+						s += " "
+						if len(v.Results.List) > 1 {
+							s += "("
 						}
-						s += exprString(result.Type)
+						for i, result := range v.Results.List {
+							if i > 0 {
+								s += ", "
+							}
+							s += exprString(result.Type)
+						}
+						if len(v.Results.List) > 1 {
+							s += ")"
+						}
 					}
-					if len(f.Results.List) > 1 {
-						s += ")"
-					}
+				case *ast.SelectorExpr:
+					s += exprString(v)
+				case *ast.Ident:
+					s += exprString(v)
+				default:
+					panic(fmt.Sprintf("Don't expect %T in interface", field.Type))
 				}
 				s += "\n"
 			}
