@@ -9,6 +9,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,14 +39,39 @@ func MakeMock(srcPath, dstPath string) error {
 		recorders := make(map[string]string)
 
 		for path, file := range pkg.Files {
-			name := filepath.Base(path)
-			err := mockFile(dstPath, name, file, recorders)
+			filename := filepath.Join(dstPath, filepath.Base(path))
+
+			out, err := os.Create(filename)
+			if err != nil {
+				return err
+			}
+			defer out.Close()
+
+			err = mockFile(out, file, recorders)
+			if err != nil {
+				return err
+			}
+
+			err = fixup(filename)
 			if err != nil {
 				return err
 			}
 		}
 
-		err := mockPkg(dstPath, name, recorders)
+		filename := filepath.Join(dstPath, name+"_mock.go")
+
+		out, err := os.Create(filename)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		err = mockPkg(out, name, recorders)
+		if err != nil {
+			return err
+		}
+
+		err = fixup(filename)
 		if err != nil {
 			return err
 		}
@@ -189,35 +215,17 @@ func exprString(exp ast.Expr) string {
 	}
 }
 
-func fixup(filename string) {
+func fixup(filename string) error {
 	cmd := exec.Command("goimports", "-w", filename)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		panic(fmt.Sprintf("Failed to run goimports on '%s': %s\noutput:\n%s",
-			filename, err, out))
+		return fmt.Errorf("Failed to run goimports on '%s': %s\noutput:\n%s",
+			filename, err, out)
 	}
+	return nil
 }
 
-func mockPkg(dstPath, name string, recorders map[string]string) (err error) {
-	filename := filepath.Join(dstPath, name+"_mock.go")
-	defer func() {
-		if err != nil {
-			// don't run fixup on error
-			return
-		}
-		if err := recover(); err != nil {
-			// catch, and re-raise panic, so we don't run fixup
-			panic(err)
-		}
-		fixup(filename)
-	}()
-
-	out, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
+func mockPkg(out io.Writer, name string, recorders map[string]string) (err error) {
 	fmt.Fprintf(out, "package %s\n\n", name)
 
 	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
@@ -284,26 +292,7 @@ func getPackageName(impPath string) (string, error) {
 	return name, nil
 }
 
-func mockFile(dstPath, name string, f *ast.File, recorders map[string]string) (err error) {
-	filename := filepath.Join(dstPath, name)
-	defer func() {
-		if err != nil {
-			// don't run fixup on error
-			return
-		}
-		if err := recover(); err != nil {
-			// catch, and re-raise panic, so we don't run fixup
-			panic(err)
-		}
-		fixup(filename)
-	}()
-
-	out, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
+func mockFile(out io.Writer, f *ast.File, recorders map[string]string) (err error) {
 	if f.Doc != nil && f.Doc.Text() != "" {
 		fmt.Fprintf(out, "/*\n%s*/\n\n", f.Doc.Text())
 	}
