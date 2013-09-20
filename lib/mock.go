@@ -84,6 +84,16 @@ func exprString(exp ast.Expr) string {
 	switch v := exp.(type) {
 	case *ast.BasicLit:
 		return v.Value
+	case *ast.CompositeLit:
+		s := exprString(v.Type) + "{"
+		for i := range v.Elts {
+			if i > 0 {
+				s += ", "
+			}
+			s += exprString(v.Elts[i])
+		}
+		s += "}"
+		return s
 	case *ast.Ident:
 		return v.Name
 	case *ast.CallExpr:
@@ -102,6 +112,24 @@ func exprString(exp ast.Expr) string {
 		} else {
 			return "..." + exprString(v.Elt)
 		}
+	case *ast.ChanType:
+		s := ""
+		if v.Dir&ast.SEND != 0 {
+			s += "<-"
+		}
+		s += "chan"
+		if v.Dir&ast.RECV != 0 {
+			s += "<-"
+		}
+		s += " " + exprString(v.Value)
+		return s
+	case *ast.KeyValueExpr:
+		return exprString(v.Key) + ": " + exprString(v.Value)
+	case *ast.ParenExpr:
+		return "(" + exprString(v.X) + ")"
+	case *ast.FuncLit:
+		// TODO: ...
+		return exprString(v.Type) + "{ !TODO! }"
 	case *ast.StarExpr:
 		return "*" + exprString(v.X)
 	case *ast.SelectorExpr:
@@ -352,24 +380,33 @@ func mockFile(out io.Writer, f *ast.File, recorders map[string]string) (err erro
 				}
 				fmt.Fprintf(out, ")\n\n")
 			case token.TYPE:
-				if len(d.Specs) != 1 {
-					return fmt.Errorf("Multiple specs for a type not implemented")
-				}
-				t := d.Specs[0].(*ast.TypeSpec)
 				// We can't ignore private types, as we might be using them.
-				fmt.Fprintf(out, "type %s %s\n\n", t.Name, exprString(t.Type))
+				if len(d.Specs) == 1 {
+					t := d.Specs[0].(*ast.TypeSpec)
+					fmt.Fprintf(out, "type %s %s\n\n", t.Name, exprString(t.Type))
+				} else {
+					fmt.Fprintf(out, "type (\n")
+					for i := range d.Specs {
+						t := d.Specs[i].(*ast.TypeSpec)
+						fmt.Fprintf(out, "\t%s %s\n", t.Name, exprString(t.Type))
+					}
+					fmt.Fprintf(out, ")\n\n")
+				}
 			case token.VAR:
 				fmt.Fprintf(out, "var (\n")
 				for _, spec := range d.Specs {
 					s := spec.(*ast.ValueSpec)
-					if len(s.Names) != 1 {
-						return fmt.Errorf("Multiple names for a constant not implemented")
+					names := make([]string, 0, len(s.Names))
+					for _, ident := range s.Names {
+						if ident.IsExported() {
+							names = append(names, ident.Name)
+						}
 					}
-					if !s.Names[0].IsExported() {
+					if len(names) == 0 {
 						// Don't care about private variables
 						continue
 					}
-					fmt.Fprintf(out, "\t%s", s.Names[0])
+					fmt.Fprintf(out, "\t" + strings.Join(names, ", "))
 					if s.Type != nil {
 						fmt.Fprintf(out, " %s", s.Type)
 					}
@@ -378,7 +415,7 @@ func mockFile(out io.Writer, f *ast.File, recorders map[string]string) (err erro
 					case 1:
 						fmt.Fprintf(out, " = %s", exprString(s.Values[0]))
 					default:
-						return fmt.Errorf("Multiple values for a constant not implemented")
+						return fmt.Errorf("Multiple values for a var not implemented")
 					}
 					fmt.Fprintf(out, "\n")
 				}
