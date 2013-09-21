@@ -47,7 +47,7 @@ func MakeMock(srcPath, dstPath string) error {
 			}
 			defer out.Close()
 
-			err = mockFile(out, file, recorders)
+			err = mockFile(out, srcPath, file, recorders)
 			if err != nil {
 				return err
 			}
@@ -299,7 +299,7 @@ func mockPkg(out io.Writer, name string, recorders map[string]string) (err error
 
 var pkgNames = map[string]string{}
 
-func getPackageName(impPath string) (string, error) {
+func getPackageName(impPath, srcPath string) (string, error) {
 	// Special case for the magic "C" package
 	if impPath == "C" {
 		return "", nil
@@ -310,17 +310,33 @@ func getPackageName(impPath string) (string, error) {
 		return name, nil
 	}
 
+	cache := true
+
+	if strings.HasPrefix(impPath, "./") {
+		// relative import, no caching, need to change directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		defer os.Chdir(cwd)
+
+		os.Chdir(srcPath)
+		cache = false
+	}
+
 	name, err := GetOutput("go", "list", "-f", "{{.Name}}", impPath)
 	if err != nil {
 		return "", fmt.Errorf("Failed to get name for '%s': %s", impPath, err)
 	}
 
-	pkgNames[impPath] = name
+	if cache {
+		pkgNames[impPath] = name
+	}
 
 	return name, nil
 }
 
-func mockFile(out io.Writer, f *ast.File, recorders map[string]string) (err error) {
+func mockFile(out io.Writer, srcPath string, f *ast.File, recorders map[string]string) (err error) {
 	if f.Doc != nil && f.Doc.Text() != "" {
 		fmt.Fprintf(out, "/*\n%s*/\n\n", f.Doc.Text())
 	}
@@ -353,7 +369,7 @@ func mockFile(out io.Writer, f *ast.File, recorders map[string]string) (err erro
 						fmt.Fprintf(out, "%s ", s.Name)
 					} else {
 						impPath := strings.Trim(s.Path.Value, "\"")
-						name, err := getPackageName(impPath)
+						name, err := getPackageName(impPath, srcPath)
 						if err != nil {
 							return err
 						}
@@ -370,7 +386,7 @@ func mockFile(out io.Writer, f *ast.File, recorders map[string]string) (err erro
 						fmt.Fprintf(out, "%s ", s.Name)
 					} else {
 						impPath := strings.Trim(s.Path.Value, "\"")
-						name, err := getPackageName(impPath)
+						name, err := getPackageName(impPath, srcPath)
 						if err != nil {
 							return err
 						}
