@@ -18,6 +18,7 @@ import (
 
 var (
 	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
+	gocov = flag.Bool("gocov", false, "install gocov package into temporary GOPATH")
 )
 
 func usage() {
@@ -158,9 +159,11 @@ func doit() error {
 
 	// Add in the gocov library, so that we can run with gocov if we want.
 
-	_, err = lib.LinkPkg(goPath, tmpPath, "github.com/axw/gocov")
-	if err != nil {
-		return err
+	if flag.Arg(0) == "gocov" || *gocov {
+		_, err = lib.LinkPkg(goPath, tmpPath, "github.com/axw/gocov")
+		if err != nil {
+			return err
+		}
 	}
 
 	// Add the actual code that we are interested in to the GOPATH too.
