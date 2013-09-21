@@ -7,17 +7,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"syscall"
 
 	"github.com/qur/withmock/lib"
 )
 
 var (
-	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
 	gocov = flag.Bool("gocov", false, "install gocov package into temporary GOPATH")
 )
 
@@ -59,160 +56,30 @@ func doit() error {
 		os.Exit(1)
 	}
 
-	// First we need to figure some things out
+	// First we need to create a context
 
-	goRoot, err := lib.GetOutput("go", "env", "GOROOT")
+	ctxt, err := lib.NewContext()
 	if err != nil {
 		return err
 	}
+	defer ctxt.Close()
 
-	goPath, err := lib.GetOutput("go", "env", "GOPATH")
-	if err != nil {
+	// Now we add the packages that we want to test to the context, this will
+	// install the imports used by those packages (mocking them as approprite).
+
+	if err := ctxt.AddPackage("."); err != nil {
 		return err
-	}
-
-	pkgName, err := lib.GetOutput("go", "list", ".")
-	if err != nil {
-		return err
-	}
-
-	// Now we need to sort out some temporary directories to work with
-
-	tmpDir, err := ioutil.TempDir("", "withmock")
-	if err != nil {
-		return err
-	}
-	if *work {
-		fmt.Fprintf(os.Stderr, "WORK=%s\n", tmpDir)
-	} else {
-		defer os.RemoveAll(tmpDir)
-	}
-
-	tmpPath := filepath.Join(tmpDir, "path")
-
-	// Now we need to figure out which packages (outside of the standard
-	// library) the code we are trying to test is using (and if we want the mock
-	// version or not).
-
-	rootImports, err := lib.GetRootImports(goRoot)
-	if err != nil {
-		return err
-	}
-
-	imports, err := lib.GetImports(".", true)
-	if err != nil {
-		return err
-	}
-
-	// Now we create a new GOPATH that contains all the packages that are
-	// imported by the code we are interested in (generating mocks if
-	// appropriate)
-
-	needsInstall := []string{}
-	standardMocks := make(map[string]string)
-
-	processed := make(map[string]bool)
-	complete := false
-
-	for !complete {
-		complete = true
-		for name, mock := range imports {
-			if processed[name] {
-				continue
-			}
-			complete = false
-
-			processed[name] = true
-
-			if rootImports[name] {
-				// Ignore standard packages unless mocked
-				if mock {
-					mockName, err := lib.MockStandard(goRoot, tmpPath, name)
-					if err != nil {
-						return err
-					}
-					standardMocks[name] = mockName
-					needsInstall = append(needsInstall, mockName)
-				}
-				continue
-			}
-
-			needsInstall = append(needsInstall, name)
-
-			mkpkg := lib.LinkPkg
-			if mock {
-				mkpkg = lib.GenMockPkg
-			}
-
-			// Process the package and get it's imports
-			pkgImports, err := mkpkg(goPath, tmpPath, name)
-			if err != nil {
-				return err
-			}
-
-			// Update imports from the package we just processed
-			for name, mock := range pkgImports {
-				imports[name] = imports[name] || mock
-			}
-		}
 	}
 
 	// Add in the gocov library, so that we can run with gocov if we want.
 
 	if flag.Arg(0) == "gocov" || *gocov {
-		_, err = lib.LinkPkg(goPath, tmpPath, "github.com/axw/gocov")
-		if err != nil {
+		if err := ctxt.LinkPkg("github.com/axw/gocov"); err != nil {
 			return err
 		}
 	}
 
-	// Add the actual code that we are interested in to the GOPATH too.
+	// Finally we can run the command inside the context
 
-	codeDest := filepath.Join(tmpPath, "src", pkgName)
-	codeSrc, err := filepath.Abs(".")
-	if err != nil {
-		return err
-	}
-	err = lib.MockImports(codeSrc, codeDest, standardMocks)
-	if err != nil {
-		return err
-	}
-
-	// Update the environment to use our new GOPATH, and cd into the appropriate
-	// path for the code of interest.
-
-	err = os.Setenv("GOPATH", tmpPath)
-	if err != nil {
-		return err
-	}
-	err = os.Chdir(codeDest)
-	if err != nil {
-		return err
-	}
-
-	// Wrap stdout and stderr with rewriters, to put the paths back to real
-	// code, not our symlinks.
-
-	stdout := lib.NewRewriter(os.Stdout, codeDest, codeSrc)
-	defer stdout.Close()
-	stderr := lib.NewRewriter(os.Stderr, codeDest, codeSrc)
-	defer stderr.Close()
-
-	// Now we install our generated mock code packages
-
-	for _, name := range needsInstall {
-		cmd := exec.Command("go", "install", name)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
-				name, err, out)
-		}
-	}
-
-	// Finally we are ready to run the given command ...
-
-	cmd := exec.Command(flag.Arg(0), flag.Args()[1:]...)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	return cmd.Run()
+	return ctxt.Run(flag.Arg(0), flag.Args()[1:]...)
 }

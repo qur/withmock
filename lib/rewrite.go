@@ -10,25 +10,32 @@ import (
 )
 
 type rewriter struct {
-	w       io.Writer
-	buf     *bytes.Buffer
-	match   []byte
-	replace []byte
+	w        io.Writer
+	buf      *bytes.Buffer
+	rewrites []rw
 }
 
-func NewRewriter(w io.Writer, old, new string) *rewriter {
+type rw struct {
+	match, replace []byte
+}
+
+func NewRewriter(w io.Writer) *rewriter {
 	return &rewriter{
 		w:       w,
 		buf:     &bytes.Buffer{},
-		match:   []byte(old),
-		replace: []byte(new),
 	}
+}
+
+func (r *rewriter) Rewrite(src, dst string) {
+	r.rewrites = append(r.rewrites, rw{[]byte(src), []byte(dst)})
 }
 
 func (r *rewriter) flushLines() error {
 	line, err := r.buf.ReadBytes('\n')
 	for err == nil {
-		line = bytes.Replace(line, r.match, r.replace, -1)
+		for _, rw := range r.rewrites {
+			line = bytes.Replace(line, rw.match, rw.replace, -1)
+		}
 
 		_, err = r.w.Write(line)
 		if err != nil {
@@ -52,7 +59,10 @@ func (r *rewriter) flushLines() error {
 }
 
 func (r *rewriter) flush() error {
-	line := bytes.Replace(r.buf.Bytes(), r.match, r.replace, -1)
+	line := r.buf.Bytes()
+	for _, rw := range r.rewrites {
+		line = bytes.Replace(line, rw.match, rw.replace, -1)
+	}
 
 	_, err := r.w.Write(line)
 	if err != nil {
