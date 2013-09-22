@@ -17,7 +17,8 @@ import (
 
 var (
 	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
-	gocov = flag.Bool("gocov", false, "install gocov package into temporary GOPATH")
+	gocov = flag.Bool("gocov", false, "run tests using gocov instead of go")
+	verbose = flag.Bool("v", false, "add '-v' to the command run, so the tests are run in verbose mode")
 )
 
 func usage() {
@@ -84,7 +85,11 @@ func doit() error {
 
 	// Start building the command string that we will run
 
+	command := "go"
 	args = []string{"test"}
+	if *verbose {
+		args = append(args, "-v")
+	}
 
 	// Now we add the packages that we want to test to the context, this will
 	// install the imports used by those packages (mocking them as approprite).
@@ -99,13 +104,14 @@ func doit() error {
 
 	// Add in the gocov library, so that we can run with gocov if we want.
 
-	if flag.Arg(0) == "gocov" || *gocov {
+	if *gocov {
 		if err := ctxt.LinkPkg("github.com/axw/gocov"); err != nil {
 			return err
 		}
+		command = "gocov"
 	}
 
 	// Finally we can run the command inside the context
 
-	return ctxt.Run("go", args...)
+	return ctxt.Run(command, args...)
 }
