@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
 	gocov = flag.Bool("gocov", false, "install gocov package into temporary GOPATH")
 )
 
@@ -64,10 +65,20 @@ func doit() error {
 	}
 	defer ctxt.Close()
 
-	// Now we add the packages that we want to test to the context, this will
-	// install the imports used by those packages (mocking them as approprite).
+	if *work {
+		ctxt.KeepWork()
+	}
 
-	if err := ctxt.AddPackage("."); err != nil {
+	// Now we add the package that we want to test to the context, this will
+	// install the imports used by that package (mocking them as approprite).
+
+	pkg, err := lib.GetOutput("go", "list", ".")
+	if err != nil {
+		return err
+	}
+
+	testPkg, err := ctxt.AddPackage(pkg)
+	if err != nil {
 		return err
 	}
 
@@ -79,7 +90,12 @@ func doit() error {
 		}
 	}
 
-	// Finally we can run the command inside the context
+	// Finally we can chdir into the test code, and run the command inside the
+	// context
+
+	if err := ctxt.Chdir(testPkg); err != nil {
+		return err
+	}
 
 	return ctxt.Run(flag.Arg(0), flag.Args()[1:]...)
 }

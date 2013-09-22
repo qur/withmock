@@ -127,8 +127,13 @@ func (c *Context) activate() error {
 		return err
 	}
 
-	// TODO: How do we know where to go?
-	if err := os.Chdir(c.code[0].dst); err != nil {
+	return nil
+}
+
+func (c *Context) Chdir(pkg string) error {
+	path := filepath.Join(c.tmpPath, "src", pkg)
+
+	if err := os.Chdir(path); err != nil {
 		return err
 	}
 
