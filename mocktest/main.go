@@ -22,10 +22,10 @@ var (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [options] <command> [arguments]*\n",
+	fmt.Fprintf(os.Stderr, "usage: %s [options] [package spec]*\n",
 		os.Args[0])
-	fmt.Fprintf(os.Stderr, "\nRun the specified command in an environment "+
-		"where imports of the package in the current directory which are "+
+	fmt.Fprintf(os.Stderr, "\nRun 'go test' on the specified packages in an "+
+		"environment where imports of the specified packages which are "+
 		"marked for mocking are replacement by automatically generated mock "+
 		"versions for use with gomock.\n\n")
 	fmt.Fprintf(os.Stderr, "options:\n\n")
