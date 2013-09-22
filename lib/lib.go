@@ -65,45 +65,46 @@ func GetImports(path string, tests bool) (map[string]bool, error) {
 	return imports, nil
 }
 
-func GetRootImports(path string) (map[string]bool, error) {
+func getStdlibImports(path string) (map[string]bool, error) {
 	imports := make(map[string]bool)
 
-	goOs, err := GetOutput("go", "env", "GOOS")
+	list, err := GetOutput("go", "list", "std")
 	if err != nil {
 		return nil, err
 	}
 
-	goArch, err := GetOutput("go", "env", "GOARCH")
-	if err != nil {
-		return nil, err
+	for _, line := range strings.Split(list, "\n") {
+		imports[strings.TrimSpace(line)] = true
 	}
-
-	root := filepath.Join(path, "pkg", goOs + "_" + goArch)
 
 	// Add in some "magic" packages that we want to ignore
 	imports["C"] = true
-	imports["unsafe"] = true
-
-	fn := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() || !strings.HasSuffix(path, ".a") {
-			return nil
-		}
-
-		imports[path[len(root)+1:len(path)-2]] = true
-
-		return nil
-	}
-
-	err = filepath.Walk(root, fn)
-	if err != nil {
-		return nil, err
-	}
 
 	return imports, nil
+}
+
+// Import "marks":
+//
+//  _ : mock
+//  + : normal (no mark actually applied)
+//  @ : test
+type mark string
+const (
+	noMark mark = ""
+	normalMark mark = "+"
+	mockMark mark = "_"
+	testMark mark = "@"
+)
+
+func markImport(name string, m mark) string {
+	switch m {
+	case noMark, normalMark:
+		return name
+	case mockMark, testMark:
+		return string(m) + name[1:]
+	default:
+		panic(fmt.Sprintf("Unknown import mark: %s", m))
+	}
 }
 
 func GenMockPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
@@ -122,7 +123,7 @@ func GenMockPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
 
 	// Write a mock version of the package
 	src := filepath.Join(srcRoot, "src", name)
-	dst := filepath.Join(dstRoot, "src", name)
+	dst := filepath.Join(dstRoot, "src", markImport(name, mockMark))
 	err := os.MkdirAll(dst, 0700)
 	if err != nil {
 		return nil, err
@@ -133,7 +134,7 @@ func GenMockPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
 	}
 
 	// Extract the imports from the package source
-	imports, err := GetImports(src, false)
+	imports, err := GetImports(dst, false)
 	if err != nil {
 		return nil, err
 	}
@@ -142,64 +143,21 @@ func GenMockPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
 	return imports, nil
 }
 
-const (
-    maxNum   = 3656158440062976
-	alphabet = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-)
-
-func base36(n int) string {
-    chars := []byte(alphabet)
-    res := []byte("_________a")
-    for i := 9; i >= 0 && n > 0; i-- {
-        res[i] = chars[n%36]
-        n /= 36
-    }
-    return string(res)
-}
-
-func makeName(n, l int) string {
-	// We want the name to always start with '_'
-	if l == 1 {
-		panic("We can't generate a mockName of length 1.")
-	}
-	l--
-
-	base := base36(n)
-	if l < len(base) {
-		base = base[len(base)-l:len(base)]
-	} else {
-		for len(base) < l {
-			base = "_" + base
-		}
-	}
-
-	return "_" + base
-}
-
-var mockNames = make(map[string]bool)
-
-func MockStandard(srcRoot, dstRoot, name string) (string, error) {
-	// Figure out a new name of the same length
-	count, newName := 0, makeName(0, len(name))
-	for mockNames[newName] {
-		count++
-		newName = makeName(count, len(name))
-	}
-
+func MockStandard(srcRoot, dstRoot, name string) error {
 	// Write a mock version of the package
 	src := filepath.Join(srcRoot, "src/pkg", name)
-	dst := filepath.Join(dstRoot, "src", newName)
+	dst := filepath.Join(dstRoot, "src", markImport(name, mockMark))
 	err := os.MkdirAll(dst, 0700)
 	if err != nil {
-		return "", err
+		return err
 	}
 	err = MakeMock(src, dst)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	// Done
-	return newName, nil
+	return nil
 }
 
 func LinkPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
@@ -245,7 +203,7 @@ func exists(path string) bool {
 	panic(err)
 }
 
-func MockImports(src, dst string, mock map[string]string) error {
+func MockImports(src, dst string, names map[string]string) error {
 	fn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -271,7 +229,7 @@ func MockImports(src, dst string, mock map[string]string) error {
 		if !strings.HasSuffix(path, ".go") {
 			return os.Symlink(path, target)
 		} else {
-			return mockFileImports(path, target, mock)
+			return mockFileImports(path, target, names)
 		}
 	}
 

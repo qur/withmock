@@ -1,16 +1,11 @@
 package lib
 
 import (
-	"flag"
 	"io/ioutil"
 	"fmt"
 	"os"
 	"path/filepath"
 	"os/exec"
-)
-
-var (
-	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
 )
 
 type Context struct {
@@ -23,11 +18,11 @@ type Context struct {
 	tmpDir string
 	removeTmp bool
 
-	rootImports map[string]bool
+	stdlibImports map[string]bool
 	imports []string
 
-	needsInstall []string
-	standardMocks map[string]string
+	processed map[string]bool
+	importRewrites map[string]string
 
 	code []codeLoc
 }
@@ -49,7 +44,7 @@ func NewContext() (*Context, error) {
 		return nil, err
 	}
 
-	rootImports, err := GetRootImports(goRoot)
+	stdlibImports, err := getStdlibImports(goRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -60,9 +55,6 @@ func NewContext() (*Context, error) {
 	if err != nil {
 		return nil, err
 	}
-	if *work {
-		fmt.Fprintf(os.Stderr, "WORK=%s\n", tmpDir)
-	}
 
 	// Build and return the context
 
@@ -72,11 +64,18 @@ func NewContext() (*Context, error) {
 		origPath: os.Getenv("GOPATH"),
 		tmpPath: filepath.Join(tmpDir, "path"),
 		tmpDir: tmpDir,
-		rootImports: rootImports,
-		removeTmp: !*work,
-		needsInstall: []string{},
-		standardMocks: make(map[string]string),
+		stdlibImports: stdlibImports,
+		removeTmp: true,
+		processed: make(map[string]bool),
+		importRewrites: make(map[string]string),
 	}, nil
+}
+
+func (c *Context) KeepWork() {
+	if c.removeTmp {
+		fmt.Fprintf(os.Stderr, "WORK=%s\n", c.tmpDir)
+		c.removeTmp = false
+	}
 }
 
 func (c *Context) Close() error {
@@ -102,7 +101,12 @@ func (c *Context) setGOPATH() error {
 }
 
 func (c *Context) installPackages() error {
-	for _, name := range c.needsInstall {
+	for name := range c.processed {
+		if c.stdlibImports[name] {
+			// stdlib imports don't need installing
+			continue
+		}
+
 		cmd := exec.Command("go", "install", name)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -131,43 +135,40 @@ func (c *Context) activate() error {
 	return nil
 }
 
-func (c *Context) installImports(path string) error {
-	imports, err := GetImports(path, true)
-	if err != nil {
-		return err
-	}
-
+func (c *Context) installImports(imports map[string]bool) (map[string]string, error) {
 	// Now we create a new GOPATH that contains all the packages that are
 	// imported by the code we are interested in (generating mocks if
 	// appropriate)
 
-	processed := make(map[string]bool)
+	names := make(map[string]string)
 	complete := false
 
 	for !complete {
 		complete = true
 		for name, mock := range imports {
-			if processed[name] {
+			label := markImport(name, normalMark)
+			if mock {
+				label = markImport(name, mockMark)
+			}
+			names[name] = label
+
+			if c.processed[label] {
 				continue
 			}
 			complete = false
 
-			processed[name] = true
+			c.processed[label] = true
 
-			if c.rootImports[name] {
+			if c.stdlibImports[name] {
 				// Ignore standard packages unless mocked
 				if mock {
-					mockName, err := MockStandard(c.goRoot, c.tmpPath, name)
+					err := MockStandard(c.goRoot, c.tmpPath, name)
 					if err != nil {
-						return err
+						return nil, err
 					}
-					c.standardMocks[name] = mockName
-					c.needsInstall = append(c.needsInstall, mockName)
 				}
 				continue
 			}
-
-			c.needsInstall = append(c.needsInstall, name)
 
 			mkpkg := LinkPkg
 			if mock {
@@ -177,17 +178,28 @@ func (c *Context) installImports(path string) error {
 			// Process the package and get it's imports
 			pkgImports, err := mkpkg(c.goPath, c.tmpPath, name)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
-			// Update imports from the package we just processed
-			for name, mock := range pkgImports {
-				imports[name] = imports[name] || mock
+			// Update imports from the package we just processed, but it can
+			// only add actual packages, not mocks
+			for name, _ := range pkgImports {
+				imports[name] = imports[name] || false
 			}
 		}
 	}
 
-	return nil
+	// remove nop rewites from the names map, and add real ones to
+	// c.importRewrites so they get added to the output rewrite rules.
+	for orig, marked := range names {
+		if orig == marked {
+			delete(names, orig)
+			continue
+		}
+		c.importRewrites[marked] = orig
+	}
+
+	return names, nil
 }
 
 func (c *Context) LinkPkg(pkg string) error {
@@ -195,30 +207,39 @@ func (c *Context) LinkPkg(pkg string) error {
 	return err
 }
 
-func (c *Context) AddPackage(path string) error {
-	if err := c.installImports(path); err != nil {
-		return err
-	}
-
-	pkgName, err := GetOutput("go", "list", path)
+func (c *Context) AddPackage(pkgName string) (string, error) {
+	path, err := GetOutput("go", "list", "-f", "{{.Dir}}", pkgName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	codeDest := filepath.Join(c.tmpPath, "src", pkgName)
+	imports, err := GetImports(path, true)
+	if err != nil {
+		return "", err
+	}
+
+	importNames, err := c.installImports(imports)
+	if err != nil {
+		return "", err
+	}
+
+	newName := markImport(pkgName, testMark)
+	c.importRewrites[newName] = pkgName
+
+	codeDest := filepath.Join(c.tmpPath, "src", newName)
 	codeSrc, err := filepath.Abs(path)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	err = MockImports(codeSrc, codeDest, c.standardMocks)
+	err = MockImports(codeSrc, codeDest, importNames)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	c.code = append(c.code, codeLoc{codeSrc, codeDest})
 
-	return nil
+	return newName, nil
 }
 
 func (c *Context) Run(command string, args ...string) error {
@@ -240,6 +261,11 @@ func (c *Context) Run(command string, args ...string) error {
 	for _, loc := range c.code {
 		stdout.Rewrite(loc.dst, loc.src)
 		stderr.Rewrite(loc.dst, loc.src)
+	}
+
+	for marked, orig := range c.importRewrites {
+		stdout.Rewrite(marked, orig)
+		stderr.Rewrite(marked, orig)
 	}
 
 	// Then run the given command
