@@ -68,8 +68,17 @@ func doit() error {
 			return err
 		}
 		for _, pkg := range strings.Split(list, "\n") {
-			pkgs = append(pkgs, strings.TrimSpace(pkg))
+			pkg = strings.TrimSpace(pkg)
+			if len(pkg) == 0 {
+				continue
+			}
+			pkgs = append(pkgs, pkg)
 		}
+	}
+
+	if len(pkgs) == 0 {
+		fmt.Printf("no packages to test\n")
+		os.Exit(1)
 	}
 
 	// First we need to create a context
