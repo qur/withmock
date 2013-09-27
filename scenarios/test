@@ -1,0 +1,19 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+ret=0
+
+for f in */test; do
+    d=$(dirname "$f")
+    echo -n "${d}: "
+    (cd $d; ./test) >> test.log 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\e[31;1mFAIL\e[0m"
+        ret=1
+    else
+        echo -e "\e[32;1mPASS\e[0m"
+    fi
+done
+
+exit $ret
