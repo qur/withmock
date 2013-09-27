@@ -96,7 +96,7 @@ func (c *Context) setGOPATH() error {
 	if err := os.Setenv("GOPATH", c.tmpPath); err != nil {
 		return err
 	}
-    if err := os.Setenv("REAL_GOPATH", c.origPath); err != nil {
+    if err := os.Setenv("ORIG_GOPATH", c.origPath); err != nil {
 		return err
 	}
 
