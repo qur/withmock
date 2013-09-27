@@ -1,0 +1,3 @@
+#!/bin/bash
+
+exec mocktest -P test.pkgs "$@"
