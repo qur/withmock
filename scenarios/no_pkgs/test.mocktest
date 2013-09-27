@@ -1,0 +1,12 @@
+#!/bin/bash
+
+out=$(mocktest "$@" ./...)
+ret=$?
+
+if [ $ret -eq 0 ]; then
+    exit 1
+fi
+
+if [ "$out" != "no packages to test" ]; then
+    exit 1
+fi
