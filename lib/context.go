@@ -207,13 +207,13 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 	return names, nil
 }
 
-func (c *Context) LinkPkg(pkg string) error {
+func (c *Context) LinkPackage(pkg string) error {
 	_, err := LinkPkg(c.goPath, c.tmpPath, pkg)
 	return err
 }
 
 func (c *Context) AddPackage(pkgName string) (string, error) {
-	path, err := GetOutput("go", "list", "-f", "{{.Dir}}", pkgName)
+	path, err := GetOutput("go", "list", "-e", "-f", "{{.Dir}}", pkgName)
 	if err != nil {
 		return "", err
 	}
@@ -245,6 +245,21 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 	c.code = append(c.code, codeLoc{codeSrc, codeDest})
 
 	return newName, nil
+}
+
+func (c *Context) LinkPackagesFromFile(path string) error {
+	pkgs, err := readPackages(path)
+	if err != nil {
+		return err
+	}
+
+	for _, pkg := range pkgs {
+		if err := c.LinkPackage(pkg); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *Context) Run(command string, args ...string) error {

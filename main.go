@@ -17,6 +17,7 @@ import (
 var (
 	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
 	gocov = flag.Bool("gocov", false, "install gocov package into temporary GOPATH")
+	pkgFile = flag.String("P", "", "install extra packages listed in the given file")
 )
 
 func usage() {
@@ -82,10 +83,17 @@ func doit() error {
 		return err
 	}
 
+	// Add extra packages if configured
+	if *pkgFile != "" {
+		if err := ctxt.LinkPackagesFromFile(*pkgFile); err != nil {
+			return err
+		}
+	}
+
 	// Add in the gocov library, so that we can run with gocov if we want.
 
 	if flag.Arg(0) == "gocov" || *gocov {
-		if err := ctxt.LinkPkg("github.com/axw/gocov"); err != nil {
+		if err := ctxt.LinkPackage("github.com/axw/gocov"); err != nil {
 			return err
 		}
 	}
