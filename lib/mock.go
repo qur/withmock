@@ -443,10 +443,6 @@ func mockFile(out io.Writer, srcPath string, f *ast.File, recorders map[string]s
 					if len(s.Names) != 1 {
 						return fmt.Errorf("Multiple names for a constant not implemented")
 					}
-					if !s.Names[0].IsExported() {
-						// Don't care about private constants
-						continue
-					}
 					fmt.Fprintf(out, "\t%s", s.Names[0])
 					if s.Type != nil {
 						fmt.Fprintf(out, " %s", s.Type)
