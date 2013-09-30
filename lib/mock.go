@@ -337,13 +337,16 @@ func getPackageName(impPath, srcPath string) (string, error) {
 }
 
 func mockFile(out io.Writer, srcPath string, f *ast.File, recorders map[string]string) (err error) {
-	if f.Doc != nil && f.Doc.Text() != "" {
-		fmt.Fprintf(out, "/*\n%s*/\n\n", f.Doc.Text())
-	}
 	if len(f.Comments) > 0 {
 		c := f.Comments[0].Text()
 		if strings.HasPrefix(c, "+build") {
-			fmt.Fprintf(out, "// %s\n", c)
+			fmt.Fprintf(out, "// %s\n\n", c)
+		}
+	}
+
+	if f.Doc != nil {
+		for _, cmt := range f.Doc.List {
+			fmt.Fprintf(out, "%s\n", cmt.Text)
 		}
 	}
 
