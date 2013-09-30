@@ -1,10 +1,12 @@
 package lib
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -48,9 +50,24 @@ func process(filename, goPath string) error {
 	}
 
 	recorders := make(map[string]string)
+	data := &bytes.Buffer{}
 
 	dir := filepath.Dir(filename)
-	return mockFile(ioutil.Discard, dir, file, recorders)
+	if err := mockFile(data, dir, file, recorders); err != nil {
+		return err
+	}
+
+	if _, err = parser.ParseFile(fset, "-", data, 0); err != nil {
+		name := "_" + strings.Replace(filename, "/", "_", -1)
+		f, err2 := os.Create(name)
+		if err2 == nil {
+			defer f.Close()
+			io.Copy(f, data)
+		}
+		return err
+	}
+
+	return nil
 }
 
 func TestMockFile(t *testing.T) {
