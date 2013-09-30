@@ -129,7 +129,7 @@ func exprString(exp ast.Expr) string {
 		return "(" + exprString(v.X) + ")"
 	case *ast.FuncLit:
 		// TODO: ...
-		return exprString(v.Type) + "{ !TODO! }"
+		return exprString(v.Type) + "{ panic(\"!TODO!\") }"
 	case *ast.StarExpr:
 		return "*" + exprString(v.X)
 	case *ast.SelectorExpr:
