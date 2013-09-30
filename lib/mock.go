@@ -114,11 +114,11 @@ func exprString(exp ast.Expr) string {
 		}
 	case *ast.ChanType:
 		s := ""
-		if v.Dir&ast.SEND != 0 {
+		if v.Dir == ast.RECV {
 			s += "<-"
 		}
 		s += "chan"
-		if v.Dir&ast.RECV != 0 {
+		if v.Dir == ast.SEND {
 			s += "<-"
 		}
 		s += " " + exprString(v.Value)
