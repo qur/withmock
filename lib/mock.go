@@ -424,7 +424,7 @@ func mockFile(out io.Writer, srcPath string, f *ast.File, recorders map[string]s
 					}
 					fmt.Fprintf(out, "\t" + strings.Join(names, ", "))
 					if s.Type != nil {
-						fmt.Fprintf(out, " %s", s.Type)
+						fmt.Fprintf(out, " %s", exprString(s.Type))
 					}
 					switch len(s.Values) {
 					case 0:
