@@ -143,29 +143,63 @@ func (c *Context) Chdir(pkg string) error {
 	return nil
 }
 
-func (c *Context) installImports(imports map[string]bool) (map[string]string, error) {
-	// Now we create a new GOPATH that contains all the packages that are
-	// imported by the code we are interested in (generating mocks if
-	// appropriate)
-
+func (c *Context) wantToProcess(mockAllowed bool, imports map[string]bool) map[string]string {
 	names := make(map[string]string)
+
+	for name, mock := range imports {
+		label := markImport(name, normalMark)
+		if mock && mockAllowed {
+			label = markImport(name, mockMark)
+		}
+		names[name] = label
+
+		c.processed[label] = c.processed[label] || false
+	}
+
+	// remove nop rewites from the names map, and add real ones to
+	// c.importRewrites so they get added to the output rewrite rules.
+	for orig, marked := range names {
+		if orig == marked {
+			delete(names, orig)
+			continue
+		}
+		c.importRewrites[marked] = orig
+	}
+
+	return names
+}
+
+func (c *Context) installImports(imports map[string]bool) (map[string]string, error) {
+	// Start by updating processed to include anything in imports we haven't
+	// seen before, this also gives us the name rewrite map we need to return
+
+	names := c.wantToProcess(true, imports)
+
+	// Now we update our GOPATH until it inclues all of the packages needed to
+	// satisfy the dependency chain created by adding imports to the list of
+	// packages that need to be installed.  This has to take into account the
+	// potential desire to have the plain, mocked and test versions of the same
+	// package in GOPATH at the same time ...
+
 	complete := false
 
 	for !complete {
 		complete = true
-		for name, mock := range imports {
-			label := markImport(name, normalMark)
-			if mock {
-				label = markImport(name, mockMark)
-			}
-			names[name] = label
-
-			if c.processed[label] {
+		for label, done := range c.processed {
+			if done {
 				continue
 			}
-			complete = false
 
+			complete = false
 			c.processed[label] = true
+
+			name := label
+			mock := false
+
+			if n, found := c.importRewrites[label]; found {
+				name = n
+				mock = true
+			}
 
 			if c.stdlibImports[name] {
 				// Ignore standard packages unless mocked
@@ -191,20 +225,8 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 
 			// Update imports from the package we just processed, but it can
 			// only add actual packages, not mocks
-			for name, _ := range pkgImports {
-				imports[name] = imports[name] || false
-			}
+			c.wantToProcess(false, pkgImports)
 		}
-	}
-
-	// remove nop rewites from the names map, and add real ones to
-	// c.importRewrites so they get added to the output rewrite rules.
-	for orig, marked := range names {
-		if orig == marked {
-			delete(names, orig)
-			continue
-		}
-		c.importRewrites[marked] = orig
 	}
 
 	return names, nil
