@@ -1,0 +1,21 @@
+#!/bin/bash
+
+./scenarios/test
+ret=$?
+
+echo
+
+echo -e "\e[33;1mgo test\e[0m"
+echo -e "======="
+for path in lib; do
+    echo -n "$path: "
+    go test -v ./$path 2>&1 > $path/test.log
+    if [ $? -ne 0 ]; then
+        echo -e "\e[31;1mFAIL\e[0m"
+        ret=1
+    else
+        echo -e "\e[32;1mPASS\e[0m"
+    fi
+done
+
+exit $ret
