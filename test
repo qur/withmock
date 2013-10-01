@@ -1,7 +1,33 @@
 #!/bin/bash
 
+go install github.com/qur/withmock
+go install github.com/qur/withmock/mocktest
+
 ./scenarios/test
 ret=$?
+
+echo
+
+echo -e "\e[33;1mexample\e[0m"
+echo -e "======="
+echo -n "withmock: "
+echo "=== withmock ===" > example/test.log
+(cd example && ./test) >> example/test.log 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\e[31;1mFAIL\e[0m"
+    ret=1
+else
+    echo -e "\e[32;1mPASS\e[0m"
+fi
+echo -n "mocktest: "
+echo "=== mocktest ===" >> example/test.log
+mocktest ./example >> example/test.log 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\e[31;1mFAIL\e[0m"
+    ret=1
+else
+    echo -e "\e[32;1mPASS\e[0m"
+fi
 
 echo
 
