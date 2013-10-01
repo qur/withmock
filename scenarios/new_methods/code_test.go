@@ -18,6 +18,7 @@ func TestShow(t *testing.T) {
 	bar := lib.MOCK().Newbar()
 
 	lib.EXPECT().NewFoo().Return(foo)
+	lib.EXPECT().NewBar().Return(bar)
 
 	foo.EXPECT().Wibble().Return(nil)
 	bar.EXPECT().Wibble()
