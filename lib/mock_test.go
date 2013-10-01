@@ -36,6 +36,24 @@ func stubImports(goPath string, file *ast.File) error {
 	return nil
 }
 
+func tryLiterals(types map[string]ast.Expr) (err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			err = fmt.Errorf("%s", p)
+		}
+	}()
+
+	for name := range types {
+		if _, ok := types[name].(*ast.InterfaceType); ok {
+			// We don't want to generate literals for interfaces
+			continue
+		}
+		literal(name, types)
+	}
+
+	return nil
+}
+
 func process(filename, goPath string) error {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
@@ -49,11 +67,12 @@ func process(filename, goPath string) error {
 		return err
 	}
 
+	types := make(map[string]ast.Expr)
 	recorders := make(map[string]string)
 	data := &bytes.Buffer{}
 
 	dir := filepath.Dir(filename)
-	if err := mockFile(data, dir, file, recorders); err != nil {
+	if err := mockFile(data, dir, file, types, recorders); err != nil {
 		return err
 	}
 
@@ -67,7 +86,7 @@ func process(filename, goPath string) error {
 		return err
 	}
 
-	return nil
+	return tryLiterals(types)
 }
 
 func TestMockFile(t *testing.T) {
@@ -76,6 +95,8 @@ func TestMockFile(t *testing.T) {
 		t.Fatalf("Failed to create temp directory: %s", err)
 	}
 	os.RemoveAll(tmpDir)
+
+	files := []string{}
 
 	fn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -93,10 +114,7 @@ func TestMockFile(t *testing.T) {
 			return nil
 		}
 
-		t.Logf("PROCESS: %s", path)
-		if err := process(path, tmpDir); err != nil {
-			t.Errorf("!!! FAILED !!!: %s", err)
-		}
+		files = append(files, path)
 
 		return nil
 	}
@@ -119,6 +137,13 @@ func TestMockFile(t *testing.T) {
 	// Now use walk to process the files in src
 	if err := filepath.Walk(src, fn); err != nil {
 		t.Fatalf("Walk returned error: %s", err)
+	}
+
+	for i, path := range files {
+		fmt.Printf("PROCESS (%d/%d): %s\n", i+1, len(files), path)
+		if err := process(path, tmpDir); err != nil {
+			t.Errorf("FAILED (%s):\n\t%s", path, err)
+		}
 	}
 
 	os.Setenv("GOPATH", goPath)

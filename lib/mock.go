@@ -36,6 +36,7 @@ func MakeMock(srcPath, dstPath string) error {
 	}
 
 	for name, pkg := range pkgs {
+		types := make(map[string]ast.Expr)
 		recorders := make(map[string]string)
 
 		for path, file := range pkg.Files {
@@ -47,7 +48,7 @@ func MakeMock(srcPath, dstPath string) error {
 			}
 			defer out.Close()
 
-			err = mockFile(out, srcPath, file, recorders)
+			err = mockFile(out, srcPath, file, types, recorders)
 			if err != nil {
 				return err
 			}
@@ -66,7 +67,7 @@ func MakeMock(srcPath, dstPath string) error {
 		}
 		defer out.Close()
 
-		err = mockPkg(out, name, recorders)
+		err = mockPkg(out, name, types, recorders)
 		if err != nil {
 			return err
 		}
@@ -78,6 +79,51 @@ func MakeMock(srcPath, dstPath string) error {
 	}
 
 	return nil
+}
+
+func literal(name string, types map[string]ast.Expr) string {
+	exp := types[name]
+	switch v := exp.(type) {
+	case *ast.BasicLit:
+		return v.Value
+	case *ast.CompositeLit:
+		s := exprString(v.Type) + "{"
+		for i := range v.Elts {
+			if i > 0 {
+				s += ", "
+			}
+			s += exprString(v.Elts[i])
+		}
+		s += "}"
+		return s
+	case *ast.StructType, *ast.ArrayType:
+		return name + "{}"
+	case *ast.MapType, *ast.ChanType:
+		return "make(" + name + ")"
+	case *ast.Ident:
+		alias := v.String()
+		if _, ok := types[alias]; ok && alias != name {
+			return literal(alias, types)
+		}
+		switch alias {
+		case "int", "int8", "int16", "int32", "int64":
+			fallthrough
+		case "uint", "uint8", "uint16", "uint32", "uint64":
+			fallthrough
+		case "rune", "byte", "uintptr", "float32", "float64":
+			return name + "(0)"
+		case "string":
+			return name + "(\"\")"
+		case "bool":
+			return "false"
+		default:
+			panic(fmt.Sprintf("Can't convert %s:(%v)%T to string in literal",
+				name, exp, exp))
+		}
+	default:
+		panic(fmt.Sprintf("Can't convert %s:(%v)%T to string in literal",
+			name, exp, exp))
+	}
 }
 
 func exprString(exp ast.Expr) string {
@@ -253,7 +299,7 @@ func fixup(filename string) error {
 	return nil
 }
 
-func mockPkg(out io.Writer, name string, recorders map[string]string) (err error) {
+func mockPkg(out io.Writer, name string, types map[string]ast.Expr, recorders map[string]string) (err error) {
 	fmt.Fprintf(out, "package %s\n\n", name)
 
 	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
@@ -285,6 +331,18 @@ func mockPkg(out io.Writer, name string, recorders map[string]string) (err error
 		if _, found := recorders[base[1:]]; base[0] == '*' && found {
 			// If pointer and non-pointer receiver, just use the non-pointer
 			continue
+		}
+		name := base
+		mod := ""
+		if base[0] == '*' {
+			name = base[1:]
+			mod = "&"
+		}
+		if _, ok := types[name].(*ast.InterfaceType); !ok {
+			fmt.Fprintf(out, "func (_ *_meta) New%s() %s {\n", name, base)
+			fmt.Fprintf(out, "\tval := %s\n", literal(name, types))
+			fmt.Fprintf(out, "\treturn %sval\n", mod)
+			fmt.Fprintf(out, "}\n\n")
 		}
 		fmt.Fprintf(out, "type %s struct {\n", rec)
 		fmt.Fprintf(out, "\tmock %s\n", base)
@@ -336,7 +394,7 @@ func getPackageName(impPath, srcPath string) (string, error) {
 	return name, nil
 }
 
-func mockFile(out io.Writer, srcPath string, f *ast.File, recorders map[string]string) (err error) {
+func mockFile(out io.Writer, srcPath string, f *ast.File, types map[string]ast.Expr, recorders map[string]string) (err error) {
 	if len(f.Comments) > 0 {
 		c := f.Comments[0].Text()
 		if strings.HasPrefix(c, "+build") {
@@ -403,11 +461,13 @@ func mockFile(out io.Writer, srcPath string, f *ast.File, recorders map[string]s
 				if len(d.Specs) == 1 {
 					t := d.Specs[0].(*ast.TypeSpec)
 					fmt.Fprintf(out, "type %s %s\n\n", t.Name, exprString(t.Type))
+					types[t.Name.String()] = t.Type
 				} else {
 					fmt.Fprintf(out, "type (\n")
 					for i := range d.Specs {
 						t := d.Specs[i].(*ast.TypeSpec)
 						fmt.Fprintf(out, "\t%s %s\n", t.Name, exprString(t.Type))
+						types[t.Name.String()] = t.Type
 					}
 					fmt.Fprintf(out, ")\n\n")
 				}
