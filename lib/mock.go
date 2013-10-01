@@ -81,11 +81,15 @@ func MakeMock(srcPath, dstPath string) error {
 	return nil
 }
 
-func literal(name string, types map[string]ast.Expr) string {
+func literal(name string, types map[string]ast.Expr) (string, bool) {
 	exp := types[name]
 	switch v := exp.(type) {
+	case *ast.SelectorExpr:
+		return exprString(exp), true
+	case *ast.FuncType:
+		return exprString(exp), true
 	case *ast.BasicLit:
-		return v.Value
+		return v.Value, false
 	case *ast.CompositeLit:
 		s := exprString(v.Type) + "{"
 		for i := range v.Elts {
@@ -95,11 +99,11 @@ func literal(name string, types map[string]ast.Expr) string {
 			s += exprString(v.Elts[i])
 		}
 		s += "}"
-		return s
+		return s, false
 	case *ast.StructType, *ast.ArrayType:
-		return name + "{}"
+		return name + "{}", false
 	case *ast.MapType, *ast.ChanType:
-		return "make(" + name + ")"
+		return "make(" + name + ")", false
 	case *ast.Ident:
 		alias := v.String()
 		if _, ok := types[alias]; ok && alias != name {
@@ -111,11 +115,13 @@ func literal(name string, types map[string]ast.Expr) string {
 		case "uint", "uint8", "uint16", "uint32", "uint64":
 			fallthrough
 		case "rune", "byte", "uintptr", "float32", "float64":
-			return name + "(0)"
+			return name + "(0)", false
 		case "string":
-			return name + "(\"\")"
+			return name + "(\"\")", false
 		case "bool":
-			return "false"
+			return "false", false
+		case "complex64", "complex128":
+			return name + "(0+0i)", false
 		default:
 			panic(fmt.Sprintf("Can't convert %s:(%v)%T to string in literal",
 				name, exp, exp))
@@ -338,10 +344,18 @@ func mockPkg(out io.Writer, name string, types map[string]ast.Expr, recorders ma
 			name = base[1:]
 			mod = "&"
 		}
-		if _, ok := types[name].(*ast.InterfaceType); !ok {
-			fmt.Fprintf(out, "func (_ *_meta) New%s() %s {\n", name, base)
-			fmt.Fprintf(out, "\tval := %s\n", literal(name, types))
-			fmt.Fprintf(out, "\treturn %sval\n", mod)
+		_, isInterface := types[name].(*ast.InterfaceType)
+		if !isInterface && !ast.IsExported(name) {
+			lit, cast := literal(name, types)
+			if cast {
+				fmt.Fprintf(out, "func (_ *_meta) New%s(val %s) %s {\n",
+					name, lit, base)
+				fmt.Fprintf(out, "\treturn (%s)(%sval)\n", base, mod)
+			} else {
+				fmt.Fprintf(out, "func (_ *_meta) New%s() %s {\n", name, base)
+				fmt.Fprintf(out, "\tval := %s\n", lit)
+				fmt.Fprintf(out, "\treturn %sval\n", mod)
+			}
 			fmt.Fprintf(out, "}\n\n")
 		}
 		fmt.Fprintf(out, "type %s struct {\n", rec)

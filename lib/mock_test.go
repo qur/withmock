@@ -44,6 +44,10 @@ func tryLiterals(types map[string]ast.Expr) (err error) {
 	}()
 
 	for name := range types {
+		if ast.IsExported(name) {
+			// We don't want to generate literals for exported types
+			continue
+		}
 		if _, ok := types[name].(*ast.InterfaceType); ok {
 			// We don't want to generate literals for interfaces
 			continue
