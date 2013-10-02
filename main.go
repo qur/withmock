@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	raw = flag.Bool("raw", false, "don't rewrite the command output")
 	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
 	gocov = flag.Bool("gocov", false, "install gocov package into temporary GOPATH")
 	pkgFile = flag.String("P", "", "install extra packages listed in the given file")
@@ -68,6 +69,10 @@ func doit() error {
 
 	if *work {
 		ctxt.KeepWork()
+	}
+
+	if *raw {
+		ctxt.DisableRewrite()
 	}
 
 	// Now we add the package that we want to test to the context, this will

@@ -16,6 +16,7 @@ import (
 )
 
 var (
+	raw = flag.Bool("raw", false, "don't rewrite the test output")
 	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
 	gocov = flag.Bool("gocov", false, "run tests using gocov instead of go")
 	verbose = flag.Bool("v", false, "add '-v' to the command run, so the tests are run in verbose mode")
@@ -91,6 +92,10 @@ func doit() error {
 
 	if *work {
 		ctxt.KeepWork()
+	}
+
+	if *raw {
+		ctxt.DisableRewrite()
 	}
 
 	// Start building the command string that we will run

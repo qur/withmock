@@ -24,6 +24,8 @@ type Context struct {
 	processed map[string]bool
 	importRewrites map[string]string
 
+	doRewrite bool
+
 	code []codeLoc
 }
 
@@ -68,6 +70,7 @@ func NewContext() (*Context, error) {
 		removeTmp: true,
 		processed: make(map[string]bool),
 		importRewrites: make(map[string]string),
+		doRewrite: true,
 	}, nil
 }
 
@@ -76,6 +79,10 @@ func (c *Context) KeepWork() {
 		fmt.Fprintf(os.Stderr, "WORK=%s\n", c.tmpDir)
 		c.removeTmp = false
 	}
+}
+
+func (c *Context) DisableRewrite() {
+	c.doRewrite = false
 }
 
 func (c *Context) Close() error {
@@ -295,28 +302,36 @@ func (c *Context) Run(command string, args ...string) error {
 		return err
 	}
 
+	// Create a Command object
+
+	cmd := exec.Command(command, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
 	// Wrap stdout and stderr with rewriters, to put the paths back to real
 	// code, not our symlinks.
 
-	stdout := NewRewriter(os.Stdout)
-	defer stdout.Close()
-	stderr := NewRewriter(os.Stderr)
-	defer stderr.Close()
+	if c.doRewrite {
+		stdout := NewRewriter(os.Stdout)
+		defer stdout.Close()
+		stderr := NewRewriter(os.Stderr)
+		defer stderr.Close()
 
-	for _, loc := range c.code {
-		stdout.Rewrite(loc.dst, loc.src)
-		stderr.Rewrite(loc.dst, loc.src)
-	}
+		for _, loc := range c.code {
+			stdout.Rewrite(loc.dst, loc.src)
+			stderr.Rewrite(loc.dst, loc.src)
+		}
 
-	for marked, orig := range c.importRewrites {
-		stdout.Rewrite(marked, orig)
-		stderr.Rewrite(marked, orig)
+		for marked, orig := range c.importRewrites {
+			stdout.Rewrite(marked, orig)
+			stderr.Rewrite(marked, orig)
+		}
+
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
 	}
 
 	// Then run the given command
 
-	cmd := exec.Command(command, args...)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
 	return cmd.Run()
 }
