@@ -28,6 +28,7 @@ type funcInfo struct {
 		name, expr string
 	}
 	params, results []field
+	body []byte
 }
 
 func (fi *funcInfo) IsMethod() bool {
@@ -50,20 +51,19 @@ func (fi *funcInfo) writeReal(out io.Writer) {
 	fmt.Fprintf(out, ") ")
 	if len(fi.results) > 0 {
 		fmt.Fprintf(out, "(")
-	}
-	for i, result := range fi.results {
-		if i > 0 {
-			fmt.Fprintf(out, ", ")
+		for i, result := range fi.results {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			n := strings.Join(result.names, ", ")
+			fmt.Fprintf(out, "%s %s", n, result.expr)
 		}
-		n := strings.Join(result.names, ", ")
-		fmt.Fprintf(out, "%s %s", n, result.expr)
+		fmt.Fprintf(out, ") ")
 	}
-	if len(fi.results) > 0 {
-		fmt.Fprintf(out, ")")
-	}
-	fmt.Fprintf(out, " {\n")
-	fmt.Fprintf(out, "\tpanic(\"not implemented yet\")\n")
-	fmt.Fprintf(out, "}\n")
+	fmt.Fprintf(out, "{\n\tpanic(\"not yet implemented\")\n}\n")
+	// TODO: this _should_ be how we write the body ...
+	//out.Write(fi.body)
+	//fmt.Fprintf(out, "\n")
 }
 
 func (fi *funcInfo) writeMock(out io.Writer) {
@@ -226,6 +226,7 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 
 type mockGen struct {
 	fset *token.FileSet
+	srcPath string
 	types map[string]ast.Expr
 	recorders map[string]string
 }
@@ -252,11 +253,13 @@ func MakeMock(srcPath, dstPath string) error {
 	for name, pkg := range pkgs {
 		m := &mockGen{
 			fset: fset,
+			srcPath: srcPath,
 			types: make(map[string]ast.Expr),
 			recorders: make(map[string]string),
 		}
 
 		for path, file := range pkg.Files {
+			srcFile := filepath.Join(srcPath, filepath.Base(path))
 			filename := filepath.Join(dstPath, filepath.Base(path))
 
 			out, err := os.Create(filename)
@@ -265,7 +268,7 @@ func MakeMock(srcPath, dstPath string) error {
 			}
 			defer out.Close()
 
-			err = m.file(out, srcPath, file)
+			err = m.file(out, file, srcFile)
 			if err != nil {
 				return err
 			}
@@ -625,7 +628,13 @@ func getPackageName(impPath, srcPath string) (string, error) {
 	return name, nil
 }
 
-func (m *mockGen) file(out io.Writer, srcPath string, f *ast.File) error {
+func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
+	data, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer data.Close()
+
 	if len(f.Comments) > 0 {
 		c := f.Comments[0].Text()
 		if strings.HasPrefix(c, "+build") {
@@ -661,7 +670,7 @@ func (m *mockGen) file(out io.Writer, srcPath string, f *ast.File) error {
 						fmt.Fprintf(out, "%s ", s.Name)
 					} else {
 						impPath := strings.Trim(s.Path.Value, "\"")
-						name, err := getPackageName(impPath, srcPath)
+						name, err := getPackageName(impPath, m.srcPath)
 						if err != nil {
 							return err
 						}
@@ -678,7 +687,7 @@ func (m *mockGen) file(out io.Writer, srcPath string, f *ast.File) error {
 						fmt.Fprintf(out, "%s ", s.Name)
 					} else {
 						impPath := strings.Trim(s.Path.Value, "\"")
-						name, err := getPackageName(impPath, srcPath)
+						name, err := getPackageName(impPath, m.srcPath)
 						if err != nil {
 							return err
 						}
@@ -795,6 +804,13 @@ func (m *mockGen) file(out io.Writer, srcPath string, f *ast.File) error {
 					}
 					fi.results = append(fi.results, r)
 				}
+			}
+			pos1 := m.fset.Position(d.Body.Lbrace)
+			pos2 := m.fset.Position(d.Body.Rbrace)
+			fi.body = make([]byte, pos2.Offset-pos1.Offset+1)
+			_, err := data.ReadAt(fi.body, int64(pos1.Offset))
+			if err != nil {
+				return err
 			}
 
 			fi.writeReal(out)

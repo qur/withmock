@@ -73,13 +73,13 @@ func process(filename, goPath string) error {
 
 	m := &mockGen{
 		fset: fset,
+		srcPath: filepath.Dir(filename),
 		types: make(map[string]ast.Expr),
 		recorders: make(map[string]string),
 	}
 	data := &bytes.Buffer{}
 
-	dir := filepath.Dir(filename)
-	if err := m.file(data, dir, file); err != nil {
+	if err := m.file(data, file, filename); err != nil {
 		return err
 	}
 
