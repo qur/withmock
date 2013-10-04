@@ -6,6 +6,7 @@ ret=0
 
 echo -e "\e[33;1mwithmock\e[0m"
 echo -e "========"
+echo "=== withmock ===" > test.log
 for f in */test.withmock; do
     d=$(dirname "$f")
     echo -n "${d}: "
@@ -22,6 +23,7 @@ echo
 
 echo -e "\e[33;1mmocktest\e[0m"
 echo -e "========"
+echo "=== mocktest ===" >> test.log
 for f in */test.mocktest; do
     d=$(dirname "$f")
     echo -n "${d}: "
