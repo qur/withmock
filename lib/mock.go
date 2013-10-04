@@ -16,6 +16,214 @@ import (
 	"strings"
 )
 
+type field struct {
+	names []string
+	expr string
+}
+
+type funcInfo struct {
+	name string
+	varidic bool
+	recv struct {
+		name, expr string
+	}
+	params, results []field
+}
+
+func (fi *funcInfo) IsMethod() bool {
+	return fi.recv.expr != ""
+}
+
+func (fi *funcInfo) writeReal(out io.Writer) {
+	fmt.Fprintf(out, "func ")
+	if fi.IsMethod() {
+		fmt.Fprintf(out, "(%s %s) ", fi.recv.name, fi.recv.expr)
+	}
+	fmt.Fprintf(out, "_real_%s(", fi.name)
+	for i, param := range fi.params {
+		if i > 0 {
+			fmt.Fprintf(out, ", ")
+		}
+		n := strings.Join(param.names, ", ")
+		fmt.Fprintf(out, "%s %s", n, param.expr)
+	}
+	fmt.Fprintf(out, ") ")
+	if len(fi.results) > 1 {
+		fmt.Fprintf(out, "(")
+	}
+	for i, result := range fi.results {
+		if i > 0 {
+			fmt.Fprintf(out, ", ")
+		}
+		n := strings.Join(result.names, ", ")
+		fmt.Fprintf(out, "%s %s", n, result.expr)
+	}
+	if len(fi.results) > 1 {
+		fmt.Fprintf(out, ")")
+	}
+	fmt.Fprintf(out, " {\n")
+	fmt.Fprintf(out, "\tpanic(\"not implemented yet\")\n")
+	fmt.Fprintf(out, "}\n")
+}
+
+func (fi *funcInfo) writeMock(out io.Writer) {
+	fmt.Fprintf(out, "func ")
+	if fi.IsMethod() {
+		fmt.Fprintf(out, "(_m %s) ", fi.recv.expr)
+	}
+	fmt.Fprintf(out, "%s(", fi.name)
+	for i, param := range fi.params {
+		if i > 0 {
+			fmt.Fprintf(out, ", ")
+		}
+		fmt.Fprintf(out, "p%d %s", i, param.expr)
+	}
+	fmt.Fprintf(out, ") ")
+	if len(fi.results) > 0 {
+		if len(fi.results) > 1 {
+			fmt.Fprintf(out, "(")
+		}
+		for i, result := range fi.results {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			fmt.Fprintf(out, "%s", result.expr)
+		}
+		if len(fi.results) > 1 {
+			fmt.Fprintf(out, ")")
+		}
+		fmt.Fprintf(out, " ")
+	}
+	fmt.Fprintf(out, "{\n")
+	if !fi.IsMethod() {
+		fmt.Fprintf(out, "\t")
+		if len(fi.results) > 0 {
+			fmt.Fprintf(out, "return ")
+		}
+		fmt.Fprintf(out, "pkgMock.%s(", fi.name)
+		for i := range fi.params {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			fmt.Fprintf(out, "p%d", i)
+		}
+		if fi.varidic {
+			fmt.Fprintf(out, "...")
+		}
+		fmt.Fprintf(out, ")\n")
+		fmt.Fprintf(out, "}\n")
+		fmt.Fprintf(out, "func (_m *packageMock) %s(", fi.name)
+		for i, param := range fi.params {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			fmt.Fprintf(out, "p%d %s", i, param.expr)
+		}
+		fmt.Fprintf(out, ") ")
+		if len(fi.results) > 0 {
+			if len(fi.results) > 1 {
+				fmt.Fprintf(out, "(")
+			}
+			for i, result := range fi.results {
+				if i > 0 {
+					fmt.Fprintf(out, ", ")
+				}
+				fmt.Fprintf(out, "%s", result.expr)
+			}
+			if len(fi.results) > 1 {
+				fmt.Fprintf(out, ")")
+			}
+			fmt.Fprintf(out, " ")
+		}
+		fmt.Fprintf(out, "{\n")
+	}
+	if fi.varidic {
+		fmt.Fprintf(out, "\targs := []interface{}{")
+		for i := 0; i < len(fi.params)-1; i++ {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			fmt.Fprintf(out, "p%d", i)
+		}
+		fmt.Fprintf(out, "}\n")
+		fmt.Fprintf(out, "\tfor _, v := range p%d {\n", len(fi.params)-1)
+		fmt.Fprintf(out, "\t\targs = append(args, v)\n")
+		fmt.Fprintf(out, "\t}\n")
+		fmt.Fprintf(out, "\t")
+		if len(fi.results) > 0 {
+			fmt.Fprintf(out, "ret := ")
+		}
+		fmt.Fprintf(out, "ctrl.Call(_m, \"%s\", args...)\n", fi.name)
+	} else {
+		fmt.Fprintf(out, "\t")
+		if len(fi.results) > 0 {
+			fmt.Fprintf(out, "ret := ")
+		}
+		fmt.Fprintf(out, "ctrl.Call(_m, \"%s\"", fi.name)
+		for i := 0; i < len(fi.params); i++ {
+			fmt.Fprintf(out, ", p%d", i)
+		}
+		fmt.Fprintf(out, ")\n")
+	}
+	for i, result := range fi.results {
+		fmt.Fprintf(out, "\tret%d, _ := ret[%d].(%s)\n", i, i, result.expr)
+	}
+	if len(fi.results) > 0 {
+		fmt.Fprintf(out, "\treturn ")
+		for i := range fi.results {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			fmt.Fprintf(out, "ret%d", i)
+		}
+		fmt.Fprintf(out, "\n")
+	}
+	fmt.Fprintf(out, "}\n")
+}
+
+func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
+	fmt.Fprintf(out, "func (_mr *%s) %s(", recorder, fi.name)
+	if fi.varidic {
+		// if the method is varidic, there must be at least one
+		// argument - so we can code for 1 or more arguments.
+		for i := range fi.params {
+			if i > 0 {
+				fmt.Fprintf(out, "interface{}, ")
+			}
+			fmt.Fprintf(out, "p%d ", i)
+		}
+		fmt.Fprintf(out, "...interface{}")
+	} else {
+		for i := range fi.params {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			fmt.Fprintf(out, "p%d interface{}", i)
+		}
+	}
+	fmt.Fprintf(out, ") *gomock.Call {\n")
+	if fi.varidic {
+		fmt.Fprintf(out, "\targs := append([]interface{}{")
+		for i := 0; i < len(fi.params)-1; i++ {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			fmt.Fprintf(out, "p%d", i)
+		}
+		fmt.Fprintf(out, "}, p%d...)\n", len(fi.params)-1)
+	}
+	fmt.Fprintf(out, "\treturn ctrl.RecordCall(_mr.mock, \"%s\"", fi.name)
+	if fi.varidic {
+		fmt.Fprintf(out, ", args...")
+	} else {
+		for i := 0; i < len(fi.params); i++ {
+			fmt.Fprintf(out, ", p%d", i)
+		}
+	}
+	fmt.Fprintf(out, ")\n")
+	fmt.Fprintf(out, "}\n")
+}
+
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
 func MakeMock(srcPath, dstPath string) error {
@@ -542,179 +750,45 @@ func mockFile(out io.Writer, srcPath string, f *ast.File, types map[string]ast.E
 				// ignore forward declarations, and non-exported functions
 				continue
 			}
-			fmt.Fprintf(out, "func ")
-			recorder := ""
-			method := false
+			fi := &funcInfo{name: d.Name.String()}
+			recorder := "_package_Rec"
 			if d.Recv != nil {
-				method = true
+				fi.recv.name = d.Recv.List[0].Names[0].String()
 				t := exprString(d.Recv.List[0].Type)
-				fmt.Fprintf(out, "(_m %s) ", t)
+				fi.recv.expr = t
 				recorder = fmt.Sprintf("_%s_Rec", t)
 				if s, ok := d.Recv.List[0].Type.(*ast.StarExpr); ok {
 					recorder = fmt.Sprintf("_%s_Rec", exprString(s.X))
 				}
 				recorders[t] = recorder
 			}
-			fmt.Fprintf(out, "%s(", d.Name)
-			varidic := false
-			params := make([]string, 0, len(d.Type.Params.List))
-			for i, param := range d.Type.Params.List {
-				_, varidic = param.Type.(*ast.Ellipsis)
-				t := exprString(param.Type)
-				params = append(params, t)
-				if i > 0 {
-					fmt.Fprintf(out, ", ")
+			for _, param := range d.Type.Params.List {
+				p := field{
+					names: make([]string, len(param.Names)),
+					expr: exprString(param.Type),
 				}
-				fmt.Fprintf(out, "p%d %s", i, t)
+				for i, name := range param.Names {
+				    p.names[i] = name.String()
+				}
+				_, fi.varidic = param.Type.(*ast.Ellipsis)
+				fi.params = append(fi.params, p)
 			}
-			fmt.Fprintf(out, ") ")
-			results := []string{}
 			if d.Type.Results != nil {
-				results = make([]string, 0, len(d.Type.Results.List))
-				if len(d.Type.Results.List) > 1 {
-					fmt.Fprintf(out, "(")
-				}
-				for i, result := range d.Type.Results.List {
-					t := exprString(result.Type)
-					results = append(results, t)
-					if i > 0 {
-						fmt.Fprintf(out, ", ")
+				for _, result := range d.Type.Results.List {
+					r := field{
+						names: make([]string, len(result.Names)),
+						expr: exprString(result.Type),
 					}
-					fmt.Fprintf(out, "%s", t)
+					for i, name := range result.Names {
+						r.names[i] = name.String()
+					}
+					fi.results = append(fi.results, r)
 				}
-				if len(d.Type.Results.List) > 1 {
-					fmt.Fprintf(out, ")")
-				}
-				fmt.Fprintf(out, " ")
 			}
-			fmt.Fprintf(out, "{\n")
-			if !method {
-				recorder = "_package_Rec"
-				fmt.Fprintf(out, "\t")
-				if len(results) > 0 {
-					fmt.Fprintf(out, "return ")
-				}
-				fmt.Fprintf(out, "pkgMock.%s(", d.Name)
-				for i := range params {
-					if i > 0 {
-						fmt.Fprintf(out, ", ")
-					}
-					fmt.Fprintf(out, "p%d", i)
-				}
-				if varidic {
-					fmt.Fprintf(out, "...")
-				}
-				fmt.Fprintf(out, ")\n")
-				fmt.Fprintf(out, "}\n")
-				fmt.Fprintf(out, "func (_m *packageMock) %s(", d.Name)
-				for i, param := range params {
-					if i > 0 {
-						fmt.Fprintf(out, ", ")
-					}
-					fmt.Fprintf(out, "p%d %s", i, param)
-				}
-				fmt.Fprintf(out, ") ")
-				if len(results) > 0 {
-					if len(results) > 1 {
-						fmt.Fprintf(out, "(")
-					}
-					for i, result := range results {
-						if i > 0 {
-							fmt.Fprintf(out, ", ")
-						}
-						fmt.Fprintf(out, "%s", result)
-					}
-					if len(results) > 1 {
-						fmt.Fprintf(out, ")")
-					}
-					fmt.Fprintf(out, " ")
-				}
-				fmt.Fprintf(out, "{\n")
-			}
-			if varidic {
-				fmt.Fprintf(out, "\targs := []interface{}{")
-				for i := 0; i < len(params)-1; i++ {
-					if i > 0 {
-						fmt.Fprintf(out, ", ")
-					}
-					fmt.Fprintf(out, "p%d", i)
-				}
-				fmt.Fprintf(out, "}\n")
-				fmt.Fprintf(out, "\tfor _, v := range p%d {\n", len(params)-1)
-				fmt.Fprintf(out, "\t\targs = append(args, v)\n")
-				fmt.Fprintf(out, "\t}\n")
-				fmt.Fprintf(out, "\t")
-				if len(results) > 0 {
-					fmt.Fprintf(out, "ret := ")
-				}
-				fmt.Fprintf(out, "ctrl.Call(_m, \"%s\", args...)\n", d.Name)
-			} else {
-				fmt.Fprintf(out, "\t")
-				if len(results) > 0 {
-					fmt.Fprintf(out, "ret := ")
-				}
-				fmt.Fprintf(out, "ctrl.Call(_m, \"%s\"", d.Name)
-				for i := 0; i < len(params); i++ {
-					fmt.Fprintf(out, ", p%d", i)
-				}
-				fmt.Fprintf(out, ")\n")
-			}
-			for i, result := range results {
-				fmt.Fprintf(out, "\tret%d, _ := ret[%d].(%s)\n", i, i, result)
-			}
-			if len(results) > 0 {
-				fmt.Fprintf(out, "\treturn ")
-				for i := range results {
-					if i > 0 {
-						fmt.Fprintf(out, ", ")
-					}
-					fmt.Fprintf(out, "ret%d", i)
-				}
-				fmt.Fprintf(out, "\n")
-			}
-			fmt.Fprintf(out, "}\n")
-			if recorder != "" {
-				fmt.Fprintf(out, "func (_mr *%s) %s(", recorder, d.Name)
-				if varidic {
-					// if the method is varidic, there must be at least one
-					// argument - so we can code for 1 or more arguments.
-					for i := range params {
-						if i > 0 {
-							fmt.Fprintf(out, "interface{}, ")
-						}
-						fmt.Fprintf(out, "p%d ", i)
-					}
-					fmt.Fprintf(out, "...interface{}")
-				} else {
-					for i := range params {
-						if i > 0 {
-							fmt.Fprintf(out, ", ")
-						}
-						fmt.Fprintf(out, "p%d interface{}", i)
-					}
-				}
-				fmt.Fprintf(out, ") *gomock.Call {\n")
-				if varidic {
-					fmt.Fprintf(out, "\targs := append([]interface{}{")
-					for i := 0; i < len(params)-1; i++ {
-						if i > 0 {
-							fmt.Fprintf(out, ", ")
-						}
-						fmt.Fprintf(out, "p%d", i)
-					}
-					fmt.Fprintf(out, "}, p%d...)\n", len(params)-1)
-				}
-				fmt.Fprintf(out, "\treturn ctrl.RecordCall(_mr.mock, \"%s\"", d.Name)
-				if varidic {
-					fmt.Fprintf(out, ", args...")
-				} else {
-					for i := 0; i < len(d.Type.Params.List); i++ {
-						fmt.Fprintf(out, ", p%d", i)
-					}
-				}
-				fmt.Fprintf(out, ")\n")
-				fmt.Fprintf(out, "}\n")
-			}
+
+			fi.writeReal(out)
+			fi.writeMock(out)
+			fi.writeRecorder(out, recorder)
 			fmt.Fprintf(out, "\n")
 		default:
 			fmt.Fprintf(out, "--- Unknown Decl Type: %T\n", decl)
