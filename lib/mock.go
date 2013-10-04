@@ -762,7 +762,9 @@ func (m *mockGen) file(out io.Writer, srcPath string, f *ast.File) error {
 			fi := &funcInfo{name: d.Name.String()}
 			recorder := "_package_Rec"
 			if d.Recv != nil {
-				fi.recv.name = d.Recv.List[0].Names[0].String()
+				if len(d.Recv.List[0].Names) > 0 {
+					fi.recv.name = d.Recv.List[0].Names[0].String()
+				}
 				t := exprString(d.Recv.List[0].Type)
 				fi.recv.expr = t
 				recorder = fmt.Sprintf("_%s_Rec", t)
