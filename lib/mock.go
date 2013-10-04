@@ -224,6 +224,12 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 	fmt.Fprintf(out, "}\n")
 }
 
+type mockGen struct {
+	fset *token.FileSet
+	types map[string]ast.Expr
+	recorders map[string]string
+}
+
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
 func MakeMock(srcPath, dstPath string) error {
@@ -244,8 +250,11 @@ func MakeMock(srcPath, dstPath string) error {
 	}
 
 	for name, pkg := range pkgs {
-		types := make(map[string]ast.Expr)
-		recorders := make(map[string]string)
+		m := &mockGen{
+			fset: fset,
+			types: make(map[string]ast.Expr),
+			recorders: make(map[string]string),
+		}
 
 		for path, file := range pkg.Files {
 			filename := filepath.Join(dstPath, filepath.Base(path))
@@ -256,7 +265,7 @@ func MakeMock(srcPath, dstPath string) error {
 			}
 			defer out.Close()
 
-			err = mockFile(out, srcPath, file, types, recorders)
+			err = m.file(out, srcPath, file)
 			if err != nil {
 				return err
 			}
@@ -275,7 +284,7 @@ func MakeMock(srcPath, dstPath string) error {
 		}
 		defer out.Close()
 
-		err = mockPkg(out, name, types, recorders)
+		err = m.pkg(out, name)
 		if err != nil {
 			return err
 		}
@@ -513,7 +522,7 @@ func fixup(filename string) error {
 	return nil
 }
 
-func mockPkg(out io.Writer, name string, types map[string]ast.Expr, recorders map[string]string) (err error) {
+func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "package %s\n\n", name)
 
 	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
@@ -541,8 +550,8 @@ func mockPkg(out io.Writer, name string, types map[string]ast.Expr, recorders ma
 	fmt.Fprintf(out, "\treturn &_package_Rec{pkgMock}\n")
 	fmt.Fprintf(out, "}\n\n")
 
-	for base, rec := range recorders {
-		if _, found := recorders[base[1:]]; base[0] == '*' && found {
+	for base, rec := range m.recorders {
+		if _, found := m.recorders[base[1:]]; base[0] == '*' && found {
 			// If pointer and non-pointer receiver, just use the non-pointer
 			continue
 		}
@@ -552,9 +561,9 @@ func mockPkg(out io.Writer, name string, types map[string]ast.Expr, recorders ma
 			name = base[1:]
 			mod = "&"
 		}
-		_, isInterface := types[name].(*ast.InterfaceType)
+		_, isInterface := m.types[name].(*ast.InterfaceType)
 		if !isInterface && !ast.IsExported(name) {
-			lit, cast := literal(name, types)
+			lit, cast := literal(name, m.types)
 			if cast {
 				fmt.Fprintf(out, "func (_ *_meta) New%s(val %s) %s {\n",
 					name, lit, base)
@@ -616,7 +625,7 @@ func getPackageName(impPath, srcPath string) (string, error) {
 	return name, nil
 }
 
-func mockFile(out io.Writer, srcPath string, f *ast.File, types map[string]ast.Expr, recorders map[string]string) (err error) {
+func (m *mockGen) file(out io.Writer, srcPath string, f *ast.File) error {
 	if len(f.Comments) > 0 {
 		c := f.Comments[0].Text()
 		if strings.HasPrefix(c, "+build") {
@@ -683,13 +692,13 @@ func mockFile(out io.Writer, srcPath string, f *ast.File, types map[string]ast.E
 				if len(d.Specs) == 1 {
 					t := d.Specs[0].(*ast.TypeSpec)
 					fmt.Fprintf(out, "type %s %s\n\n", t.Name, exprString(t.Type))
-					types[t.Name.String()] = t.Type
+					m.types[t.Name.String()] = t.Type
 				} else {
 					fmt.Fprintf(out, "type (\n")
 					for i := range d.Specs {
 						t := d.Specs[i].(*ast.TypeSpec)
 						fmt.Fprintf(out, "\t%s %s\n", t.Name, exprString(t.Type))
-						types[t.Name.String()] = t.Type
+						m.types[t.Name.String()] = t.Type
 					}
 					fmt.Fprintf(out, ")\n\n")
 				}
@@ -760,7 +769,7 @@ func mockFile(out io.Writer, srcPath string, f *ast.File, types map[string]ast.E
 				if s, ok := d.Recv.List[0].Type.(*ast.StarExpr); ok {
 					recorder = fmt.Sprintf("_%s_Rec", exprString(s.X))
 				}
-				recorders[t] = recorder
+				m.recorders[t] = recorder
 			}
 			for _, param := range d.Type.Params.List {
 				p := field{

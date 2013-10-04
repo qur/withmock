@@ -71,12 +71,15 @@ func process(filename, goPath string) error {
 		return err
 	}
 
-	types := make(map[string]ast.Expr)
-	recorders := make(map[string]string)
+	m := &mockGen{
+		fset: fset,
+		types: make(map[string]ast.Expr),
+		recorders: make(map[string]string),
+	}
 	data := &bytes.Buffer{}
 
 	dir := filepath.Dir(filename)
-	if err := mockFile(data, dir, file, types, recorders); err != nil {
+	if err := m.file(data, dir, file); err != nil {
 		return err
 	}
 
@@ -90,7 +93,7 @@ func process(filename, goPath string) error {
 		return err
 	}
 
-	return tryLiterals(types)
+	return tryLiterals(m.types)
 }
 
 func TestMockFile(t *testing.T) {
