@@ -48,7 +48,7 @@ func (fi *funcInfo) writeReal(out io.Writer) {
 		fmt.Fprintf(out, "%s %s", n, param.expr)
 	}
 	fmt.Fprintf(out, ") ")
-	if len(fi.results) > 1 {
+	if len(fi.results) > 0 {
 		fmt.Fprintf(out, "(")
 	}
 	for i, result := range fi.results {
@@ -58,7 +58,7 @@ func (fi *funcInfo) writeReal(out io.Writer) {
 		n := strings.Join(result.names, ", ")
 		fmt.Fprintf(out, "%s %s", n, result.expr)
 	}
-	if len(fi.results) > 1 {
+	if len(fi.results) > 0 {
 		fmt.Fprintf(out, ")")
 	}
 	fmt.Fprintf(out, " {\n")
