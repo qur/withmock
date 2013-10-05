@@ -9,6 +9,7 @@ echo -e "========"
 echo "=== withmock ===" > test.log
 for f in */test.withmock; do
     d=$(dirname "$f")
+    echo "--- ${d} ---" >> test.log
     echo -n "${d}: "
     (cd $d; ./test.withmock) >> test.log 2>&1
     if [ $? -ne 0 ]; then
@@ -26,6 +27,7 @@ echo -e "========"
 echo "=== mocktest ===" >> test.log
 for f in */test.mocktest; do
     d=$(dirname "$f")
+    echo "--- ${d} ---" >> test.log
     echo -n "${d}: "
     (cd $d; ./test.mocktest) >> test.log 2>&1
     if [ $? -ne 0 ]; then
