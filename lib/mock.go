@@ -40,7 +40,10 @@ func (fi *funcInfo) writeReal(out io.Writer) {
 	if fi.IsMethod() {
 		fmt.Fprintf(out, "(%s %s) ", fi.recv.name, fi.recv.expr)
 	}
-	fmt.Fprintf(out, "_real_%s(", fi.name)
+	if ast.IsExported(fi.name) {
+		fmt.Fprintf(out, "_real_")
+	}
+	fmt.Fprintf(out, "%s(", fi.name)
 	for i, param := range fi.params {
 		if i > 0 {
 			fmt.Fprintf(out, ", ")
@@ -60,10 +63,50 @@ func (fi *funcInfo) writeReal(out io.Writer) {
 		}
 		fmt.Fprintf(out, ") ")
 	}
-	fmt.Fprintf(out, "{\n\tpanic(\"not yet implemented\")\n}\n")
-	// TODO: this _should_ be how we write the body ...
-	//out.Write(fi.body)
-	//fmt.Fprintf(out, "\n")
+	out.Write(fi.body)
+	fmt.Fprintf(out, "\n")
+}
+
+func (fi *funcInfo) countParams() int {
+	p := 0
+	for _, param := range fi.params {
+		for _ = range param.names {
+			p++
+		}
+	}
+	return p
+}
+
+func (fi *funcInfo) writeParams(out io.Writer) int {
+	p := 0
+	for i, param := range fi.params {
+		if i > 0 {
+			fmt.Fprintf(out, ", ")
+		}
+		for j := range param.names {
+			if j > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			fmt.Fprintf(out, "p%d", p)
+			p++
+		}
+		fmt.Fprintf(out, " %s", param.expr)
+	}
+	return p
+}
+
+func (fi *funcInfo) retTypes() []string {
+	results := make([]string, 0, len(fi.results))
+	for _, result := range fi.results {
+		x := len(result.names)
+		if x == 0 {
+			x = 1
+		}
+		for i := 0; i < x; i++ {
+			results = append(results, result.expr)
+		}
+	}
+	return results
 }
 
 func (fi *funcInfo) writeMock(out io.Writer) {
@@ -72,27 +115,11 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		fmt.Fprintf(out, "(_m %s) ", fi.recv.expr)
 	}
 	fmt.Fprintf(out, "%s(", fi.name)
-	for i, param := range fi.params {
-		if i > 0 {
-			fmt.Fprintf(out, ", ")
-		}
-		fmt.Fprintf(out, "p%d %s", i, param.expr)
-	}
+	args := fi.writeParams(out)
+	returns := fi.retTypes()
 	fmt.Fprintf(out, ") ")
-	if len(fi.results) > 0 {
-		if len(fi.results) > 1 {
-			fmt.Fprintf(out, "(")
-		}
-		for i, result := range fi.results {
-			if i > 0 {
-				fmt.Fprintf(out, ", ")
-			}
-			fmt.Fprintf(out, "%s", result.expr)
-		}
-		if len(fi.results) > 1 {
-			fmt.Fprintf(out, ")")
-		}
-		fmt.Fprintf(out, " ")
+	if len(returns) > 0 {
+		fmt.Fprintf(out, "(%s) ", strings.Join(returns, ", "))
 	}
 	fmt.Fprintf(out, "{\n")
 	if !fi.IsMethod() {
@@ -101,7 +128,7 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 			fmt.Fprintf(out, "return ")
 		}
 		fmt.Fprintf(out, "pkgMock.%s(", fi.name)
-		for i := range fi.params {
+		for i := 0; i < args; i++ {
 			if i > 0 {
 				fmt.Fprintf(out, ", ")
 			}
@@ -113,40 +140,23 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		fmt.Fprintf(out, ")\n")
 		fmt.Fprintf(out, "}\n")
 		fmt.Fprintf(out, "func (_m *packageMock) %s(", fi.name)
-		for i, param := range fi.params {
-			if i > 0 {
-				fmt.Fprintf(out, ", ")
-			}
-			fmt.Fprintf(out, "p%d %s", i, param.expr)
-		}
+		fi.writeParams(out)
 		fmt.Fprintf(out, ") ")
-		if len(fi.results) > 0 {
-			if len(fi.results) > 1 {
-				fmt.Fprintf(out, "(")
-			}
-			for i, result := range fi.results {
-				if i > 0 {
-					fmt.Fprintf(out, ", ")
-				}
-				fmt.Fprintf(out, "%s", result.expr)
-			}
-			if len(fi.results) > 1 {
-				fmt.Fprintf(out, ")")
-			}
-			fmt.Fprintf(out, " ")
+		if len(returns) > 0 {
+			fmt.Fprintf(out, "(%s) ", strings.Join(returns, ", "))
 		}
 		fmt.Fprintf(out, "{\n")
 	}
 	if fi.varidic {
 		fmt.Fprintf(out, "\targs := []interface{}{")
-		for i := 0; i < len(fi.params)-1; i++ {
+		for i := 0; i < args-1; i++ {
 			if i > 0 {
 				fmt.Fprintf(out, ", ")
 			}
 			fmt.Fprintf(out, "p%d", i)
 		}
 		fmt.Fprintf(out, "}\n")
-		fmt.Fprintf(out, "\tfor _, v := range p%d {\n", len(fi.params)-1)
+		fmt.Fprintf(out, "\tfor _, v := range p%d {\n", args-1)
 		fmt.Fprintf(out, "\t\targs = append(args, v)\n")
 		fmt.Fprintf(out, "\t}\n")
 		fmt.Fprintf(out, "\t")
@@ -160,17 +170,17 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 			fmt.Fprintf(out, "ret := ")
 		}
 		fmt.Fprintf(out, "ctrl.Call(_m, \"%s\"", fi.name)
-		for i := 0; i < len(fi.params); i++ {
+		for i := 0; i < args; i++ {
 			fmt.Fprintf(out, ", p%d", i)
 		}
 		fmt.Fprintf(out, ")\n")
 	}
-	for i, result := range fi.results {
-		fmt.Fprintf(out, "\tret%d, _ := ret[%d].(%s)\n", i, i, result.expr)
+	for i, ret := range returns {
+		fmt.Fprintf(out, "\tret%d, _ := ret[%d].(%s)\n", i, i, ret)
 	}
-	if len(fi.results) > 0 {
+	if len(returns) > 0 {
 		fmt.Fprintf(out, "\treturn ")
-		for i := range fi.results {
+		for i := 0; i < len(returns); i++ {
 			if i > 0 {
 				fmt.Fprintf(out, ", ")
 			}
@@ -182,41 +192,46 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 }
 
 func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
+	args := fi.countParams()
 	fmt.Fprintf(out, "func (_mr *%s) %s(", recorder, fi.name)
-	if fi.varidic {
-		// if the method is varidic, there must be at least one
-		// argument - so we can code for 1 or more arguments.
-		for i := range fi.params {
-			if i > 0 {
-				fmt.Fprintf(out, "interface{}, ")
+	if args > 0 {
+		if fi.varidic {
+			if args > 1 {
+				for i := 0; i < args-1; i++ {
+					if i > 0 {
+						fmt.Fprintf(out, ", ")
+					}
+					fmt.Fprintf(out, "p%d", i)
+				}
+				fmt.Fprintf(out, " interface{}, ")
 			}
-			fmt.Fprintf(out, "p%d ", i)
-		}
-		fmt.Fprintf(out, "...interface{}")
-	} else {
-		for i := range fi.params {
-			if i > 0 {
-				fmt.Fprintf(out, ", ")
+			fmt.Fprintf(out, "p%d ...interface{}", args-1)
+		} else {
+			for i := 0; i < args; i++ {
+				if i > 0 {
+					fmt.Fprintf(out, ", ")
+				}
+				fmt.Fprintf(out, "p%d", i)
 			}
-			fmt.Fprintf(out, "p%d interface{}", i)
+			fmt.Fprintf(out, " interface{}")
 		}
 	}
 	fmt.Fprintf(out, ") *gomock.Call {\n")
 	if fi.varidic {
 		fmt.Fprintf(out, "\targs := append([]interface{}{")
-		for i := 0; i < len(fi.params)-1; i++ {
+		for i := 0; i < args-1; i++ {
 			if i > 0 {
 				fmt.Fprintf(out, ", ")
 			}
 			fmt.Fprintf(out, "p%d", i)
 		}
-		fmt.Fprintf(out, "}, p%d...)\n", len(fi.params)-1)
+		fmt.Fprintf(out, "}, p%d...)\n", args-1)
 	}
 	fmt.Fprintf(out, "\treturn ctrl.RecordCall(_mr.mock, \"%s\"", fi.name)
 	if fi.varidic {
 		fmt.Fprintf(out, ", args...")
 	} else {
-		for i := 0; i < len(fi.params); i++ {
+		for i := 0; i < args; i++ {
 			fmt.Fprintf(out, ", p%d", i)
 		}
 	}
@@ -357,7 +372,11 @@ func exprString(exp ast.Expr) string {
 	case *ast.BasicLit:
 		return v.Value
 	case *ast.CompositeLit:
-		s := exprString(v.Type) + "{"
+		s := ""
+		if v.Type != nil {
+			s += exprString(v.Type)
+		}
+		s += "{"
 		for i := range v.Elts {
 			if i > 0 {
 				s += ", "
@@ -411,12 +430,7 @@ func exprString(exp ast.Expr) string {
 		for _, field := range v.Fields.List {
 			names := make([]string, 0, len(field.Names))
 			for _, ident := range field.Names {
-				if ident.IsExported() {
-					names = append(names, ident.Name)
-				}
-			}
-			if len(names) == 0 {
-				continue
+				names = append(names, ident.Name)
 			}
 			s += "\t" + strings.Join(names, ", ") + " "
 			s += exprString(field.Type) + "\n"
@@ -717,9 +731,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					s := spec.(*ast.ValueSpec)
 					names := make([]string, 0, len(s.Names))
 					for _, ident := range s.Names {
-						if ident.IsExported() {
-							names = append(names, ident.Name)
-						}
+						names = append(names, ident.Name)
 					}
 					if len(names) == 0 {
 						// Don't care about private variables
@@ -764,10 +776,6 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 				fmt.Fprintf(out, "--- unknown GenDecl Token: %v\n", d.Tok)
 			}
 		case *ast.FuncDecl:
-			if d.Body == nil || !d.Name.IsExported() {
-				// ignore forward declarations, and non-exported functions
-				continue
-			}
 			fi := &funcInfo{name: d.Name.String()}
 			recorder := "_package_Rec"
 			if d.Recv != nil {
@@ -805,17 +813,21 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					fi.results = append(fi.results, r)
 				}
 			}
-			pos1 := m.fset.Position(d.Body.Lbrace)
-			pos2 := m.fset.Position(d.Body.Rbrace)
-			fi.body = make([]byte, pos2.Offset-pos1.Offset+1)
-			_, err := data.ReadAt(fi.body, int64(pos1.Offset))
-			if err != nil {
-				return err
+			if d.Body != nil {
+				pos1 := m.fset.Position(d.Body.Lbrace)
+				pos2 := m.fset.Position(d.Body.Rbrace)
+				fi.body = make([]byte, pos2.Offset-pos1.Offset+1)
+				_, err := data.ReadAt(fi.body, int64(pos1.Offset))
+				if err != nil {
+					return err
+				}
 			}
 
 			fi.writeReal(out)
-			fi.writeMock(out)
-			fi.writeRecorder(out, recorder)
+			if d.Body != nil && d.Name.IsExported() {
+				fi.writeMock(out)
+				fi.writeRecorder(out, recorder)
+			}
 			fmt.Fprintf(out, "\n")
 		default:
 			fmt.Fprintf(out, "--- Unknown Decl Type: %T\n", decl)
