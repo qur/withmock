@@ -1,5 +1,7 @@
 #!/bin/bash
 
+ret=0
+
 echo -e "\e[33;1mgo install\e[0m"
 echo -e "=========="
 echo -n "withmock: "
@@ -30,10 +32,17 @@ else
     echo -e "\e[32;1mPASS\e[0m"
 fi
 
+# stop if install failed
+if [ $ret -ne 0 ]; then
+    exit $ret
+fi
+
 echo
 
 ./scenarios/test
-ret=$?
+if [ $? -ne 0 ]; then
+    ret=1
+fi
 
 echo
 
