@@ -548,10 +548,10 @@ func exprString(exp ast.Expr) string {
 }
 
 func fixup(filename string) error {
-	cmd := exec.Command("goimports", "-w", filename)
+	cmd := exec.Command("gofmt", "-w", filename)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Failed to run goimports on '%s': %s\noutput:\n%s",
+		return fmt.Errorf("Failed to run gofmt on '%s': %s\noutput:\n%s",
 			filename, err, out)
 	}
 	return nil
@@ -851,6 +851,9 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 			fmt.Fprintf(out, "--- Unknown Decl Type: %T\n", decl)
 		}
 	}
+
+	fmt.Fprintf(out, "\n// Make sure gomock is used\n")
+	fmt.Fprintf(out, "var _ = gomock.Any()\n")
 
 	return nil
 }
