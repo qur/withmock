@@ -334,10 +334,13 @@ func MakeMock(srcPath, dstPath string) error {
 				return err
 			}
 
+			/*
+			// TODO: we want to gofmt, goimports can break things ...
 			err = fixup(filename)
 			if err != nil {
 				return err
 			}
+			*/
 		}
 
 		filename := filepath.Join(dstPath, name+"_mock.go")
@@ -353,6 +356,8 @@ func MakeMock(srcPath, dstPath string) error {
 			return err
 		}
 
+		// TODO: currently we need to use goimports to add missing imports, we
+		// need to sort out our own imports, then we can switch to gofmt.
 		err = fixup(filename)
 		if err != nil {
 			return err
@@ -587,7 +592,7 @@ func exprString(exp ast.Expr) string {
 }
 
 func fixup(filename string) error {
-	cmd := exec.Command("gofmt", "-w", filename)
+	cmd := exec.Command("goimports", "-w", filename)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Failed to run gofmt on '%s': %s\noutput:\n%s",
