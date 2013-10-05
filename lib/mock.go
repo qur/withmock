@@ -70,8 +70,10 @@ func (fi *funcInfo) writeReal(out io.Writer) {
 func (fi *funcInfo) countParams() int {
 	p := 0
 	for _, param := range fi.params {
-		for _ = range param.names {
+		if len(param.names) == 0 {
 			p++
+		} else {
+			p += len(param.names)
 		}
 	}
 	return p
@@ -83,12 +85,17 @@ func (fi *funcInfo) writeParams(out io.Writer) int {
 		if i > 0 {
 			fmt.Fprintf(out, ", ")
 		}
-		for j := range param.names {
-			if j > 0 {
-				fmt.Fprintf(out, ", ")
-			}
+		if len(param.names) == 0 {
 			fmt.Fprintf(out, "p%d", p)
 			p++
+		} else {
+			for j := range param.names {
+				if j > 0 {
+					fmt.Fprintf(out, ", ")
+				}
+				fmt.Fprintf(out, "p%d", p)
+				p++
+			}
 		}
 		fmt.Fprintf(out, " %s", param.expr)
 	}
