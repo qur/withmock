@@ -123,8 +123,8 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 	}
 	fmt.Fprintf(out, "%s(", fi.name)
 	args := fi.writeParams(out)
-	returns := fi.retTypes()
 	fmt.Fprintf(out, ") ")
+	returns := fi.retTypes()
 	if len(returns) > 0 {
 		fmt.Fprintf(out, "(%s) ", strings.Join(returns, ", "))
 	}
@@ -134,7 +134,7 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		if len(fi.results) > 0 {
 			fmt.Fprintf(out, "return ")
 		}
-		fmt.Fprintf(out, "pkgMock.%s(", fi.name)
+		fmt.Fprintf(out, "_pkgMock.%s(", fi.name)
 		for i := 0; i < args; i++ {
 			if i > 0 {
 				fmt.Fprintf(out, ", ")
@@ -155,6 +155,24 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		fmt.Fprintf(out, "{\n")
 	}
 	if fi.varidic {
+		fmt.Fprintf(out, "\tif !_allMocked {\n")
+		fmt.Fprintf(out, "\t")
+		if len(fi.results) > 0 {
+			fmt.Fprintf(out, "return ")
+		}
+		if fi.IsMethod() {
+			fmt.Fprintf(out, "_m.")
+		}
+		fmt.Fprintf(out, "_real_%s(", fi.name)
+		for i := 0; i < args-1; i++ {
+			fmt.Fprintf(out, "p%d, ", i)
+		}
+		fmt.Fprintf(out, "p%d...", args-1)
+		fmt.Fprintf(out, ")\n")
+		if len(fi.results) == 0 {
+			fmt.Fprintf(out, "\treturn")
+		}
+		fmt.Fprintf(out, "\t}\n")
 		fmt.Fprintf(out, "\targs := []interface{}{")
 		for i := 0; i < args-1; i++ {
 			if i > 0 {
@@ -170,13 +188,33 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		if len(fi.results) > 0 {
 			fmt.Fprintf(out, "ret := ")
 		}
-		fmt.Fprintf(out, "ctrl.Call(_m, \"%s\", args...)\n", fi.name)
+		fmt.Fprintf(out, "_ctrl.Call(_m, \"%s\", args...)\n", fi.name)
 	} else {
+		fmt.Fprintf(out, "\tif !_allMocked {\n")
+		fmt.Fprintf(out, "\t")
+		if len(fi.results) > 0 {
+			fmt.Fprintf(out, "return ")
+		}
+		if fi.IsMethod() {
+			fmt.Fprintf(out, "_m.")
+		}
+		fmt.Fprintf(out, "_real_%s(", fi.name)
+		for i := 0; i < args; i++ {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			fmt.Fprintf(out, "p%d", i)
+		}
+		fmt.Fprintf(out, ")\n")
+		if len(fi.results) == 0 {
+			fmt.Fprintf(out, "\treturn")
+		}
+		fmt.Fprintf(out, "\t}\n")
 		fmt.Fprintf(out, "\t")
 		if len(fi.results) > 0 {
 			fmt.Fprintf(out, "ret := ")
 		}
-		fmt.Fprintf(out, "ctrl.Call(_m, \"%s\"", fi.name)
+		fmt.Fprintf(out, "_ctrl.Call(_m, \"%s\"", fi.name)
 		for i := 0; i < args; i++ {
 			fmt.Fprintf(out, ", p%d", i)
 		}
@@ -234,7 +272,7 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 		}
 		fmt.Fprintf(out, "}, p%d...)\n", args-1)
 	}
-	fmt.Fprintf(out, "\treturn ctrl.RecordCall(_mr.mock, \"%s\"", fi.name)
+	fmt.Fprintf(out, "\treturn _ctrl.RecordCall(_mr.mock, \"%s\"", fi.name)
 	if fi.varidic {
 		fmt.Fprintf(out, ", args...")
 	} else {
@@ -251,6 +289,7 @@ type mockGen struct {
 	srcPath string
 	types map[string]ast.Expr
 	recorders map[string]string
+	inits []string
 }
 
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
@@ -569,20 +608,28 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "}\n\n")
 
 	fmt.Fprintf(out, "var (\n")
-	fmt.Fprintf(out, "\tctrl *gomock.Controller\n")
-	fmt.Fprintf(out, "\tpkgMock = &packageMock{}\n")
+	fmt.Fprintf(out, "\t_allMocked = false\n")
+	fmt.Fprintf(out, "\t_ctrl *gomock.Controller\n")
+	fmt.Fprintf(out, "\t_pkgMock = &packageMock{}\n")
 	fmt.Fprintf(out, ")\n\n")
+
+	fmt.Fprintf(out, "func init() {\n")
+	for _, init := range m.inits {
+		fmt.Fprintf(out, "\t%s()\n", init)
+	}
+	fmt.Fprintf(out, "\t_allMocked = true\n")
+	fmt.Fprintf(out, "}\n\n")
 
 	fmt.Fprintf(out, "func MOCK() *_meta {\n")
 	fmt.Fprintf(out, "\treturn nil\n")
 	fmt.Fprintf(out, "}\n\n")
 
-	fmt.Fprintf(out, "func (_ *_meta) SetController(_ctrl *gomock.Controller) {\n")
-	fmt.Fprintf(out, "\tctrl = _ctrl\n")
+	fmt.Fprintf(out, "func (_ *_meta) SetController(controller *gomock.Controller) {\n")
+	fmt.Fprintf(out, "\t_ctrl = controller\n")
 	fmt.Fprintf(out, "}\n\n")
 
 	fmt.Fprintf(out, "func EXPECT() *_package_Rec {\n")
-	fmt.Fprintf(out, "\treturn &_package_Rec{pkgMock}\n")
+	fmt.Fprintf(out, "\treturn &_package_Rec{_pkgMock}\n")
 	fmt.Fprintf(out, "}\n\n")
 
 	for base, rec := range m.recorders {
@@ -841,7 +888,13 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 				}
 			}
 
-			fi.writeReal(out)
+			if fi.name == "init" && !fi.IsMethod() {
+				fi.name = fmt.Sprintf("_real_init_%d", len(m.inits))
+				fi.writeReal(out)
+				m.inits = append(m.inits, fi.name)
+			} else {
+				fi.writeReal(out)
+			}
 			if d.Body != nil && d.Name.IsExported() {
 				fi.writeMock(out)
 				fi.writeRecorder(out, recorder)
