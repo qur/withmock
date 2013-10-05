@@ -456,6 +456,17 @@ func exprString(exp ast.Expr) string {
 		return "map[" + exprString(v.Key) + "]" + exprString(v.Value)
 	case *ast.UnaryExpr:
 		return v.Op.String() + exprString(v.X)
+	case *ast.TypeAssertExpr:
+		s := exprString(v.X) + ".("
+		if v.Type == nil {
+			s += "type"
+		} else {
+			s += exprString(v.Type)
+		}
+		s += ")"
+		return s
+	case *ast.IndexExpr:
+		return exprString(v.X) + "[" + exprString(v.Index) + "]"
 	case *ast.InterfaceType:
 		if len(v.Methods.List) == 0 {
 			return "interface{}"
