@@ -107,7 +107,7 @@ func markImport(name string, m mark) string {
 	}
 }
 
-func GenMockPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
+func GenPkg(srcPath, dstRoot, name string, mock bool) (map[string]bool, error) {
 	// Find the package source, it may be in any entry in srcPath
 	srcRoot := ""
 	for _, src := range filepath.SplitList(srcPath) {
@@ -123,12 +123,12 @@ func GenMockPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
 
 	// Write a mock version of the package
 	src := filepath.Join(srcRoot, "src", name)
-	dst := filepath.Join(dstRoot, "src", markImport(name, mockMark))
+	dst := filepath.Join(dstRoot, "src", name)
 	err := os.MkdirAll(dst, 0700)
 	if err != nil {
 		return nil, err
 	}
-	err = MakeMock(src, dst)
+	err = MakePkg(src, dst, mock)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func MockStandard(srcRoot, dstRoot, name string) error {
 	if err != nil {
 		return err
 	}
-	err = MakeMock(src, dst)
+	err = MakePkg(src, dst, true)
 	if err != nil {
 		return err
 	}

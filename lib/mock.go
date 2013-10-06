@@ -287,6 +287,7 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 type mockGen struct {
 	fset *token.FileSet
 	srcPath string
+	mockByDefault bool
 	types map[string]ast.Expr
 	recorders map[string]string
 	inits []string
@@ -294,7 +295,7 @@ type mockGen struct {
 
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
-func MakeMock(srcPath, dstPath string) error {
+func MakePkg(srcPath, dstPath string, mock bool) error {
 	isGoFile := func(info os.FileInfo) bool {
 		if info.IsDir() {
 			return false
@@ -315,6 +316,7 @@ func MakeMock(srcPath, dstPath string) error {
 		m := &mockGen{
 			fset: fset,
 			srcPath: srcPath,
+			mockByDefault: mock,
 			types: make(map[string]ast.Expr),
 			recorders: make(map[string]string),
 		}
@@ -622,7 +624,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	for _, init := range m.inits {
 		fmt.Fprintf(out, "\t%s()\n", init)
 	}
-	fmt.Fprintf(out, "\t_allMocked = true\n")
+	fmt.Fprintf(out, "\t_allMocked = %v\n", m.mockByDefault)
 	fmt.Fprintf(out, "}\n\n")
 
 	fmt.Fprintf(out, "func MOCK() *_meta {\n")

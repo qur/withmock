@@ -155,7 +155,7 @@ func (c *Context) wantToProcess(mockAllowed bool, imports map[string]bool) map[s
 
 	for name, mock := range imports {
 		label := markImport(name, normalMark)
-		if mock && mockAllowed {
+		if mock && mockAllowed && c.stdlibImports[name] {
 			label = markImport(name, mockMark)
 		}
 		names[name] = label
@@ -201,7 +201,7 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 			c.processed[label] = true
 
 			name := label
-			mock := false
+			mock := imports[name]
 
 			if n, found := c.importRewrites[label]; found {
 				name = n
@@ -219,13 +219,16 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				continue
 			}
 
-			mkpkg := LinkPkg
-			if mock {
-				mkpkg = GenMockPkg
+			if name == "code.google.com/p/gomock/gomock" {
+				// special case for gomock, as we can't mock it.
+				if _, err := LinkPkg(c.goPath, c.tmpPath, name); err != nil {
+					return nil, err
+				}
+				continue
 			}
 
 			// Process the package and get it's imports
-			pkgImports, err := mkpkg(c.goPath, c.tmpPath, name)
+			pkgImports, err := GenPkg(c.goPath, c.tmpPath, name, mock)
 			if err != nil {
 				return nil, err
 			}
