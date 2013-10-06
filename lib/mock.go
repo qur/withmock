@@ -117,9 +117,15 @@ func (fi *funcInfo) retTypes() []string {
 }
 
 func (fi *funcInfo) writeMock(out io.Writer) {
+	scopedName := fi.name
 	fmt.Fprintf(out, "func ")
 	if fi.IsMethod() {
 		fmt.Fprintf(out, "(_m %s) ", fi.recv.expr)
+		if fi.recv.expr[0] == '*' {
+			scopedName = fi.recv.expr[1:] + "." + scopedName
+		} else {
+			scopedName = fi.recv.expr + "." + scopedName
+		}
 	}
 	fmt.Fprintf(out, "%s(", fi.name)
 	args := fi.writeParams(out)
@@ -155,8 +161,8 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		fmt.Fprintf(out, "{\n")
 	}
 	if fi.varidic {
-		fmt.Fprintf(out, "\tif !_allMocked {\n")
-		fmt.Fprintf(out, "\t")
+		fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) || _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
+		fmt.Fprintf(out, "\t\t")
 		if len(fi.results) > 0 {
 			fmt.Fprintf(out, "return ")
 		}
@@ -190,8 +196,8 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		}
 		fmt.Fprintf(out, "_ctrl.Call(_m, \"%s\", args...)\n", fi.name)
 	} else {
-		fmt.Fprintf(out, "\tif !_allMocked {\n")
-		fmt.Fprintf(out, "\t")
+		fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) || _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
+		fmt.Fprintf(out, "\t\t")
 		if len(fi.results) > 0 {
 			fmt.Fprintf(out, "return ")
 		}
@@ -616,6 +622,8 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 
 	fmt.Fprintf(out, "var (\n")
 	fmt.Fprintf(out, "\t_allMocked = false\n")
+	fmt.Fprintf(out, "\t_enabledMocks = make(map[string]bool)\n")
+	fmt.Fprintf(out, "\t_disabledMocks = make(map[string]bool)\n")
 	fmt.Fprintf(out, "\t_ctrl *gomock.Controller\n")
 	fmt.Fprintf(out, "\t_pkgMock = &packageMock{}\n")
 	fmt.Fprintf(out, ")\n\n")
@@ -629,10 +637,30 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 
 	fmt.Fprintf(out, "func MOCK() *_meta {\n")
 	fmt.Fprintf(out, "\treturn nil\n")
-	fmt.Fprintf(out, "}\n\n")
+	fmt.Fprintf(out, "}\n")
 
 	fmt.Fprintf(out, "func (_ *_meta) SetController(controller *gomock.Controller) {\n")
 	fmt.Fprintf(out, "\t_ctrl = controller\n")
+	fmt.Fprintf(out, "}\n")
+
+	fmt.Fprintf(out, "func (_ *_meta) MockAll(enabled bool) {\n")
+	fmt.Fprintf(out, "\t_allMocked = enabled\n")
+	fmt.Fprintf(out, "\t_enabledMocks = make(map[string]bool)\n")
+	fmt.Fprintf(out, "\t_disabledMocks = make(map[string]bool)\n")
+	fmt.Fprintf(out, "}\n")
+
+	fmt.Fprintf(out, "func (_ *_meta) EnableMock(names ...string) {\n")
+	fmt.Fprintf(out, "\tfor _, name := range names {\n")
+	fmt.Fprintf(out, "\t\t_enabledMocks[name] = true\n")
+	fmt.Fprintf(out, "\t\tdelete(_disabledMocks, name)\n")
+	fmt.Fprintf(out, "\t}\n")
+	fmt.Fprintf(out, "}\n\n")
+
+	fmt.Fprintf(out, "func (_ *_meta) DisableMock(names ...string) {\n")
+	fmt.Fprintf(out, "\tfor _, name := range names {\n")
+	fmt.Fprintf(out, "\t\t_disabledMocks[name] = true\n")
+	fmt.Fprintf(out, "\t\tdelete(_enabledMocks, name)\n")
+	fmt.Fprintf(out, "\t}\n")
 	fmt.Fprintf(out, "}\n\n")
 
 	fmt.Fprintf(out, "func EXPECT() *_package_Rec {\n")
