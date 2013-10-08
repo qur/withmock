@@ -297,6 +297,7 @@ type mockGen struct {
 	types map[string]ast.Expr
 	recorders map[string]string
 	inits []string
+	data io.ReaderAt
 }
 
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
@@ -375,22 +376,22 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 	return nil
 }
 
-func literal(name string, types map[string]ast.Expr) (string, bool) {
-	exp := types[name]
+func (m *mockGen) literal(name string) (string, bool) {
+	exp := m.types[name]
 	switch v := exp.(type) {
 	case *ast.SelectorExpr:
-		return exprString(exp), true
+		return m.exprString(exp), true
 	case *ast.FuncType:
-		return exprString(exp), true
+		return m.exprString(exp), true
 	case *ast.BasicLit:
 		return v.Value, false
 	case *ast.CompositeLit:
-		s := exprString(v.Type) + "{"
+		s := m.exprString(v.Type) + "{"
 		for i := range v.Elts {
 			if i > 0 {
 				s += ", "
 			}
-			s += exprString(v.Elts[i])
+			s += m.exprString(v.Elts[i])
 		}
 		s += "}"
 		return s, false
@@ -400,8 +401,8 @@ func literal(name string, types map[string]ast.Expr) (string, bool) {
 		return "make(" + name + ")", false
 	case *ast.Ident:
 		alias := v.String()
-		if _, ok := types[alias]; ok && alias != name {
-			return literal(alias, types)
+		if _, ok := m.types[alias]; ok && alias != name {
+			return m.literal(alias)
 		}
 		switch alias {
 		case "int", "int8", "int16", "int32", "int64":
@@ -426,33 +427,33 @@ func literal(name string, types map[string]ast.Expr) (string, bool) {
 	}
 }
 
-func exprString(exp ast.Expr) string {
+func (m *mockGen) exprString(exp ast.Expr) string {
 	switch v := exp.(type) {
 	case *ast.BasicLit:
 		return v.Value
 	case *ast.CompositeLit:
 		s := ""
 		if v.Type != nil {
-			s += exprString(v.Type)
+			s += m.exprString(v.Type)
 		}
 		s += "{"
 		for i := range v.Elts {
 			if i > 0 {
 				s += ", "
 			}
-			s += exprString(v.Elts[i])
+			s += m.exprString(v.Elts[i])
 		}
 		s += "}"
 		return s
 	case *ast.Ident:
 		return v.Name
 	case *ast.CallExpr:
-		s := exprString(v.Fun) + "("
+		s := m.exprString(v.Fun) + "("
 		for i := range v.Args {
 			if i > 0 {
 				s += ", "
 			}
-			s += exprString(v.Args[i])
+			s += m.exprString(v.Args[i])
 		}
 		s += ")"
 		return s
@@ -460,7 +461,7 @@ func exprString(exp ast.Expr) string {
 		if v.Elt == nil {
 			return "..."
 		} else {
-			return "..." + exprString(v.Elt)
+			return "..." + m.exprString(v.Elt)
 		}
 	case *ast.ChanType:
 		s := ""
@@ -471,18 +472,25 @@ func exprString(exp ast.Expr) string {
 		if v.Dir == ast.SEND {
 			s += "<-"
 		}
-		s += " " + exprString(v.Value)
+		s += " " + m.exprString(v.Value)
 		return s
 	case *ast.KeyValueExpr:
-		return exprString(v.Key) + ": " + exprString(v.Value)
+		return m.exprString(v.Key) + ": " + m.exprString(v.Value)
 	case *ast.ParenExpr:
-		return "(" + exprString(v.X) + ")"
+		return "(" + m.exprString(v.X) + ")"
 	case *ast.FuncLit:
-		panic("exprString shouldn't be called for func literals")
+		pos1 := m.fset.Position(v.Body.Lbrace)
+		pos2 := m.fset.Position(v.Body.Rbrace)
+		body := make([]byte, pos2.Offset-pos1.Offset+1)
+		_, err := m.data.ReadAt(body, int64(pos1.Offset))
+		if err != nil {
+			panic(fmt.Sprintf("Failed to read from m.data: %s", err))
+		}
+		return m.exprString(v.Type) + " " + string(body)
 	case *ast.StarExpr:
-		return "*" + exprString(v.X)
+		return "*" + m.exprString(v.X)
 	case *ast.SelectorExpr:
-		return exprString(v.X) + "." + v.Sel.Name
+		return m.exprString(v.X) + "." + v.Sel.Name
 	case *ast.StructType:
 		s := "struct {\n"
 		for _, field := range v.Fields.List {
@@ -491,33 +499,33 @@ func exprString(exp ast.Expr) string {
 				names = append(names, ident.Name)
 			}
 			s += "\t" + strings.Join(names, ", ") + " "
-			s += exprString(field.Type) + "\n"
+			s += m.exprString(field.Type) + "\n"
 		}
 		s += "}"
 		return s
 	case *ast.ArrayType:
 		if v.Len == nil {
 			// Slice
-			return "[]" + exprString(v.Elt)
+			return "[]" + m.exprString(v.Elt)
 		} else {
 			// Array
-			return "[" + exprString(v.Len) + "]" + exprString(v.Elt)
+			return "[" + m.exprString(v.Len) + "]" + m.exprString(v.Elt)
 		}
 	case *ast.MapType:
-		return "map[" + exprString(v.Key) + "]" + exprString(v.Value)
+		return "map[" + m.exprString(v.Key) + "]" + m.exprString(v.Value)
 	case *ast.UnaryExpr:
-		return v.Op.String() + exprString(v.X)
+		return v.Op.String() + m.exprString(v.X)
 	case *ast.TypeAssertExpr:
-		s := exprString(v.X) + ".("
+		s := m.exprString(v.X) + ".("
 		if v.Type == nil {
 			s += "type"
 		} else {
-			s += exprString(v.Type)
+			s += m.exprString(v.Type)
 		}
 		s += ")"
 		return s
 	case *ast.IndexExpr:
-		return exprString(v.X) + "[" + exprString(v.Index) + "]"
+		return m.exprString(v.X) + "[" + m.exprString(v.Index) + "]"
 	case *ast.InterfaceType:
 		if len(v.Methods.List) == 0 {
 			return "interface{}"
@@ -533,7 +541,7 @@ func exprString(exp ast.Expr) string {
 							if i > 0 {
 								s += ", "
 							}
-							s += exprString(param.Type)
+							s += m.exprString(param.Type)
 						}
 					}
 					s += ")"
@@ -546,16 +554,16 @@ func exprString(exp ast.Expr) string {
 							if i > 0 {
 								s += ", "
 							}
-							s += exprString(result.Type)
+							s += m.exprString(result.Type)
 						}
 						if len(v.Results.List) > 1 {
 							s += ")"
 						}
 					}
 				case *ast.SelectorExpr:
-					s += exprString(v)
+					s += m.exprString(v)
 				case *ast.Ident:
-					s += exprString(v)
+					s += m.exprString(v)
 				default:
 					panic(fmt.Sprintf("Don't expect %T in interface", field.Type))
 				}
@@ -571,7 +579,7 @@ func exprString(exp ast.Expr) string {
 				if i > 0 {
 					s += ", "
 				}
-				s += exprString(param.Type)
+				s += m.exprString(param.Type)
 			}
 		}
 		s += ")"
@@ -584,7 +592,7 @@ func exprString(exp ast.Expr) string {
 				if i > 0 {
 					s += ", "
 				}
-				s += exprString(result.Type)
+				s += m.exprString(result.Type)
 			}
 			if len(v.Results.List) > 1 {
 				s += ")"
@@ -592,7 +600,7 @@ func exprString(exp ast.Expr) string {
 		}
 		return s
 	case *ast.BinaryExpr:
-		return exprString(v.X) + v.Op.String() + exprString(v.Y)
+		return m.exprString(v.X) + v.Op.String() + m.exprString(v.Y)
 	default:
 		panic(fmt.Sprintf("Can't convert (%v)%T to string in exprString", exp, exp))
 	}
@@ -686,7 +694,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 			fmt.Fprintf(out, "type %s struct {\n", mock)
 			fmt.Fprintf(out, "\t%s\n", name)
 			fmt.Fprintf(out, "}\n")
-			lit, cast := literal(name, m.types)
+			lit, cast := m.literal(name)
 			if cast {
 				fmt.Fprintf(out, "func (_ *_meta) New%s(val %s) %s {\n",
 					name, lit, retType)
@@ -754,6 +762,9 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 		return err
 	}
 	defer data.Close()
+
+	// Make sure data is available to exprString/literal
+	m.data = data
 
 	if len(f.Comments) > 0 {
 		c := f.Comments[0].Text()
@@ -826,13 +837,13 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 				// We can't ignore private types, as we might be using them.
 				if len(d.Specs) == 1 {
 					t := d.Specs[0].(*ast.TypeSpec)
-					fmt.Fprintf(out, "type %s %s\n\n", t.Name, exprString(t.Type))
+					fmt.Fprintf(out, "type %s %s\n\n", t.Name, m.exprString(t.Type))
 					m.types[t.Name.String()] = t.Type
 				} else {
 					fmt.Fprintf(out, "type (\n")
 					for i := range d.Specs {
 						t := d.Specs[i].(*ast.TypeSpec)
-						fmt.Fprintf(out, "\t%s %s\n", t.Name, exprString(t.Type))
+						fmt.Fprintf(out, "\t%s %s\n", t.Name, m.exprString(t.Type))
 						m.types[t.Name.String()] = t.Type
 					}
 					fmt.Fprintf(out, ")\n\n")
@@ -847,26 +858,12 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					}
 					fmt.Fprintf(out, "\t" + strings.Join(names, ", "))
 					if s.Type != nil {
-						fmt.Fprintf(out, " %s", exprString(s.Type))
+						fmt.Fprintf(out, " %s", m.exprString(s.Type))
 					}
 					switch len(s.Values) {
 					case 0:
 					case 1:
-						fmt.Fprintf(out, " = ")
-						v := s.Values[0]
-						if f, ok := v.(*ast.FuncLit); ok {
-							pos1 := m.fset.Position(f.Body.Lbrace)
-							pos2 := m.fset.Position(f.Body.Rbrace)
-							body := make([]byte, pos2.Offset-pos1.Offset+1)
-							_, err := data.ReadAt(body, int64(pos1.Offset))
-							if err != nil {
-								return err
-							}
-							fmt.Fprintf(out, "%s %s", exprString(f.Type),
-								string(body))
-						} else {
-							fmt.Fprintf(out, "%s", exprString(s.Values[0]))
-						}
+						fmt.Fprintf(out, " = %s", m.exprString(s.Values[0]))
 					default:
 						return fmt.Errorf("Multiple values for a var not implemented")
 					}
@@ -887,7 +884,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					switch len(s.Values) {
 					case 0:
 					case 1:
-						fmt.Fprintf(out, " = %s", exprString(s.Values[0]))
+						fmt.Fprintf(out, " = %s", m.exprString(s.Values[0]))
 					default:
 						return fmt.Errorf("Multiple values for a constant not implemented")
 					}
@@ -904,18 +901,18 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 				if len(d.Recv.List[0].Names) > 0 {
 					fi.recv.name = d.Recv.List[0].Names[0].String()
 				}
-				t := exprString(d.Recv.List[0].Type)
+				t := m.exprString(d.Recv.List[0].Type)
 				fi.recv.expr = t
 				recorder = fmt.Sprintf("_%s_Rec", t)
 				if s, ok := d.Recv.List[0].Type.(*ast.StarExpr); ok {
-					recorder = fmt.Sprintf("_%s_Rec", exprString(s.X))
+					recorder = fmt.Sprintf("_%s_Rec", m.exprString(s.X))
 				}
 				m.recorders[t] = recorder
 			}
 			for _, param := range d.Type.Params.List {
 				p := field{
 					names: make([]string, len(param.Names)),
-					expr: exprString(param.Type),
+					expr: m.exprString(param.Type),
 				}
 				for i, name := range param.Names {
 				    p.names[i] = name.String()
@@ -927,7 +924,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 				for _, result := range d.Type.Results.List {
 					r := field{
 						names: make([]string, len(result.Names)),
-						expr: exprString(result.Type),
+						expr: m.exprString(result.Type),
 					}
 					for i, name := range result.Names {
 						r.names[i] = name.String()

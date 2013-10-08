@@ -36,23 +36,23 @@ func stubImports(goPath string, file *ast.File) error {
 	return nil
 }
 
-func tryLiterals(types map[string]ast.Expr) (err error) {
+func tryLiterals(m *mockGen) (err error) {
 	defer func() {
 		if p := recover(); p != nil {
 			err = fmt.Errorf("%s", p)
 		}
 	}()
 
-	for name := range types {
+	for name := range m.types {
 		if ast.IsExported(name) {
 			// We don't want to generate literals for exported types
 			continue
 		}
-		if _, ok := types[name].(*ast.InterfaceType); ok {
+		if _, ok := m.types[name].(*ast.InterfaceType); ok {
 			// We don't want to generate literals for interfaces
 			continue
 		}
-		literal(name, types)
+		m.literal(name)
 	}
 
 	return nil
@@ -93,7 +93,7 @@ func process(filename, goPath string) error {
 		return err
 	}
 
-	return tryLiterals(m.types)
+	return tryLiterals(m)
 }
 
 func TestMockFile(t *testing.T) {
