@@ -32,7 +32,10 @@ new_methods     - do we generate NewXXX methods for private types, so that we
 
 no_pkgs         - do we exit sensibly when presented with no packages to test?
 
-runtime         -
+runtime         - check that we can control the mocking behaviour at runtime.
+                  this means enabling and disabling mocks either across an
+                  entire package, or for parts of a package on a test by test
+                  basis.
 
 shared_types    -
 
