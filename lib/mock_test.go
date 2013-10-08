@@ -101,7 +101,7 @@ func TestMockFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %s", err)
 	}
-	os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir)
 
 	files := []string{}
 
