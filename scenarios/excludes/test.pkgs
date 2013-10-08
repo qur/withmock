@@ -1,0 +1,2 @@
+# This package should not be mocked
+github.com/qur/withmock/scenarios/excludes/lib

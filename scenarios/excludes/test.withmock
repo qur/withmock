@@ -1,0 +1,3 @@
+#!/bin/bash
+
+exec withmock -exclude test.pkgs go test "$@"

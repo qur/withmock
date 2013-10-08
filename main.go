@@ -19,6 +19,7 @@ var (
 	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
 	gocov = flag.Bool("gocov", false, "install gocov package into temporary GOPATH")
 	pkgFile = flag.String("P", "", "install extra packages listed in the given file")
+	exclFile = flag.String("exclude", "", "any package listed in the given file will not be mocked, even if marked in test code.")
 )
 
 func usage() {
@@ -75,6 +76,14 @@ func doit() error {
 		ctxt.DisableRewrite()
 	}
 
+	// Load the excluded packages file if configured
+
+	if *exclFile != "" {
+		if err := ctxt.ExcludePackagesFromFile(*exclFile); err != nil {
+			return err
+		}
+	}
+
 	// Now we add the package that we want to test to the context, this will
 	// install the imports used by that package (mocking them as approprite).
 
@@ -89,6 +98,7 @@ func doit() error {
 	}
 
 	// Add extra packages if configured
+
 	if *pkgFile != "" {
 		if err := ctxt.LinkPackagesFromFile(*pkgFile); err != nil {
 			return err

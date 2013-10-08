@@ -48,3 +48,6 @@ func_literals   - originally we would replace function literals with a function
                   easiest way to know what to put there.  since implementing
                   runtime control this is no longer appropriate, and we need to
                   make sure that the original function body is available.
+
+excludes        - make sure that when we specify that a package is excluded from
+                  mocking that it actually does get excluded.

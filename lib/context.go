@@ -21,6 +21,8 @@ type Context struct {
 	stdlibImports map[string]bool
 	imports []string
 
+	excludes map[string]bool
+
 	processed map[string]bool
 	importRewrites map[string]string
 
@@ -71,6 +73,8 @@ func NewContext() (*Context, error) {
 		processed: make(map[string]bool),
 		importRewrites: make(map[string]string),
 		doRewrite: true,
+		// create excludes already including gomock, as we can't mock it.
+		excludes: map[string]bool{"code.google.com/p/gomock/gomock": true},
 	}, nil
 }
 
@@ -219,8 +223,9 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				continue
 			}
 
-			if name == "code.google.com/p/gomock/gomock" {
-				// special case for gomock, as we can't mock it.
+			if c.excludes[name] {
+				// this package has been specifically excluded from mocking, so
+				// we just link it, even if mocked is indicated.
 				if _, err := LinkPkg(c.goPath, c.tmpPath, name); err != nil {
 					return nil, err
 				}
@@ -292,6 +297,19 @@ func (c *Context) LinkPackagesFromFile(path string) error {
 		if err := c.LinkPackage(pkg); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (c *Context) ExcludePackagesFromFile(path string) error {
+	pkgs, err := readPackages(path)
+	if err != nil {
+		return err
+	}
+
+	for _, pkg := range pkgs {
+		c.excludes[pkg] = true
 	}
 
 	return nil

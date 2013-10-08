@@ -21,6 +21,7 @@ var (
 	gocov = flag.Bool("gocov", false, "run tests using gocov instead of go")
 	verbose = flag.Bool("v", false, "add '-v' to the command run, so the tests are run in verbose mode")
 	pkgFile = flag.String("P", "", "install extra packages listed in the given file")
+	exclFile = flag.String("exclude", "", "any package listed in the given file will not be mocked, even if marked in test code.")
 )
 
 func usage() {
@@ -98,6 +99,14 @@ func doit() error {
 		ctxt.DisableRewrite()
 	}
 
+	// Load the excluded packages file if configured
+
+	if *exclFile != "" {
+		if err := ctxt.ExcludePackagesFromFile(*exclFile); err != nil {
+			return err
+		}
+	}
+
 	// Start building the command string that we will run
 
 	command := "go"
@@ -118,6 +127,7 @@ func doit() error {
 	}
 
 	// Add extra packages if configured
+
 	if *pkgFile != "" {
 		if err := ctxt.LinkPackagesFromFile(*pkgFile); err != nil {
 			return err
