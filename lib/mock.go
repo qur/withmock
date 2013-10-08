@@ -673,22 +673,29 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 			continue
 		}
 		name := base
+		mock := "Mock_" + name
+		retType := mock
 		mod := ""
 		if base[0] == '*' {
 			name = base[1:]
+			mock = "Mock_" + name
+			retType = "*" + mock
 			mod = "&"
 		}
 		_, isInterface := m.types[name].(*ast.InterfaceType)
 		if !isInterface && !ast.IsExported(name) {
+			fmt.Fprintf(out, "type %s struct {\n", mock)
+			fmt.Fprintf(out, "\t%s\n", name)
+			fmt.Fprintf(out, "}\n")
 			lit, cast := literal(name, m.types)
 			if cast {
 				fmt.Fprintf(out, "func (_ *_meta) New%s(val %s) %s {\n",
-					name, lit, base)
-				fmt.Fprintf(out, "\treturn (%s)(%sval)\n", base, mod)
+					name, lit, retType)
+				fmt.Fprintf(out, "\treturn %s%s{(%s)(val)}\n", mod, mock, base)
 			} else {
-				fmt.Fprintf(out, "func (_ *_meta) New%s() %s {\n", name, base)
-				fmt.Fprintf(out, "\tval := %s\n", lit)
-				fmt.Fprintf(out, "\treturn %sval\n", mod)
+				fmt.Fprintf(out, "func (_ *_meta) New%s() %s {\n", name,
+					retType)
+				fmt.Fprintf(out, "\treturn %s%s{%s}\n", mod, mock, lit)
 			}
 			fmt.Fprintf(out, "}\n\n")
 		}
