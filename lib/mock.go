@@ -776,6 +776,10 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 			case token.IMPORT:
 				if len(d.Specs) == 1 {
 					s := d.Specs[0].(*ast.ImportSpec)
+					impPath := strings.Trim(s.Path.Value, "\"")
+					if impPath == "code.google.com/p/gomock/gomock" {
+						continue
+					}
 					if s.Doc != nil {
 						fmt.Fprintf(out, "%s", s.Doc.Text())
 					}
@@ -783,7 +787,6 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					if s.Name != nil {
 						fmt.Fprintf(out, "%s ", s.Name)
 					} else {
-						impPath := strings.Trim(s.Path.Value, "\"")
 						name, err := getPackageName(impPath, m.srcPath)
 						if err != nil {
 							return err
@@ -796,11 +799,14 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 				fmt.Fprintf(out, "import (\n")
 				for _, spec := range d.Specs {
 					s := spec.(*ast.ImportSpec)
+					impPath := strings.Trim(s.Path.Value, "\"")
+					if impPath == "code.google.com/p/gomock/gomock" {
+						continue
+					}
 					fmt.Fprintf(out, "\t")
 					if s.Name != nil {
 						fmt.Fprintf(out, "%s ", s.Name)
 					} else {
-						impPath := strings.Trim(s.Path.Value, "\"")
 						name, err := getPackageName(impPath, m.srcPath)
 						if err != nil {
 							return err
