@@ -39,3 +39,9 @@ shared_types    -
 uses_gomock     - packages that already use gomock should only import it once.
 
 with_deps       -
+
+func_literals   - originally we would replace function literals with a function
+                  that would panic if you actually called it - since it was the
+                  easiest way to know what to put there.  since implementing
+                  runtime control this is no longer appropriate, and we need to
+                  make sure that the original function body is available.
