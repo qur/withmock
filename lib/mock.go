@@ -478,8 +478,7 @@ func exprString(exp ast.Expr) string {
 	case *ast.ParenExpr:
 		return "(" + exprString(v.X) + ")"
 	case *ast.FuncLit:
-		// TODO: ...
-		return exprString(v.Type) + "{ panic(\"!TODO!\") }"
+		panic("exprString shouldn't be called for func literals")
 	case *ast.StarExpr:
 		return "*" + exprString(v.X)
 	case *ast.SelectorExpr:
@@ -846,10 +845,6 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					for _, ident := range s.Names {
 						names = append(names, ident.Name)
 					}
-					if len(names) == 0 {
-						// Don't care about private variables
-						continue
-					}
 					fmt.Fprintf(out, "\t" + strings.Join(names, ", "))
 					if s.Type != nil {
 						fmt.Fprintf(out, " %s", exprString(s.Type))
@@ -857,7 +852,21 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					switch len(s.Values) {
 					case 0:
 					case 1:
-						fmt.Fprintf(out, " = %s", exprString(s.Values[0]))
+						fmt.Fprintf(out, " = ")
+						v := s.Values[0]
+						if f, ok := v.(*ast.FuncLit); ok {
+							pos1 := m.fset.Position(f.Body.Lbrace)
+							pos2 := m.fset.Position(f.Body.Rbrace)
+							body := make([]byte, pos2.Offset-pos1.Offset+1)
+							_, err := data.ReadAt(body, int64(pos1.Offset))
+							if err != nil {
+								return err
+							}
+							fmt.Fprintf(out, "%s %s", exprString(f.Type),
+								string(body))
+						} else {
+							fmt.Fprintf(out, "%s", exprString(s.Values[0]))
+						}
 					default:
 						return fmt.Errorf("Multiple values for a var not implemented")
 					}
