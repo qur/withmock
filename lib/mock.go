@@ -30,63 +30,103 @@ func newIfInfo(filename string) *ifInfo {
 	}
 }
 
-func genInterface(name string, i *ifInfo) error {
-	out, err := os.Create(i.filename)
+func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
+	info := i[name]
+
+	methods := []*funcInfo{}
+
+	m := &mockGen{}
+
+	t := info.types[tname]
+	for _, f := range t.Methods.List {
+		switch v := f.Type.(type) {
+		case *ast.FuncType:
+			fi := &funcInfo{
+				name: f.Names[0].Name,
+				realDisabled: true,
+			}
+			if v.Params != nil {
+				for _, param := range v.Params.List {
+					field := field{
+						expr: m.exprString(param.Type),
+					}
+					fi.params = append(fi.params, field)
+				}
+			}
+			if v.Results != nil {
+				for _, result := range v.Results.List {
+					field := field{
+						expr: m.exprString(result.Type),
+					}
+					fi.results = append(fi.results, field)
+				}
+			}
+			methods = append(methods, fi)
+		case *ast.Ident:
+			n := v.String()
+			if _, ok := info.types[n]; !ok {
+				return nil, fmt.Errorf("Unknown type %s in package %s", n, name)
+			}
+			m, err := i.getMethods(name, n)
+			if err != nil {
+				return nil, err
+			}
+			methods = append(methods, m...)
+		case *ast.SelectorExpr:
+			p, ok := v.X.(*ast.Ident)
+			if !ok {
+				panic(fmt.Sprintf("Don't know how to handle selector of non" +
+					" Ident value: %T", v.X))
+			}
+			fmt.Printf("??? - %s - %s - %T\n", p, v.Sel, f.Type)
+		default:
+			panic(fmt.Sprintf("Don't expect %T in interface", f.Type))
+		}
+	}
+
+	return methods, nil
+}
+
+func (i Interfaces) genInterface(name string) error {
+	info := i[name]
+
+	out, err := os.Create(info.filename)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
 
-	m := &mockGen{}
-
 	fmt.Fprintf(out, "package %s\n\n", name)
 	fmt.Fprintf(out, "import (\n")
 	fmt.Fprintf(out, "\tgomock \"code.google.com/p/gomock/gomock\"\n")
 	fmt.Fprintf(out, ")\n\n")
-	for name, t := range i.types {
-		fmt.Printf("    %s\n", name)
-		fmt.Fprintf(out, "type Mock_%s struct{}\n", name)
-		fmt.Fprintf(out, "type _mock_%s_rec struct{\n", name)
-		fmt.Fprintf(out, "\tmock *Mock_%s\n", name)
+	for tname := range info.types {
+		fmt.Printf("    %s\n", tname)
+		fmt.Fprintf(out, "type Mock%s struct{}\n", tname)
+		fmt.Fprintf(out, "type _mock_%s_rec struct{\n", tname)
+		fmt.Fprintf(out, "\tmock *Mock%s\n", tname)
 		fmt.Fprintf(out, "}\n\n")
 
-		fmt.Fprintf(out, "func (_ *_meta) New%s() *Mock_%s {\n", name, name)
-		fmt.Fprintf(out, "\treturn &Mock_%s{}\n", name)
+		// Make sure that our mock satisifies the interface
+		fmt.Fprintf(out, "var _ %s = &Mock%s{}\n", tname, tname)
+
+		fmt.Fprintf(out, "func (_ *_meta) New%s() *Mock%s {\n", tname, tname)
+		fmt.Fprintf(out, "\treturn &Mock%s{}\n", tname)
 		fmt.Fprintf(out, "}\n")
-		fmt.Fprintf(out, "func (_m *Mock_%s) EXPECT() *_mock_%s_rec {\n",
-			name, name)
-		fmt.Fprintf(out, "\treturn &_mock_%s_rec{_m}\n", name)
+		fmt.Fprintf(out, "func (_m *Mock%s) EXPECT() *_mock_%s_rec {\n",
+			tname, tname)
+		fmt.Fprintf(out, "\treturn &_mock_%s_rec{_m}\n", tname)
 		fmt.Fprintf(out, "}\n\n")
 
-		for _, f := range t.Methods.List {
-			switch v := f.Type.(type) {
-			case *ast.FuncType:
-				fi := &funcInfo{
-					name: f.Names[0].Name,
-					realDisabled: true,
-				}
-				fi.recv.expr = "*Mock_" + name
-				if v.Params != nil {
-					for _, param := range v.Params.List {
-						field := field{
-							expr: m.exprString(param.Type),
-						}
-						fi.params = append(fi.params, field)
-					}
-				}
-				if v.Results != nil {
-					for _, result := range v.Results.List {
-						field := field{
-							expr: m.exprString(result.Type),
-						}
-						fi.results = append(fi.results, field)
-					}
-				}
-				fi.writeMock(out)
-				fi.writeRecorder(out, "_mock_"+name+"_rec")
-			default:
-				panic(fmt.Sprintf("??? - %T", f.Type))
-			}
+		methods, err := i.getMethods(name, tname)
+		if err != nil {
+			return err
+		}
+
+		for _, m := range methods {
+			m.recv.expr = "*Mock" + tname
+			m.writeMock(out)
+			m.writeRecorder(out, "_mock_"+tname+"_rec")
 		}
 	}
 
@@ -98,7 +138,7 @@ func genInterfaces(interfaces Interfaces) error {
 	for name, i := range interfaces {
 		fmt.Printf("%s: %s\n", name, i.filename)
 
-		if err := genInterface(name, i); err != nil {
+		if err := interfaces.genInterface(name); err != nil {
 			return err
 		}
 
@@ -481,6 +521,9 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 		iface := newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go"))
 		interfaces[name] = iface
 		for n, t := range m.types {
+			if !ast.IsExported(n) {
+				continue
+			}
 			if i, ok := t.(*ast.InterfaceType); ok && len(i.Methods.List) > 0 {
 				iface.types[n] = i
 			}
@@ -650,10 +693,10 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 		} else {
 			s := "interface {\n"
 			for _, field := range v.Methods.List {
+				s += "\t"
 				switch v := field.Type.(type) {
 				case *ast.FuncType:
-					s += "\t" + field.Names[0].Name
-					s += "("
+					s += field.Names[0].Name + "("
 					if v.Params != nil {
 						for i, param := range v.Params.List {
 							if i > 0 {
