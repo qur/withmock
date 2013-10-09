@@ -51,3 +51,6 @@ func_literals   - originally we would replace function literals with a function
 
 excludes        - make sure that when we specify that a package is excluded from
                   mocking that it actually does get excluded.
+
+embedding       - the mocking should handle embedded types and the methods
+                  implemented by those types pretty much as expected.
