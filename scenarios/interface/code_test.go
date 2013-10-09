@@ -5,7 +5,7 @@ import (
 
 	"code.google.com/p/gomock/gomock"
 
-	"github.com/qur/withmock/scenarios/new_methods/lib" // mock
+	"github.com/qur/withmock/scenarios/interface/lib" // mock
 )
 
 func TestShow(t *testing.T) {
