@@ -16,6 +16,103 @@ import (
 	"strings"
 )
 
+type ifInfo struct {
+	filename string
+	types map[string]*ast.InterfaceType
+}
+
+type Interfaces map[string]*ifInfo
+
+func newIfInfo(filename string) *ifInfo {
+	return &ifInfo{
+		filename: filename,
+		types: make(map[string]*ast.InterfaceType),
+	}
+}
+
+func genInterface(name string, i *ifInfo) error {
+	out, err := os.Create(i.filename)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	m := &mockGen{}
+
+	fmt.Fprintf(out, "package %s\n\n", name)
+	fmt.Fprintf(out, "import (\n")
+	fmt.Fprintf(out, "\tgomock \"code.google.com/p/gomock/gomock\"\n")
+	fmt.Fprintf(out, ")\n\n")
+	for name, t := range i.types {
+		fmt.Printf("    %s\n", name)
+		fmt.Fprintf(out, "type Mock_%s struct{}\n", name)
+		fmt.Fprintf(out, "type _mock_%s_rec struct{\n", name)
+		fmt.Fprintf(out, "\tmock *Mock_%s\n", name)
+		fmt.Fprintf(out, "}\n\n")
+
+		fmt.Fprintf(out, "func (_ *_meta) New%s() *Mock_%s {\n", name, name)
+		fmt.Fprintf(out, "\treturn &Mock_%s{}\n", name)
+		fmt.Fprintf(out, "}\n")
+		fmt.Fprintf(out, "func (_m *Mock_%s) EXPECT() *_mock_%s_rec {\n",
+			name, name)
+		fmt.Fprintf(out, "\treturn &_mock_%s_rec{_m}\n", name)
+		fmt.Fprintf(out, "}\n\n")
+
+		for _, f := range t.Methods.List {
+			switch v := f.Type.(type) {
+			case *ast.FuncType:
+				fi := &funcInfo{
+					name: f.Names[0].Name,
+					realDisabled: true,
+				}
+				fi.recv.expr = "*Mock_" + name
+				if v.Params != nil {
+					for _, param := range v.Params.List {
+						field := field{
+							expr: m.exprString(param.Type),
+						}
+						fi.params = append(fi.params, field)
+					}
+				}
+				if v.Results != nil {
+					for _, result := range v.Results.List {
+						field := field{
+							expr: m.exprString(result.Type),
+						}
+						fi.results = append(fi.results, field)
+					}
+				}
+				fi.writeMock(out)
+				fi.writeRecorder(out, "_mock_"+name+"_rec")
+			default:
+				panic(fmt.Sprintf("??? - %T", f.Type))
+			}
+		}
+	}
+
+	return nil
+}
+
+func genInterfaces(interfaces Interfaces) error {
+	fmt.Printf("----- \\/ -----\n")
+	for name, i := range interfaces {
+		fmt.Printf("%s: %s\n", name, i.filename)
+
+		if err := genInterface(name, i); err != nil {
+			return err
+		}
+
+		// TODO: currently we need to use goimports to add missing imports, we
+		// need to sort out our own imports, then we can switch to gofmt.
+		if err := fixup(i.filename); err != nil {
+			return err
+		}
+	}
+	fmt.Printf("----- /\\ -----\n")
+
+	return nil
+}
+
 type field struct {
 	names []string
 	expr string
@@ -24,6 +121,7 @@ type field struct {
 type funcInfo struct {
 	name string
 	varidic bool
+	realDisabled bool
 	recv struct {
 		name, expr string
 	}
@@ -161,24 +259,27 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		fmt.Fprintf(out, "{\n")
 	}
 	if fi.varidic {
-		fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) || _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
-		fmt.Fprintf(out, "\t\t")
-		if len(fi.results) > 0 {
-			fmt.Fprintf(out, "return ")
+		if !fi.realDisabled {
+			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) " +
+				"|| _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
+			fmt.Fprintf(out, "\t\t")
+			if len(fi.results) > 0 {
+				fmt.Fprintf(out, "return ")
+			}
+			if fi.IsMethod() {
+				fmt.Fprintf(out, "_m.")
+			}
+			fmt.Fprintf(out, "_real_%s(", fi.name)
+			for i := 0; i < args-1; i++ {
+				fmt.Fprintf(out, "p%d, ", i)
+			}
+			fmt.Fprintf(out, "p%d...", args-1)
+			fmt.Fprintf(out, ")\n")
+			if len(fi.results) == 0 {
+				fmt.Fprintf(out, "\treturn")
+			}
+			fmt.Fprintf(out, "\t}\n")
 		}
-		if fi.IsMethod() {
-			fmt.Fprintf(out, "_m.")
-		}
-		fmt.Fprintf(out, "_real_%s(", fi.name)
-		for i := 0; i < args-1; i++ {
-			fmt.Fprintf(out, "p%d, ", i)
-		}
-		fmt.Fprintf(out, "p%d...", args-1)
-		fmt.Fprintf(out, ")\n")
-		if len(fi.results) == 0 {
-			fmt.Fprintf(out, "\treturn")
-		}
-		fmt.Fprintf(out, "\t}\n")
 		fmt.Fprintf(out, "\targs := []interface{}{")
 		for i := 0; i < args-1; i++ {
 			if i > 0 {
@@ -196,26 +297,29 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		}
 		fmt.Fprintf(out, "_ctrl.Call(_m, \"%s\", args...)\n", fi.name)
 	} else {
-		fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) || _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
-		fmt.Fprintf(out, "\t\t")
-		if len(fi.results) > 0 {
-			fmt.Fprintf(out, "return ")
-		}
-		if fi.IsMethod() {
-			fmt.Fprintf(out, "_m.")
-		}
-		fmt.Fprintf(out, "_real_%s(", fi.name)
-		for i := 0; i < args; i++ {
-			if i > 0 {
-				fmt.Fprintf(out, ", ")
+		if !fi.realDisabled {
+			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) " +
+				"||  _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
+			fmt.Fprintf(out, "\t\t")
+			if len(fi.results) > 0 {
+				fmt.Fprintf(out, "return ")
 			}
-			fmt.Fprintf(out, "p%d", i)
+			if fi.IsMethod() {
+				fmt.Fprintf(out, "_m.")
+			}
+			fmt.Fprintf(out, "_real_%s(", fi.name)
+			for i := 0; i < args; i++ {
+				if i > 0 {
+					fmt.Fprintf(out, ", ")
+				}
+				fmt.Fprintf(out, "p%d", i)
+			}
+			fmt.Fprintf(out, ")\n")
+			if len(fi.results) == 0 {
+				fmt.Fprintf(out, "\treturn")
+			}
+			fmt.Fprintf(out, "\t}\n")
 		}
-		fmt.Fprintf(out, ")\n")
-		if len(fi.results) == 0 {
-			fmt.Fprintf(out, "\treturn")
-		}
-		fmt.Fprintf(out, "\t}\n")
 		fmt.Fprintf(out, "\t")
 		if len(fi.results) > 0 {
 			fmt.Fprintf(out, "ret := ")
@@ -319,6 +423,8 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 		return err
 	}
 
+	interfaces := make(Interfaces)
+
 	for name, pkg := range pkgs {
 		m := &mockGen{
 			fset: fset,
@@ -371,6 +477,18 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 		if err != nil {
 			return err
 		}
+
+		iface := newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go"))
+		interfaces[name] = iface
+		for n, t := range m.types {
+			if i, ok := t.(*ast.InterfaceType); ok && len(i.Methods.List) > 0 {
+				iface.types[n] = i
+			}
+		}
+	}
+
+	if err := genInterfaces(interfaces); err != nil {
+		return err
 	}
 
 	return nil
