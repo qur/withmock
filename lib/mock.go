@@ -17,8 +17,7 @@ import (
 )
 
 type external struct {
-	impPath string
-	name string
+	name, impPath, selector string
 }
 
 type ifDetails struct {
@@ -57,10 +56,11 @@ func (id *ifDetails) addLocal(name string) {
 	id.locals = append(id.locals, name)
 }
 
-func (id *ifDetails) addExternal(importPath, name string) {
+func (id *ifDetails) addExternal(name, importPath, selector string) {
 	id.externals = append(id.externals, external{
-		impPath: importPath,
 		name: name,
+		impPath: importPath,
+		selector: selector,
 	})
 }
 
@@ -95,7 +95,7 @@ func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
 				panic(fmt.Sprintf("Unkown package %s in interface %s",
 					p, t.Name))
 			}
-			id.addExternal(impPath, v.Sel.String())
+			id.addExternal(p.String(), impPath, v.Sel.String())
 			fmt.Printf("??? - %s - %s - %T\n", p, v.Sel, f.Type)
 		default:
 			panic(fmt.Sprintf("Don't expect %T in interface", f.Type))
@@ -135,7 +135,21 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 	}
 
 	for _, e := range t.externals {
-		fmt.Printf("??? - %s - %s\n", e.impPath, e.name)
+		if _, ok := i[e.name]; !ok {
+			info, err := loadInterfaceInfo(e.impPath)
+			if err != nil {
+				return nil, err
+			}
+			i[e.name] = info
+		}
+
+		m, err := i.getMethods(e.name, e.selector)
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, m...)
+
+		fmt.Printf("??? - %s - %s - %s\n", e.name, e.impPath, e.selector)
 	}
 
 	return methods, nil
@@ -1179,4 +1193,8 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 	fmt.Fprintf(out, "var _ = gomock.Any()\n")
 
 	return nil
+}
+
+func loadInterfaceInfo(impPath string) (*ifInfo, error) {
+	return nil, fmt.Errorf("loadInterfaceInfo not implemented")
 }
