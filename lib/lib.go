@@ -15,6 +15,15 @@ import (
 	"strings"
 )
 
+func LookupImportPath(impPath string) (string, error) {
+	path, err := GetOutput("go", "list", "-e", "-f", "{{.Dir}}", impPath)
+	if err != nil {
+		return "", err
+	}
+
+	return path, nil
+}
+
 func GetOutput(name string, args ...string) (string, error) {
 	buf := &bytes.Buffer{}
 	cmd := exec.Command(name, args...)

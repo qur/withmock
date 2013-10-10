@@ -253,7 +253,7 @@ func (c *Context) LinkPackage(pkg string) error {
 }
 
 func (c *Context) AddPackage(pkgName string) (string, error) {
-	path, err := GetOutput("go", "list", "-e", "-f", "{{.Dir}}", pkgName)
+	path, err := LookupImportPath(pkgName)
 	if err != nil {
 		return "", err
 	}

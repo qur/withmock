@@ -204,6 +204,12 @@ func (i Interfaces) genInterface(name string) error {
 func genInterfaces(interfaces Interfaces) error {
 	fmt.Printf("----- \\/ -----\n")
 	for name, i := range interfaces {
+		if i.filename == "" {
+			// no filename means this package was only parsed for information,
+			// we don't need to write anything out
+			continue
+		}
+
 		fmt.Printf("%s: %s\n", name, i.filename)
 
 		if err := interfaces.genInterface(name); err != nil {
@@ -1196,5 +1202,61 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 }
 
 func loadInterfaceInfo(impPath string) (*ifInfo, error) {
-	return nil, fmt.Errorf("loadInterfaceInfo not implemented")
+	path, err := LookupImportPath(impPath)
+	if err != nil {
+		return nil, err
+	}
+
+	imports := make(map[string]string)
+	ifInfo := newIfInfo("")
+
+	fmt.Printf("process package %s at %s\n", impPath, path)
+
+	isGoFile := func(info os.FileInfo) bool {
+		if info.IsDir() {
+			return false
+		}
+		if strings.HasSuffix(info.Name(), "_test.go") {
+			return false
+		}
+		return strings.HasSuffix(info.Name(), ".go")
+	}
+
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, path, isGoFile, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			for _, i := range file.Imports {
+				impPath := strings.Trim(i.Path.Value, "\"")
+				if i.Name != nil {
+					imports[i.Name.String()] = impPath
+				} else {
+					name, err := getPackageName(impPath, path)
+					if err != nil {
+						return nil, err
+					}
+					imports[name] = impPath
+				}
+			}
+
+			for _, decl := range file.Decls {
+				if d, ok := decl.(*ast.GenDecl); ok {
+					if d.Tok == token.TYPE {
+						for i := range d.Specs {
+							t := d.Specs[i].(*ast.TypeSpec)
+							ifInfo.addType(t, imports)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	fmt.Printf("%s ifInfo: %+v\n", impPath, ifInfo)
+
+	return ifInfo, nil
 }
