@@ -96,7 +96,6 @@ func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
 					p, t.Name))
 			}
 			id.addExternal(p.String(), impPath, v.Sel.String())
-			fmt.Printf("??? - %s - %s - %T\n", p, v.Sel, f.Type)
 		default:
 			panic(fmt.Sprintf("Don't expect %T in interface", f.Type))
 		}
@@ -148,8 +147,6 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 			return nil, err
 		}
 		methods = append(methods, m...)
-
-		fmt.Printf("??? - %s - %s - %s\n", e.name, e.impPath, e.selector)
 	}
 
 	return methods, nil
@@ -169,7 +166,6 @@ func (i Interfaces) genInterface(name string) error {
 	fmt.Fprintf(out, "\tgomock \"code.google.com/p/gomock/gomock\"\n")
 	fmt.Fprintf(out, ")\n\n")
 	for tname := range info.types {
-		fmt.Printf("    %s\n", tname)
 		fmt.Fprintf(out, "type Mock%s struct{}\n", tname)
 		fmt.Fprintf(out, "type _mock_%s_rec struct{\n", tname)
 		fmt.Fprintf(out, "\tmock *Mock%s\n", tname)
@@ -202,15 +198,12 @@ func (i Interfaces) genInterface(name string) error {
 }
 
 func genInterfaces(interfaces Interfaces) error {
-	fmt.Printf("----- \\/ -----\n")
 	for name, i := range interfaces {
 		if i.filename == "" {
 			// no filename means this package was only parsed for information,
 			// we don't need to write anything out
 			continue
 		}
-
-		fmt.Printf("%s: %s\n", name, i.filename)
 
 		if err := interfaces.genInterface(name); err != nil {
 			return err
@@ -222,7 +215,6 @@ func genInterfaces(interfaces Interfaces) error {
 			return err
 		}
 	}
-	fmt.Printf("----- /\\ -----\n")
 
 	return nil
 }
@@ -1210,8 +1202,6 @@ func loadInterfaceInfo(impPath string) (*ifInfo, error) {
 	imports := make(map[string]string)
 	ifInfo := newIfInfo("")
 
-	fmt.Printf("process package %s at %s\n", impPath, path)
-
 	isGoFile := func(info os.FileInfo) bool {
 		if info.IsDir() {
 			return false
@@ -1255,8 +1245,6 @@ func loadInterfaceInfo(impPath string) (*ifInfo, error) {
 			}
 		}
 	}
-
-	fmt.Printf("%s ifInfo: %+v\n", impPath, ifInfo)
 
 	return ifInfo, nil
 }
