@@ -76,6 +76,7 @@ func process(filename, goPath string) error {
 		srcPath: filepath.Dir(filename),
 		types: make(map[string]ast.Expr),
 		recorders: make(map[string]string),
+		ifInfo: newIfInfo("_ifmocks.go"),
 	}
 	data := &bytes.Buffer{}
 

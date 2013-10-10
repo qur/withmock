@@ -16,9 +16,93 @@ import (
 	"strings"
 )
 
+type external struct {
+	impPath string
+	name string
+}
+
+type ifDetails struct {
+	methods []*funcInfo
+	locals []string
+	externals []external
+}
+
+func (id *ifDetails) addMethod(name string, f *ast.FuncType) {
+	m := &mockGen{}
+
+	fi := &funcInfo{
+		name: name,
+		realDisabled: true,
+	}
+	if f.Params != nil {
+		for _, param := range f.Params.List {
+			field := field{
+				expr: m.exprString(param.Type),
+			}
+			fi.params = append(fi.params, field)
+		}
+	}
+	if f.Results != nil {
+		for _, result := range f.Results.List {
+			field := field{
+				expr: m.exprString(result.Type),
+			}
+			fi.results = append(fi.results, field)
+		}
+	}
+	id.methods = append(id.methods, fi)
+}
+
+func (id *ifDetails) addLocal(name string) {
+	id.locals = append(id.locals, name)
+}
+
+func (id *ifDetails) addExternal(importPath, name string) {
+	id.externals = append(id.externals, external{
+		impPath: importPath,
+		name: name,
+	})
+}
+
 type ifInfo struct {
 	filename string
-	types map[string]*ast.InterfaceType
+	types map[string]*ifDetails
+}
+
+func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
+	i, ok := t.Type.(*ast.InterfaceType)
+	if !ok {
+		// Only care about interfaces
+		return
+	}
+
+	id := &ifDetails{}
+
+	for _, f := range i.Methods.List {
+		switch v := f.Type.(type) {
+		case *ast.FuncType:
+			id.addMethod(f.Names[0].Name, v)
+		case *ast.Ident:
+			id.addLocal(v.String())
+		case *ast.SelectorExpr:
+			p, ok := v.X.(*ast.Ident)
+			if !ok {
+				panic(fmt.Sprintf("Don't know how to handle selector of non" +
+					" Ident value: %T", v.X))
+			}
+			impPath, ok := imports[p.String()]
+			if !ok {
+				panic(fmt.Sprintf("Unkown package %s in interface %s",
+					p, t.Name))
+			}
+			id.addExternal(impPath, v.Sel.String())
+			fmt.Printf("??? - %s - %s - %T\n", p, v.Sel, f.Type)
+		default:
+			panic(fmt.Sprintf("Don't expect %T in interface", f.Type))
+		}
+	}
+
+	ii.types[t.Name.String()] = id
 }
 
 type Interfaces map[string]*ifInfo
@@ -26,7 +110,7 @@ type Interfaces map[string]*ifInfo
 func newIfInfo(filename string) *ifInfo {
 	return &ifInfo{
 		filename: filename,
-		types: make(map[string]*ast.InterfaceType),
+		types: make(map[string]*ifDetails),
 	}
 }
 
@@ -35,53 +119,23 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 
 	methods := []*funcInfo{}
 
-	m := &mockGen{}
-
 	t := info.types[tname]
-	for _, f := range t.Methods.List {
-		switch v := f.Type.(type) {
-		case *ast.FuncType:
-			fi := &funcInfo{
-				name: f.Names[0].Name,
-				realDisabled: true,
-			}
-			if v.Params != nil {
-				for _, param := range v.Params.List {
-					field := field{
-						expr: m.exprString(param.Type),
-					}
-					fi.params = append(fi.params, field)
-				}
-			}
-			if v.Results != nil {
-				for _, result := range v.Results.List {
-					field := field{
-						expr: m.exprString(result.Type),
-					}
-					fi.results = append(fi.results, field)
-				}
-			}
-			methods = append(methods, fi)
-		case *ast.Ident:
-			n := v.String()
-			if _, ok := info.types[n]; !ok {
-				return nil, fmt.Errorf("Unknown type %s in package %s", n, name)
-			}
-			m, err := i.getMethods(name, n)
-			if err != nil {
-				return nil, err
-			}
-			methods = append(methods, m...)
-		case *ast.SelectorExpr:
-			p, ok := v.X.(*ast.Ident)
-			if !ok {
-				panic(fmt.Sprintf("Don't know how to handle selector of non" +
-					" Ident value: %T", v.X))
-			}
-			fmt.Printf("??? - %s - %s - %T\n", p, v.Sel, f.Type)
-		default:
-			panic(fmt.Sprintf("Don't expect %T in interface", f.Type))
+
+	methods = append(methods, t.methods...)
+
+	for _, n := range t.locals {
+		if _, ok := info.types[n]; !ok {
+			return nil, fmt.Errorf("Unknown type %s in package %s", n, name)
 		}
+		m, err := i.getMethods(name, n)
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, m...)
+	}
+
+	for _, e := range t.externals {
+		fmt.Printf("??? - %s - %s\n", e.impPath, e.name)
 	}
 
 	return methods, nil
@@ -442,6 +496,7 @@ type mockGen struct {
 	recorders map[string]string
 	inits []string
 	data io.ReaderAt
+	ifInfo *ifInfo
 }
 
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
@@ -472,6 +527,7 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 			mockByDefault: mock,
 			types: make(map[string]ast.Expr),
 			recorders: make(map[string]string),
+			ifInfo: newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go")),
 		}
 
 		for path, file := range pkg.Files {
@@ -518,16 +574,7 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 			return err
 		}
 
-		iface := newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go"))
-		interfaces[name] = iface
-		for n, t := range m.types {
-			if !ast.IsExported(n) {
-				continue
-			}
-			if i, ok := t.(*ast.InterfaceType); ok && len(i.Methods.List) > 0 {
-				iface.types[n] = i
-			}
-		}
+		interfaces[name] = m.ifInfo
 	}
 
 	if err := genInterfaces(interfaces); err != nil {
@@ -940,6 +987,8 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 		}
 	}
 
+	imports := make(map[string]string)
+
 	fmt.Fprintf(out, "package %s\n\n", f.Name)
 
 	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
@@ -964,12 +1013,14 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					fmt.Fprintf(out, "import ")
 					if s.Name != nil {
 						fmt.Fprintf(out, "%s ", s.Name)
+						imports[s.Name.String()] = impPath
 					} else {
 						name, err := getPackageName(impPath, m.srcPath)
 						if err != nil {
 							return err
 						}
 						fmt.Fprintf(out, "%s ", name)
+						imports[name] = impPath
 					}
 					fmt.Fprintf(out, "%s\n\n", s.Path.Value)
 					continue
@@ -984,12 +1035,14 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					fmt.Fprintf(out, "\t")
 					if s.Name != nil {
 						fmt.Fprintf(out, "%s ", s.Name)
+						imports[s.Name.String()] = impPath
 					} else {
 						name, err := getPackageName(impPath, m.srcPath)
 						if err != nil {
 							return err
 						}
 						fmt.Fprintf(out, "%s ", name)
+						imports[name] = impPath
 					}
 					fmt.Fprintf(out, "%s\n", s.Path.Value)
 				}
@@ -1000,12 +1053,14 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					t := d.Specs[0].(*ast.TypeSpec)
 					fmt.Fprintf(out, "type %s %s\n\n", t.Name, m.exprString(t.Type))
 					m.types[t.Name.String()] = t.Type
+					m.ifInfo.addType(t, imports)
 				} else {
 					fmt.Fprintf(out, "type (\n")
 					for i := range d.Specs {
 						t := d.Specs[i].(*ast.TypeSpec)
 						fmt.Fprintf(out, "\t%s %s\n", t.Name, m.exprString(t.Type))
 						m.types[t.Name.String()] = t.Type
+						m.ifInfo.addType(t, imports)
 					}
 					fmt.Fprintf(out, ")\n\n")
 				}
