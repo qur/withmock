@@ -197,6 +197,61 @@ func (i Interfaces) genInterface(name string) error {
 	return nil
 }
 
+func (i Interfaces) genExtInterface(name string, extPkg string) error {
+	info := i[name]
+
+	out, err := os.Create(info.filename)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	fmt.Fprintf(out, "package %s\n\n", name)
+	fmt.Fprintf(out, "import (\n")
+	fmt.Fprintf(out, "\t. \"%s\"\n", extPkg)
+	fmt.Fprintf(out, "\tgomock \"code.google.com/p/gomock/gomock\"\n")
+	fmt.Fprintf(out, ")\n\n")
+
+	fmt.Fprintf(out, "var (\n")
+	fmt.Fprintf(out, "\t_ctrl *gomock.Controller\n")
+	fmt.Fprintf(out, ")\n\n")
+
+	fmt.Fprintf(out, "func SetController(controller *gomock.Controller) {\n")
+	fmt.Fprintf(out, "\t_ctrl = controller\n")
+	fmt.Fprintf(out, "}\n")
+
+	for tname := range info.types {
+		fmt.Fprintf(out, "type Mock%s struct{}\n", tname)
+		fmt.Fprintf(out, "type _mock_%s_rec struct{\n", tname)
+		fmt.Fprintf(out, "\tmock *Mock%s\n", tname)
+		fmt.Fprintf(out, "}\n\n")
+
+		// Make sure that our mock satisifies the interface
+		fmt.Fprintf(out, "var _ %s = &Mock%s{}\n", tname, tname)
+
+		fmt.Fprintf(out, "func New%s() *Mock%s {\n", tname, tname)
+		fmt.Fprintf(out, "\treturn &Mock%s{}\n", tname)
+		fmt.Fprintf(out, "}\n")
+		fmt.Fprintf(out, "func (_m *Mock%s) EXPECT() *_mock_%s_rec {\n",
+			tname, tname)
+		fmt.Fprintf(out, "\treturn &_mock_%s_rec{_m}\n", tname)
+		fmt.Fprintf(out, "}\n\n")
+
+		methods, err := i.getMethods(name, tname)
+		if err != nil {
+			return err
+		}
+
+		for _, m := range methods {
+			m.recv.expr = "*Mock" + tname
+			m.writeMock(out)
+			m.writeRecorder(out, "_mock_"+tname+"_rec")
+		}
+	}
+
+	return nil
+}
+
 func genInterfaces(interfaces Interfaces) error {
 	for name, i := range interfaces {
 		if i.filename == "" {
@@ -356,7 +411,7 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		}
 		fmt.Fprintf(out, ")\n")
 		fmt.Fprintf(out, "}\n")
-		fmt.Fprintf(out, "func (_m *packageMock) %s(", fi.name)
+		fmt.Fprintf(out, "func (_m *_packageMock) %s(", fi.name)
 		fi.writeParams(out)
 		fmt.Fprintf(out, ") ")
 		if len(returns) > 0 {
@@ -842,9 +897,9 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
 
 	fmt.Fprintf(out, "type _meta struct{}\n")
-	fmt.Fprintf(out, "type packageMock struct{}\n")
+	fmt.Fprintf(out, "type _packageMock struct{}\n")
 	fmt.Fprintf(out, "type _package_Rec struct{\n")
-	fmt.Fprintf(out, "\tmock *packageMock\n")
+	fmt.Fprintf(out, "\tmock *_packageMock\n")
 	fmt.Fprintf(out, "}\n\n")
 
 	fmt.Fprintf(out, "var (\n")
@@ -852,7 +907,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "\t_enabledMocks = make(map[string]bool)\n")
 	fmt.Fprintf(out, "\t_disabledMocks = make(map[string]bool)\n")
 	fmt.Fprintf(out, "\t_ctrl *gomock.Controller\n")
-	fmt.Fprintf(out, "\t_pkgMock = &packageMock{}\n")
+	fmt.Fprintf(out, "\t_pkgMock = &_packageMock{}\n")
 	fmt.Fprintf(out, ")\n\n")
 
 	fmt.Fprintf(out, "func init() {\n")
@@ -1247,4 +1302,46 @@ func loadInterfaceInfo(impPath string) (*ifInfo, error) {
 	}
 
 	return ifInfo, nil
+}
+
+func MockInterfaces(tmpPath, pkgName string) error {
+	i := make(Interfaces)
+
+	dst := filepath.Join(tmpPath, "src", pkgName, "_mocks_")
+	err := os.MkdirAll(dst, 0700)
+	if err != nil {
+		return err
+	}
+
+	path, err := LookupImportPath(pkgName)
+	if err != nil {
+		return err
+	}
+
+	name, err := getPackageName(pkgName, path)
+	if err != nil {
+		return err
+	}
+
+	info, err := loadInterfaceInfo(pkgName)
+	if err != nil {
+		return err
+	}
+
+	info.filename = filepath.Join(dst, "ifmocks.go")
+
+	i[name + "_mocks"] = info
+	extPkg := markImport(pkgName, testMark)
+
+	if err := i.genExtInterface(name + "_mocks", extPkg); err != nil {
+		return err
+	}
+
+	// TODO: currently we need to use goimports to add missing imports, we
+	// need to sort out our own imports, then we can switch to gofmt.
+	if err := fixup(info.filename); err != nil {
+		return err
+	}
+
+	return nil
 }

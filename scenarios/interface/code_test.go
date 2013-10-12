@@ -1,4 +1,4 @@
-package code
+package code_test
 
 import (
 	"testing"
@@ -6,6 +6,9 @@ import (
 	"code.google.com/p/gomock/gomock"
 
 	"github.com/qur/withmock/scenarios/interface/lib" // mock
+
+	"github.com/qur/withmock/scenarios/interface"
+	"github.com/qur/withmock/scenarios/interface/_mocks_"
 )
 
 func TestShow(t *testing.T) {
@@ -19,7 +22,25 @@ func TestShow(t *testing.T) {
 	foo.EXPECT().Wibble().Return(nil)
 
 	// Run the function we want to test
-	err := TryMe(foo)
+	err := code.TryMe(foo)
+
+	if err != nil {
+		t.Errorf("Unexpected error return: %s", err)
+	}
+}
+
+func TestLocalInterface(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	code_mocks.SetController(ctrl)
+
+	toot := code_mocks.NewTooter()
+
+	toot.EXPECT().Toot().Return(nil)
+
+	// Run the function we want to test
+	err := code.TryMe2(toot)
 
 	if err != nil {
 		t.Errorf("Unexpected error return: %s", err)

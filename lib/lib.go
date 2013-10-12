@@ -116,6 +116,17 @@ func markImport(name string, m mark) string {
 	}
 }
 
+func getMark(label string) mark {
+	switch label[0] {
+	case mockMark[0]:
+		return mockMark
+	case testMark[0]:
+		return testMark
+	default:
+		return normalMark
+	}
+}
+
 func GenPkg(srcPath, dstRoot, name string, mock bool) (map[string]bool, error) {
 	// Find the package source, it may be in any entry in srcPath
 	srcRoot := ""

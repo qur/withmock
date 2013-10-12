@@ -1,11 +1,12 @@
 package lib
 
 import (
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
 	"os"
-	"path/filepath"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
 type Context struct {
@@ -165,6 +166,11 @@ func (c *Context) wantToProcess(mockAllowed bool, imports map[string]bool) map[s
 		names[name] = label
 
 		c.processed[label] = c.processed[label] || false
+
+		if strings.HasSuffix(label, "/_mocks_") {
+			// Special mocks package that we don't want to process
+			c.processed[label] = true
+		}
 	}
 
 	// remove nop rewites from the names map, and add real ones to
@@ -270,6 +276,7 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 
 	newName := markImport(pkgName, testMark)
 	c.importRewrites[newName] = pkgName
+	importNames[pkgName] = newName
 
 	codeDest := filepath.Join(c.tmpPath, "src", newName)
 	codeSrc, err := filepath.Abs(path)
@@ -278,6 +285,11 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 	}
 
 	err = MockImports(codeSrc, codeDest, importNames)
+	if err != nil {
+		return "", err
+	}
+
+	err = MockInterfaces(c.tmpPath, pkgName)
 	if err != nil {
 		return "", err
 	}

@@ -42,21 +42,28 @@ func mockFileImports(src, dst string, change map[string]string) error {
 		for _, spec := range g.Specs {
 			s := spec.(*ast.ImportSpec)
 
-			if testFile {
+			impPath := strings.Trim(s.Path.Value, "\"")
+			newPath := change[impPath]
+
+			if newPath == "" {
+				// no change needed
+				continue
+			}
+
+			if testFile && getMark(newPath) != testMark {
 				// for test files, we only replace the import if it was marked
 				// to be mocked (as the test code might want the non-mocked
-				// version too).
+				// version too), unless the mark is testMark - which means we
+				// are importing the code under test, and we want to make sure
+				// we get the actual code under test, not an unmodified copy.
 				comment := strings.TrimSpace(s.Comment.Text())
 				if strings.ToLower(comment) != "mock" {
 					continue
 				}
 			}
 
-			impPath := strings.Trim(s.Path.Value, "\"")
-			if change[impPath] != "" {
-				start := fset.Position(s.Path.Pos()).Offset
-				rewrites = append(rewrites, rewrite{start+1, change[impPath]})
-			}
+			start := fset.Position(s.Path.Pos()).Offset
+			rewrites = append(rewrites, rewrite{start+1, change[impPath]})
 		}
 	}
 
