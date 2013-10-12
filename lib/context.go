@@ -13,18 +13,18 @@ type Context struct {
 	goPath string
 	goRoot string
 
-	tmpPath string
+	tmpPath  string
 	origPath string
 
-	tmpDir string
+	tmpDir    string
 	removeTmp bool
 
 	stdlibImports map[string]bool
-	imports []string
+	imports       []string
 
 	excludes map[string]bool
 
-	processed map[string]bool
+	processed      map[string]bool
 	importRewrites map[string]string
 
 	doRewrite bool
@@ -64,16 +64,16 @@ func NewContext() (*Context, error) {
 	// Build and return the context
 
 	return &Context{
-		goPath: goPath,
-		goRoot: goRoot,
-		origPath: os.Getenv("GOPATH"),
-		tmpPath: filepath.Join(tmpDir, "path"),
-		tmpDir: tmpDir,
-		stdlibImports: stdlibImports,
-		removeTmp: true,
-		processed: make(map[string]bool),
+		goPath:         goPath,
+		goRoot:         goRoot,
+		origPath:       os.Getenv("GOPATH"),
+		tmpPath:        filepath.Join(tmpDir, "path"),
+		tmpDir:         tmpDir,
+		stdlibImports:  stdlibImports,
+		removeTmp:      true,
+		processed:      make(map[string]bool),
 		importRewrites: make(map[string]string),
-		doRewrite: true,
+		doRewrite:      true,
 		// create excludes already including gomock, as we can't mock it.
 		excludes: map[string]bool{"code.google.com/p/gomock/gomock": true},
 	}, nil
@@ -108,7 +108,7 @@ func (c *Context) setGOPATH() error {
 	if err := os.Setenv("GOPATH", c.tmpPath); err != nil {
 		return err
 	}
-    if err := os.Setenv("ORIG_GOPATH", c.origPath); err != nil {
+	if err := os.Setenv("ORIG_GOPATH", c.origPath); err != nil {
 		return err
 	}
 

@@ -98,11 +98,12 @@ func getStdlibImports(path string) (map[string]bool, error) {
 //  + : normal (no mark actually applied)
 //  @ : test
 type mark string
+
 const (
-	noMark mark = ""
+	noMark     mark = ""
 	normalMark mark = "+"
-	mockMark mark = "_"
-	testMark mark = "@"
+	mockMark   mark = "_"
+	testMark   mark = "@"
 )
 
 func markImport(name string, m mark) string {

@@ -1,8 +1,8 @@
 package dep1
 
 import (
-	"os"
 	"fmt"
+	"os"
 )
 
 var Wibble *os.File

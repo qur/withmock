@@ -63,7 +63,7 @@ func mockFileImports(src, dst string, change map[string]string) error {
 			}
 
 			start := fset.Position(s.Path.Pos()).Offset
-			rewrites = append(rewrites, rewrite{start+1, change[impPath]})
+			rewrites = append(rewrites, rewrite{start + 1, change[impPath]})
 		}
 	}
 

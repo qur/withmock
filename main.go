@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	raw = flag.Bool("raw", false, "don't rewrite the command output")
-	work = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
-	gocov = flag.Bool("gocov", false, "install gocov package into temporary GOPATH")
-	pkgFile = flag.String("P", "", "install extra packages listed in the given file")
+	raw      = flag.Bool("raw", false, "don't rewrite the command output")
+	work     = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
+	gocov    = flag.Bool("gocov", false, "install gocov package into temporary GOPATH")
+	pkgFile  = flag.String("P", "", "install extra packages listed in the given file")
 	exclFile = flag.String("exclude", "", "any package listed in the given file will not be mocked, even if marked in test code.")
 )
 

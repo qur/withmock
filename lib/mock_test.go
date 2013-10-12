@@ -9,9 +9,9 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
-	"path/filepath"
 )
 
 func stubImports(goPath string, file *ast.File) error {
@@ -72,11 +72,11 @@ func process(filename, goPath string) error {
 	}
 
 	m := &mockGen{
-		fset: fset,
-		srcPath: filepath.Dir(filename),
-		types: make(map[string]ast.Expr),
+		fset:      fset,
+		srcPath:   filepath.Dir(filename),
+		types:     make(map[string]ast.Expr),
 		recorders: make(map[string]string),
-		ifInfo: newIfInfo("_ifmocks.go"),
+		ifInfo:    newIfInfo("_ifmocks.go"),
 	}
 	data := &bytes.Buffer{}
 

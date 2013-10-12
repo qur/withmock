@@ -18,18 +18,18 @@ import (
 
 type field struct {
 	names []string
-	expr string
+	expr  string
 }
 
 type funcInfo struct {
-	name string
-	varidic bool
+	name         string
+	varidic      bool
 	realDisabled bool
-	recv struct {
+	recv         struct {
 		name, expr string
 	}
 	params, results []field
-	body []byte
+	body            []byte
 }
 
 func (fi *funcInfo) IsMethod() bool {
@@ -163,7 +163,7 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 	}
 	if fi.varidic {
 		if !fi.realDisabled {
-			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) " +
+			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) "+
 				"|| _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
 			fmt.Fprintf(out, "\t\t")
 			if len(fi.results) > 0 {
@@ -201,7 +201,7 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		fmt.Fprintf(out, "_ctrl.Call(_m, \"%s\", args...)\n", fi.name)
 	} else {
 		if !fi.realDisabled {
-			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) " +
+			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) "+
 				"||  _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
 			fmt.Fprintf(out, "\t\t")
 			if len(fi.results) > 0 {
@@ -298,14 +298,14 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 }
 
 type mockGen struct {
-	fset *token.FileSet
-	srcPath string
+	fset          *token.FileSet
+	srcPath       string
 	mockByDefault bool
-	types map[string]ast.Expr
-	recorders map[string]string
-	inits []string
-	data io.ReaderAt
-	ifInfo *ifInfo
+	types         map[string]ast.Expr
+	recorders     map[string]string
+	inits         []string
+	data          io.ReaderAt
+	ifInfo        *ifInfo
 }
 
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
@@ -331,12 +331,12 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 
 	for name, pkg := range pkgs {
 		m := &mockGen{
-			fset: fset,
-			srcPath: srcPath,
+			fset:          fset,
+			srcPath:       srcPath,
 			mockByDefault: mock,
-			types: make(map[string]ast.Expr),
-			recorders: make(map[string]string),
-			ifInfo: newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go")),
+			types:         make(map[string]ast.Expr),
+			recorders:     make(map[string]string),
+			ifInfo:        newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go")),
 		}
 
 		for path, file := range pkg.Files {
@@ -355,11 +355,11 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 			}
 
 			/*
-			// TODO: we want to gofmt, goimports can break things ...
-			err = fixup(filename)
-			if err != nil {
-				return err
-			}
+				// TODO: we want to gofmt, goimports can break things ...
+				err = fixup(filename)
+				if err != nil {
+					return err
+				}
 			*/
 		}
 
@@ -881,7 +881,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					for _, ident := range s.Names {
 						names = append(names, ident.Name)
 					}
-					fmt.Fprintf(out, "\t" + strings.Join(names, ", "))
+					fmt.Fprintf(out, "\t"+strings.Join(names, ", "))
 					if s.Type != nil {
 						fmt.Fprintf(out, " %s", m.exprString(s.Type))
 					}
@@ -937,10 +937,10 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 			for _, param := range d.Type.Params.List {
 				p := field{
 					names: make([]string, len(param.Names)),
-					expr: m.exprString(param.Type),
+					expr:  m.exprString(param.Type),
 				}
 				for i, name := range param.Names {
-				    p.names[i] = name.String()
+					p.names[i] = name.String()
 				}
 				_, fi.varidic = param.Type.(*ast.Ellipsis)
 				fi.params = append(fi.params, p)
@@ -949,7 +949,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 				for _, result := range d.Type.Results.List {
 					r := field{
 						names: make([]string, len(result.Names)),
-						expr: m.exprString(result.Type),
+						expr:  m.exprString(result.Type),
 					}
 					for i, name := range result.Names {
 						r.names[i] = name.String()
@@ -1072,10 +1072,10 @@ func MockInterfaces(tmpPath, pkgName string) error {
 
 	info.filename = filepath.Join(dst, "ifmocks.go")
 
-	i[name + "_mocks"] = info
+	i[name+"_mocks"] = info
 	extPkg := markImport(pkgName, testMark)
 
-	if err := i.genExtInterface(name + "_mocks", extPkg); err != nil {
+	if err := i.genExtInterface(name+"_mocks", extPkg); err != nil {
 		return err
 	}
 

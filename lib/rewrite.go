@@ -21,8 +21,8 @@ type rw struct {
 
 func NewRewriter(w io.Writer) *rewriter {
 	return &rewriter{
-		w:       w,
-		buf:     &bytes.Buffer{},
+		w:   w,
+		buf: &bytes.Buffer{},
 	}
 }
 

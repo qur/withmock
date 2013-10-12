@@ -15,8 +15,8 @@ type external struct {
 }
 
 type ifDetails struct {
-	methods []*funcInfo
-	locals []string
+	methods   []*funcInfo
+	locals    []string
 	externals []external
 }
 
@@ -24,7 +24,7 @@ func (id *ifDetails) addMethod(name string, f *ast.FuncType) {
 	m := &mockGen{}
 
 	fi := &funcInfo{
-		name: name,
+		name:         name,
 		realDisabled: true,
 	}
 	if f.Params != nil {
@@ -52,15 +52,15 @@ func (id *ifDetails) addLocal(name string) {
 
 func (id *ifDetails) addExternal(name, importPath, selector string) {
 	id.externals = append(id.externals, external{
-		name: name,
-		impPath: importPath,
+		name:     name,
+		impPath:  importPath,
 		selector: selector,
 	})
 }
 
 type ifInfo struct {
 	filename string
-	types map[string]*ifDetails
+	types    map[string]*ifDetails
 }
 
 func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
@@ -81,7 +81,7 @@ func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
 		case *ast.SelectorExpr:
 			p, ok := v.X.(*ast.Ident)
 			if !ok {
-				panic(fmt.Sprintf("Don't know how to handle selector of non" +
+				panic(fmt.Sprintf("Don't know how to handle selector of non"+
 					" Ident value: %T", v.X))
 			}
 			impPath, ok := imports[p.String()]
@@ -103,7 +103,7 @@ type Interfaces map[string]*ifInfo
 func newIfInfo(filename string) *ifInfo {
 	return &ifInfo{
 		filename: filename,
-		types: make(map[string]*ifDetails),
+		types:    make(map[string]*ifDetails),
 	}
 }
 
