@@ -36,6 +36,40 @@ func GetOutput(name string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+func hasNonGoCode(impPath string) (bool, error) {
+	src, err := LookupImportPath(impPath)
+	if err != nil {
+		return false, err
+	}
+
+	nonGoCode := false
+
+	fn := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Ignore every directory except path
+		if info.Mode().IsDir() {
+			if path == src {
+				return nil
+			} else {
+				return filepath.SkipDir
+			}
+		}
+
+		// Non-code we leave alone, code may need modification
+		if strings.HasSuffix(path, ".c") || strings.HasSuffix(path, ".s") {
+			nonGoCode = true
+		}
+
+		return nil
+	}
+
+	// Now use walk to process the files in src
+	return nonGoCode, filepath.Walk(src, fn)
+}
+
 func GetImports(path string, tests bool) (map[string]bool, error) {
 	imports := make(map[string]bool)
 

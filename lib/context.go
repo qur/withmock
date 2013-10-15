@@ -218,6 +218,15 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				mock = true
 			}
 
+			if c.excludes[name] {
+				// this package has been specifically excluded from mocking, so
+				// we just link it, even if mocked is indicated.
+				if _, err := LinkPkg(c.goPath, c.tmpPath, name); err != nil {
+					return nil, err
+				}
+				continue
+			}
+
 			if c.stdlibImports[name] {
 				// Ignore standard packages unless mocked
 				if mock {
@@ -229,11 +238,25 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				continue
 			}
 
-			if c.excludes[name] {
-				// this package has been specifically excluded from mocking, so
-				// we just link it, even if mocked is indicated.
-				if _, err := LinkPkg(c.goPath, c.tmpPath, name); err != nil {
-					return nil, err
+			// We have to take care with packages that include non-go code, as
+			// we can't rewrite them.  If not marked for mocking then we just
+			// link it.  If it is marked for mocking, then we will just error
+			// for now, since we can't currently deal with that request.
+			nonGoCode, err := hasNonGoCode(name)
+			if err != nil {
+				return nil, err
+			}
+
+			if nonGoCode {
+				if mock {
+					return nil, fmt.Errorf("Unable to mock \"%s\".\n"+
+						"Mocking packages with non-Go code is not "+
+						"currently supported.", name)
+				} else {
+					_, err := LinkPkg(c.goPath, c.tmpPath, name)
+					if err != nil {
+						return nil, err
+					}
 				}
 				continue
 			}
