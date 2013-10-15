@@ -1,29 +1,22 @@
-package withdeps
+package code
 
 import (
 	"testing"
 
-	"fmt" // mock
-
 	"code.google.com/p/gomock/gomock"
+
+	"github.com/qur/withmock/scenarios/basic/lib" // mock
 )
 
-func TestShow(t *testing.T) {
+func TestTryMe(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	fmt.MOCK().SetController(ctrl)
-
-	// We need some test data
-	data := "one\ntwo\nthree"
-
-	// The test data contains three lines that we expect to be printed.
-	fmt.EXPECT().Printf("%d: %s\n", 1, "one")
-	fmt.EXPECT().Printf("%d: %s\n", 2, "two")
-	fmt.EXPECT().Printf("%d: %s\n", 3, "three")
+	lib.MOCK().SetController(ctrl)
+	lib.EXPECT().Wibble().Return(nil)
 
 	// Run the function we want to test
-	err := Show(data)
+	err := TryMe()
 
 	if err != nil {
 		t.Errorf("Unexpected error return: %s", err)

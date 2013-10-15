@@ -1,5 +1,7 @@
 basic           - a basic "does this work at all" test.
 
+basic_stdlib    - similar to basic, but mocking a stdlib package
+
 interface       - do we generate a Mock that implements any interface in the
                   package?
 
