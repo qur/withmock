@@ -20,8 +20,10 @@ type ifDetails struct {
 	externals []external
 }
 
-func (id *ifDetails) addMethod(name string, f *ast.FuncType) {
+func (id *ifDetails) addMethod(name string, f *ast.FuncType) []string {
 	m := &mockGen{}
+
+	m.collectScopes()
 
 	fi := &funcInfo{
 		name:         name,
@@ -44,6 +46,8 @@ func (id *ifDetails) addMethod(name string, f *ast.FuncType) {
 		}
 	}
 	id.methods = append(id.methods, fi)
+
+	return m.getScopes()
 }
 
 func (id *ifDetails) addLocal(name string) {
@@ -61,6 +65,11 @@ func (id *ifDetails) addExternal(name, importPath, selector string) {
 type ifInfo struct {
 	filename string
 	types    map[string]*ifDetails
+	imports  map[string]string
+}
+
+func (ii *ifInfo) addImport(name, path string) {
+	ii.imports[name] = path
 }
 
 func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
@@ -75,7 +84,15 @@ func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
 	for _, f := range i.Methods.List {
 		switch v := f.Type.(type) {
 		case *ast.FuncType:
-			id.addMethod(f.Names[0].Name, v)
+			scopes := id.addMethod(f.Names[0].Name, v)
+			for _, scope := range scopes {
+				impPath, ok := imports[scope]
+				if !ok {
+					panic(fmt.Sprintf("Unkown package %s in interface %s",
+						scope, t.Name))
+				}
+				ii.addImport(scope, impPath)
+			}
 		case *ast.Ident:
 			id.addLocal(v.String())
 		case *ast.SelectorExpr:
@@ -89,6 +106,7 @@ func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
 				panic(fmt.Sprintf("Unkown package %s in interface %s",
 					p, t.Name))
 			}
+			ii.addImport(p.String(), impPath)
 			id.addExternal(p.String(), impPath, v.Sel.String())
 		default:
 			panic(fmt.Sprintf("Don't expect %T in interface", f.Type))
@@ -104,6 +122,7 @@ func newIfInfo(filename string) *ifInfo {
 	return &ifInfo{
 		filename: filename,
 		types:    make(map[string]*ifDetails),
+		imports:  make(map[string]string),
 	}
 }
 
@@ -157,6 +176,9 @@ func (i Interfaces) genInterface(name string) error {
 
 	fmt.Fprintf(out, "package %s\n\n", name)
 	fmt.Fprintf(out, "import (\n")
+	for name, impPath := range info.imports {
+		fmt.Fprintf(out, "\t%s \"%s\"\n", name, impPath)
+	}
 	fmt.Fprintf(out, "\tgomock \"code.google.com/p/gomock/gomock\"\n")
 	fmt.Fprintf(out, ")\n\n")
 	for tname := range info.types {
@@ -203,6 +225,9 @@ func (i Interfaces) genExtInterface(name string, extPkg string) error {
 	fmt.Fprintf(out, "package %s\n\n", name)
 	fmt.Fprintf(out, "import (\n")
 	fmt.Fprintf(out, "\t. \"%s\"\n", extPkg)
+	for name, impPath := range info.imports {
+		fmt.Fprintf(out, "\t%s \"%s\"\n", name, impPath)
+	}
 	fmt.Fprintf(out, "\tgomock \"code.google.com/p/gomock/gomock\"\n")
 	fmt.Fprintf(out, ")\n\n")
 

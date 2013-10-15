@@ -306,6 +306,7 @@ type mockGen struct {
 	inits         []string
 	data          io.ReaderAt
 	ifInfo        *ifInfo
+	scopes        map[string]bool
 }
 
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
@@ -507,7 +508,9 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 	case *ast.StarExpr:
 		return "*" + m.exprString(v.X)
 	case *ast.SelectorExpr:
-		return m.exprString(v.X) + "." + v.Sel.Name
+		scope := m.exprString(v.X)
+		m.registerScope(scope)
+		return scope + "." + v.Sel.Name
 	case *ast.StructType:
 		s := "struct {\n"
 		for _, field := range v.Fields.List {
@@ -621,6 +624,25 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 	default:
 		panic(fmt.Sprintf("Can't convert (%v)%T to string in exprString", exp, exp))
 	}
+}
+
+func (m *mockGen) registerScope(scope string) {
+	if m.scopes != nil {
+		m.scopes[scope] = true
+	}
+}
+
+func (m *mockGen) collectScopes() {
+	m.scopes = make(map[string]bool)
+}
+
+func (m *mockGen) getScopes() []string {
+	scopes := make([]string, 0, len(m.scopes))
+	for scope := range m.scopes {
+		scopes = append(scopes, scope)
+	}
+	m.scopes = nil
+	return scopes
 }
 
 func fixup(filename string) error {
