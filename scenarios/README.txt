@@ -56,3 +56,6 @@ excludes        - make sure that when we specify that a package is excluded from
 
 embedding       - the mocking should handle embedded types and the methods
                   implemented by those types pretty much as expected.
+
+issue16         - We weren't correctly generating code for constants that used
+                  a explicit type from another package.
