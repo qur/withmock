@@ -926,7 +926,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					}
 					fmt.Fprintf(out, "\t%s", s.Names[0])
 					if s.Type != nil {
-						fmt.Fprintf(out, " %s", s.Type)
+						fmt.Fprintf(out, " %s", m.exprString(s.Type))
 					}
 					switch len(s.Values) {
 					case 0:
