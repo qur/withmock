@@ -59,3 +59,5 @@ embedding       - the mocking should handle embedded types and the methods
 
 issue16         - We weren't correctly generating code for constants that used
                   a explicit type from another package.
+
+nongocode       - Make sure that we can test packages that include non-go code.
