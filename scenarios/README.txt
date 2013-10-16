@@ -60,4 +60,15 @@ embedding       - the mocking should handle embedded types and the methods
 issue16         - We weren't correctly generating code for constants that used
                   a explicit type from another package.
 
+issue17         - We were trying to rewrite packages with non-Go code in them
+                  for mocking.  However, this didn't actually work because we
+                  were only rewriting the Go code.  This scenario includes
+                  packages with asm code and packages with C code.  We then try
+                  and use one mocked and one unmocked version of each kind of
+                  package.  We can't rewrite these types of packages for runtime
+                  control - but we should be able to mock them using the old
+                  approach of _just_ writing out mocked code (provided that we
+                  ignore the non-Go files, otherwise the toolchain will try and
+                  include those too).
+
 nongocode       - Make sure that we can test packages that include non-go code.
