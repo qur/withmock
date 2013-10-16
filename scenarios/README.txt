@@ -72,3 +72,8 @@ issue17         - We were trying to rewrite packages with non-Go code in them
                   include those too).
 
 nongocode       - Make sure that we can test packages that include non-go code.
+
+issue18         - If an imported package includes non-Go code, then we don't
+                  adds any package it imports into the list of packages to be
+                  installed.  This then results in go test failing to compile
+                  the test binary.
