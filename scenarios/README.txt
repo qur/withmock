@@ -77,3 +77,7 @@ issue18         - If an imported package includes non-Go code, then we don't
                   adds any package it imports into the list of packages to be
                   installed.  This then results in go test failing to compile
                   the test binary.
+
+issue19         - If two packages are dot-imported then we will get name
+                  conflicts over the MOCK and EXPECT functions that we add to
+                  all packages.
