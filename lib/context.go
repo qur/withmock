@@ -253,10 +253,14 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 						"Mocking packages with non-Go code is not "+
 						"currently supported.", name)
 				} else {
-					_, err := LinkPkg(c.goPath, c.tmpPath, name)
+					pkgImports, err := LinkPkg(c.goPath, c.tmpPath, name)
 					if err != nil {
 						return nil, err
 					}
+
+					// Update imports from the package we just processed, but it
+					// can only add actual packages, not mocks
+					c.wantToProcess(false, pkgImports)
 				}
 				continue
 			}
