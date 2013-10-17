@@ -66,6 +66,7 @@ type ifInfo struct {
 	filename string
 	types    map[string]*ifDetails
 	imports  map[string]string
+	EXPECT   string
 }
 
 func (ii *ifInfo) addImport(name, path string) {
@@ -193,8 +194,8 @@ func (i Interfaces) genInterface(name string) error {
 		fmt.Fprintf(out, "func (_ *_meta) New%s() *Mock%s {\n", tname, tname)
 		fmt.Fprintf(out, "\treturn &Mock%s{}\n", tname)
 		fmt.Fprintf(out, "}\n")
-		fmt.Fprintf(out, "func (_m *Mock%s) EXPECT() *_mock_%s_rec {\n",
-			tname, tname)
+		fmt.Fprintf(out, "func (_m *Mock%s) %s() *_mock_%s_rec {\n",
+			tname, info.EXPECT, tname)
 		fmt.Fprintf(out, "\treturn &_mock_%s_rec{_m}\n", tname)
 		fmt.Fprintf(out, "}\n\n")
 
@@ -251,8 +252,8 @@ func (i Interfaces) genExtInterface(name string, extPkg string) error {
 		fmt.Fprintf(out, "func New%s() *Mock%s {\n", tname, tname)
 		fmt.Fprintf(out, "\treturn &Mock%s{}\n", tname)
 		fmt.Fprintf(out, "}\n")
-		fmt.Fprintf(out, "func (_m *Mock%s) EXPECT() *_mock_%s_rec {\n",
-			tname, tname)
+		fmt.Fprintf(out, "func (_m *Mock%s) %s() *_mock_%s_rec {\n",
+			tname, info.EXPECT, tname)
 		fmt.Fprintf(out, "\treturn &_mock_%s_rec{_m}\n", tname)
 		fmt.Fprintf(out, "}\n\n")
 

@@ -307,6 +307,8 @@ type mockGen struct {
 	data          io.ReaderAt
 	ifInfo        *ifInfo
 	scopes        map[string]bool
+	MOCK          string
+	EXPECT        string
 }
 
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
@@ -338,7 +340,11 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 			types:         make(map[string]ast.Expr),
 			recorders:     make(map[string]string),
 			ifInfo:        newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go")),
+			MOCK:          "MOCK",
+			EXPECT:        "EXPECT",
 		}
+
+		m.ifInfo.EXPECT = m.EXPECT
 
 		for path, file := range pkg.Files {
 			srcFile := filepath.Join(srcPath, filepath.Base(path))
@@ -678,7 +684,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "\t_pkgMock = &_packageMock{}\n")
 	fmt.Fprintf(out, ")\n\n")
 
-	fmt.Fprintf(out, "func MOCK() *_meta {\n")
+	fmt.Fprintf(out, "func %s() *_meta {\n", m.MOCK)
 	fmt.Fprintf(out, "\treturn nil\n")
 	fmt.Fprintf(out, "}\n")
 
@@ -706,7 +712,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "\t}\n")
 	fmt.Fprintf(out, "}\n\n")
 
-	fmt.Fprintf(out, "func EXPECT() *_package_Rec {\n")
+	fmt.Fprintf(out, "func %s() *_package_Rec {\n", m.EXPECT)
 	fmt.Fprintf(out, "\treturn &_package_Rec{_pkgMock}\n")
 	fmt.Fprintf(out, "}\n\n")
 
@@ -745,7 +751,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 		fmt.Fprintf(out, "type %s struct {\n", rec)
 		fmt.Fprintf(out, "\tmock %s\n", base)
 		fmt.Fprintf(out, "}\n\n")
-		fmt.Fprintf(out, "func (_m %s) EXPECT() *%s {\n", base, rec)
+		fmt.Fprintf(out, "func (_m %s) %s() *%s {\n", base, m.EXPECT, rec)
 		fmt.Fprintf(out, "\treturn &%s{_m}\n", rec)
 		fmt.Fprintf(out, "}\n\n")
 	}
@@ -1090,6 +1096,8 @@ func MockInterfaces(tmpPath, pkgName string) error {
 	}
 
 	info.filename = filepath.Join(dst, "ifmocks.go")
+
+	info.EXPECT = "EXPECT"
 
 	i[name+"_mocks"] = info
 	extPkg := markImport(pkgName, testMark)
