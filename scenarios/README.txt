@@ -81,3 +81,7 @@ issue18         - If an imported package includes non-Go code, then we don't
 issue19         - If two packages are dot-imported then we will get name
                   conflicts over the MOCK and EXPECT functions that we add to
                   all packages.
+
+struct_tags     - Tags on struct fields were not being copied to the generated
+                  code, which breaks things like JSON encode/decode that use
+                  tags.
