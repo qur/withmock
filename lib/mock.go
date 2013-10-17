@@ -519,7 +519,11 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 				names = append(names, ident.Name)
 			}
 			s += "\t" + strings.Join(names, ", ") + " "
-			s += m.exprString(field.Type) + "\n"
+			s += m.exprString(field.Type)
+			if field.Tag != nil {
+				s += " " + field.Tag.Value
+			}
+			s += "\n"
 		}
 		s += "}"
 		return s
