@@ -89,3 +89,8 @@ struct_tags     - Tags on struct fields were not being copied to the generated
 missing         - The error message produced when a package is missing is really
                   cryptic, we should be detecting missing packages, and using an
                   explicit error message.
+
+issue23         - If a package is imported by two sets of code under test, and
+                  the first marks it to be mocked then the mocking will also be
+                  enabled for the second.  If the second package didn't ask for
+                  mocking enabled, it shouldn't be.
