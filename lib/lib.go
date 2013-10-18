@@ -112,6 +112,42 @@ func GetImports(path string, tests bool) (map[string]bool, error) {
 	return imports, nil
 }
 
+func GetMockedPackages(path string) ([]string, error) {
+	imports := []string{}
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, path, nil,
+		parser.ImportsOnly|parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, i := range file.Imports {
+		impPath := strings.Trim(i.Path.Value, "\"")
+		comment := strings.TrimSpace(i.Comment.Text())
+		mock := strings.ToLower(comment) == "mock"
+		if strings.HasPrefix(impPath, "_mock_/") {
+			mock = true
+		}
+
+		if !mock {
+			continue
+		}
+
+		if i.Name != nil {
+			imports = append(imports, i.Name.String())
+		} else {
+			name, err := getPackageName(impPath, filepath.Dir(path))
+			if err != nil {
+				return nil, err
+			}
+			imports = append(imports, name)
+		}
+	}
+
+	return imports, nil
+}
+
 func getStdlibImports(path string) (map[string]bool, error) {
 	imports := make(map[string]bool)
 

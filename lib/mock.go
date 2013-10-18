@@ -678,13 +678,6 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "\t_pkgMock = &_packageMock{}\n")
 	fmt.Fprintf(out, ")\n\n")
 
-	fmt.Fprintf(out, "func init() {\n")
-	for _, init := range m.inits {
-		fmt.Fprintf(out, "\t%s()\n", init)
-	}
-	fmt.Fprintf(out, "\t_allMocked = %v\n", m.mockByDefault)
-	fmt.Fprintf(out, "}\n\n")
-
 	fmt.Fprintf(out, "func MOCK() *_meta {\n")
 	fmt.Fprintf(out, "\treturn nil\n")
 	fmt.Fprintf(out, "}\n")

@@ -5,6 +5,7 @@
 package lib
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -83,6 +84,22 @@ func mockFileImports(src, dst string, change map[string]string) error {
 	_, err = io.Copy(w, r)
 	if err != nil {
 		return err
+	}
+
+	// Add an init function to setup any mocks, if this is a test file that
+	// needs mocks enabled
+	if strings.HasSuffix(src, "_test.go") {
+		i, err := GetMockedPackages(src)
+		if err != nil {
+			return err
+		}
+		if len(i) > 0 {
+			fmt.Fprintf(w, "\nfunc init() {\n")
+			for _, pkg := range i {
+				fmt.Fprintf(w, "\t%s.MOCK().MockAll(true)\n", pkg)
+			}
+			fmt.Fprintf(w, "}\n")
+		}
 	}
 
 	// Now we go back and apply any rewrites
