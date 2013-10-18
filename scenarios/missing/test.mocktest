@@ -1,0 +1,10 @@
+#!/bin/bash
+
+output="$(mocktest "$@" 2>&1)"
+
+if [ "$output" != "ERROR: Unable to find package: github.com/qur/withmock/scenarios/missing/lib" ] ; then
+    echo "Incorrect output"
+    exit 1
+fi
+
+exit 0

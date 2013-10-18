@@ -85,3 +85,7 @@ issue19         - If two packages are dot-imported then we will get name
 struct_tags     - Tags on struct fields were not being copied to the generated
                   code, which breaks things like JSON encode/decode that use
                   tags.
+
+missing         - The error message produced when a package is missing is really
+                  cryptic, we should be detecting missing packages, and using an
+                  explicit error message.

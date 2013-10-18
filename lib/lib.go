@@ -21,6 +21,10 @@ func LookupImportPath(impPath string) (string, error) {
 		return "", err
 	}
 
+	if path == "" {
+		return "", fmt.Errorf("Unable to find package: %s", impPath)
+	}
+
 	return path, nil
 }
 
