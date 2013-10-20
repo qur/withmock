@@ -1,0 +1,7 @@
+mocks:
+  DEFAULT:
+    MOCK: MOCK_DEFAULT
+  github.com/qur/withmock/scenarios/issue19/lib2:
+    MOCK: MOCK2
+    EXPECT: EXPECT2
+    obj.EXPECT: EXPECT3

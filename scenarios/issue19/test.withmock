@@ -1,3 +1,3 @@
 #!/bin/bash
 
-exec withmock go test "$@"
+exec withmock -c mock.yml go test "$@"

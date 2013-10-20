@@ -309,11 +309,12 @@ type mockGen struct {
 	scopes        map[string]bool
 	MOCK          string
 	EXPECT        string
+	ObjEXPECT     string
 }
 
 // MakeMock writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
-func MakePkg(srcPath, dstPath string, mock bool) error {
+func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) error {
 	isGoFile := func(info os.FileInfo) bool {
 		if info.IsDir() {
 			return false
@@ -340,8 +341,9 @@ func MakePkg(srcPath, dstPath string, mock bool) error {
 			types:         make(map[string]ast.Expr),
 			recorders:     make(map[string]string),
 			ifInfo:        newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go")),
-			MOCK:          "MOCK",
-			EXPECT:        "EXPECT",
+			MOCK:          cfg.MOCK,
+			EXPECT:        cfg.EXPECT,
+			ObjEXPECT:     cfg.ObjEXPECT,
 		}
 
 		m.ifInfo.EXPECT = m.EXPECT
@@ -751,7 +753,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 		fmt.Fprintf(out, "type %s struct {\n", rec)
 		fmt.Fprintf(out, "\tmock %s\n", base)
 		fmt.Fprintf(out, "}\n\n")
-		fmt.Fprintf(out, "func (_m %s) %s() *%s {\n", base, m.EXPECT, rec)
+		fmt.Fprintf(out, "func (_m %s) %s() *%s {\n", base, m.ObjEXPECT, rec)
 		fmt.Fprintf(out, "\treturn &%s{_m}\n", rec)
 		fmt.Fprintf(out, "}\n\n")
 	}
@@ -1071,7 +1073,7 @@ func loadInterfaceInfo(impPath string) (*ifInfo, error) {
 	return ifInfo, nil
 }
 
-func MockInterfaces(tmpPath, pkgName string) error {
+func MockInterfaces(tmpPath, pkgName string, cfg *MockConfig) error {
 	i := make(Interfaces)
 
 	dst := filepath.Join(tmpPath, "src", pkgName, "_mocks_")
@@ -1097,7 +1099,7 @@ func MockInterfaces(tmpPath, pkgName string) error {
 
 	info.filename = filepath.Join(dst, "ifmocks.go")
 
-	info.EXPECT = "EXPECT"
+	info.EXPECT = cfg.EXPECT
 
 	i[name+"_mocks"] = info
 	extPkg := markImport(pkgName, testMark)

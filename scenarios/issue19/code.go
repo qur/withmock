@@ -12,3 +12,7 @@ func TryMe1() error {
 func TryMe2() error {
 	return Wibble2()
 }
+
+func TryMe3(f *Foo) error {
+	return f.Wibble()
+}

@@ -30,6 +30,8 @@ type Context struct {
 	doRewrite bool
 
 	code []codeLoc
+
+	cfg *Config
 }
 
 type codeLoc struct {
@@ -74,6 +76,7 @@ func NewContext() (*Context, error) {
 		processed:      make(map[string]bool),
 		importRewrites: make(map[string]string),
 		doRewrite:      true,
+		cfg:            &Config{},
 		// create excludes already including gomock, as we can't mock it.
 		excludes: map[string]bool{"code.google.com/p/gomock/gomock": true},
 	}, nil
@@ -102,6 +105,11 @@ func (c *Context) Close() error {
 	}
 
 	return nil
+}
+
+func (c *Context) LoadConfig(path string) (err error) {
+	c.cfg, err = ReadConfig(path)
+	return
 }
 
 func (c *Context) setGOPATH() error {
@@ -218,6 +226,8 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				mock = true
 			}
 
+			cfg := c.cfg.Mock(name)
+
 			if c.excludes[name] {
 				// this package has been specifically excluded from mocking, so
 				// we just link it, even if mocked is indicated.
@@ -230,7 +240,7 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 			if c.stdlibImports[name] {
 				// Ignore standard packages unless mocked
 				if mock {
-					err := MockStandard(c.goRoot, c.tmpPath, name)
+					err := MockStandard(c.goRoot, c.tmpPath, name, cfg)
 					if err != nil {
 						return nil, err
 					}
@@ -266,7 +276,7 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 			}
 
 			// Process the package and get it's imports
-			pkgImports, err := GenPkg(c.goPath, c.tmpPath, name, mock)
+			pkgImports, err := GenPkg(c.goPath, c.tmpPath, name, mock, cfg)
 			if err != nil {
 				return nil, err
 			}
@@ -311,12 +321,14 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 		return "", err
 	}
 
-	err = MockImports(codeSrc, codeDest, importNames)
+	err = MockImports(codeSrc, codeDest, importNames, c.cfg)
 	if err != nil {
 		return "", err
 	}
 
-	err = MockInterfaces(c.tmpPath, pkgName)
+	cfg := c.cfg.Mock(pkgName)
+
+	err = MockInterfaces(c.tmpPath, pkgName, cfg)
 	if err != nil {
 		return "", err
 	}

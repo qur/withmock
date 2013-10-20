@@ -112,8 +112,8 @@ func GetImports(path string, tests bool) (map[string]bool, error) {
 	return imports, nil
 }
 
-func GetMockedPackages(path string) ([]string, error) {
-	imports := []string{}
+func GetMockedPackages(path string) (map[string]string, error) {
+	imports := make(map[string]string)
 
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, nil,
@@ -135,13 +135,13 @@ func GetMockedPackages(path string) ([]string, error) {
 		}
 
 		if i.Name != nil {
-			imports = append(imports, i.Name.String())
+			imports[i.Name.String()] = impPath
 		} else {
 			name, err := getPackageName(impPath, filepath.Dir(path))
 			if err != nil {
 				return nil, err
 			}
-			imports = append(imports, name)
+			imports[name] = impPath
 		}
 	}
 
@@ -202,7 +202,7 @@ func getMark(label string) mark {
 	}
 }
 
-func GenPkg(srcPath, dstRoot, name string, mock bool) (map[string]bool, error) {
+func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (map[string]bool, error) {
 	// Find the package source, it may be in any entry in srcPath
 	srcRoot := ""
 	for _, src := range filepath.SplitList(srcPath) {
@@ -223,7 +223,7 @@ func GenPkg(srcPath, dstRoot, name string, mock bool) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = MakePkg(src, dst, mock)
+	err = MakePkg(src, dst, mock, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +238,7 @@ func GenPkg(srcPath, dstRoot, name string, mock bool) (map[string]bool, error) {
 	return imports, nil
 }
 
-func MockStandard(srcRoot, dstRoot, name string) error {
+func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	// Write a mock version of the package
 	src := filepath.Join(srcRoot, "src/pkg", name)
 	dst := filepath.Join(dstRoot, "src", markImport(name, mockMark))
@@ -246,7 +246,7 @@ func MockStandard(srcRoot, dstRoot, name string) error {
 	if err != nil {
 		return err
 	}
-	err = MakePkg(src, dst, true)
+	err = MakePkg(src, dst, true, cfg)
 	if err != nil {
 		return err
 	}
@@ -298,7 +298,7 @@ func exists(path string) bool {
 	panic(err)
 }
 
-func MockImports(src, dst string, names map[string]string) error {
+func MockImports(src, dst string, names map[string]string, cfg *Config) error {
 	fn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -324,7 +324,7 @@ func MockImports(src, dst string, names map[string]string) error {
 		if !strings.HasSuffix(path, ".go") {
 			return os.Symlink(path, target)
 		} else {
-			return mockFileImports(path, target, names)
+			return mockFileImports(path, target, names, cfg)
 		}
 	}
 

@@ -22,6 +22,7 @@ var (
 	verbose  = flag.Bool("v", false, "add '-v' to the command run, so the tests are run in verbose mode")
 	pkgFile  = flag.String("P", "", "install extra packages listed in the given file")
 	exclFile = flag.String("exclude", "", "any package listed in the given file will not be mocked, even if marked in test code.")
+	cfgFile  = flag.String("c", "", "load config from the specified file")
 )
 
 func usage() {
@@ -103,6 +104,14 @@ func doit() error {
 
 	if *exclFile != "" {
 		if err := ctxt.ExcludePackagesFromFile(*exclFile); err != nil {
+			return err
+		}
+	}
+
+	// Load the config file if specified
+
+	if *cfgFile != "" {
+		if err := ctxt.LoadConfig(*cfgFile); err != nil {
 			return err
 		}
 	}

@@ -19,7 +19,7 @@ type rewrite struct {
 	content string
 }
 
-func mockFileImports(src, dst string, change map[string]string) error {
+func mockFileImports(src, dst string, change map[string]string, cfg *Config) error {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, src, nil,
 		parser.ImportsOnly|parser.ParseComments)
@@ -95,8 +95,9 @@ func mockFileImports(src, dst string, change map[string]string) error {
 		}
 		if len(i) > 0 {
 			fmt.Fprintf(w, "\nfunc init() {\n")
-			for _, pkg := range i {
-				fmt.Fprintf(w, "\t%s.MOCK().MockAll(true)\n", pkg)
+			for pkg, impPath := range i {
+				c := cfg.Mock(impPath)
+				fmt.Fprintf(w, "\t%s.%s().MockAll(true)\n", pkg, c.MOCK)
 			}
 			fmt.Fprintf(w, "}\n")
 		}

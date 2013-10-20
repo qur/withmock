@@ -14,7 +14,12 @@ import (
 func main() {
 	srcPath, dstPath := os.Args[1], os.Args[2]
 
-	err := lib.MakePkg(srcPath, dstPath, true)
+	cfg := &lib.MockConfig{
+		MOCK:   "MOCK",
+		EXPECT: "EXPECT",
+	}
+
+	err := lib.MakePkg(srcPath, dstPath, true, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(1)
