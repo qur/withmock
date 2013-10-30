@@ -392,12 +392,37 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) error {
 			return err
 		}
 
+		// special case to deal with the fact that the runtime package injects
+		// the sigpipe function into os from a .c file.
+		if name == "os" {
+			writeSigpipe(dstPath)
+		}
+
 		interfaces[name] = m.ifInfo
 	}
 
 	if err := genInterfaces(interfaces); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func writeSigpipe(path string) error {
+	filename := filepath.Join(path, "sigpipe.c")
+
+	out, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	fmt.Fprintf(out, "#include \"runtime.h\"\n")
+	fmt.Fprintf(out, "\n")
+	fmt.Fprintf(out, "void\n")
+	fmt.Fprintf(out, "·sigpipe(void) {\n")
+	fmt.Fprintf(out, "\tos·sigpipe();\n")
+	fmt.Fprintf(out, "}\n")
 
 	return nil
 }
