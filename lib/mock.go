@@ -811,9 +811,13 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 	m.data = data
 
 	if len(f.Comments) > 0 {
-		c := f.Comments[0].Text()
-		if strings.HasPrefix(c, "+build") {
-			fmt.Fprintf(out, "// %s\n\n", c)
+		for _, cg := range f.Comments {
+			if strings.HasPrefix(cg.Text(), "+build") {
+				for _, c := range cg.List {
+					fmt.Fprintf(out, "%s\n", c.Text)
+				}
+				fmt.Fprintf(out, "\n")
+			}
 		}
 	}
 
