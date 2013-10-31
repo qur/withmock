@@ -100,3 +100,6 @@ build_constraints - make sure that build constraints are respected.  This
                   a combination of explicit and implicit build contraints. In
                   particular, build constraints that aren't the first comment
                   didn't work.
+
+issue24         - If withmock/mocktest are used to test a package outside of
+                  GOPATH, it fails.

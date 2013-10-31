@@ -1,0 +1,12 @@
+#!/bin/bash
+
+dir=$(mktemp -d)
+
+cp *.go "$dir/"
+
+(cd "$dir"; withmock go test "$@")
+ret=$?
+
+rm -r "$dir"
+
+exit $ret
