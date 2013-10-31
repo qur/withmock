@@ -16,6 +16,11 @@ import (
 )
 
 func LookupImportPath(impPath string) (string, error) {
+	if strings.HasPrefix(impPath, "_/") {
+		// special case if impPath is outside of GOPATH
+		return impPath[1:], nil
+	}
+
 	path, err := GetOutput("go", "list", "-e", "-f", "{{.Dir}}", impPath)
 	if err != nil {
 		return "", err

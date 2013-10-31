@@ -800,6 +800,7 @@ func getPackageName(impPath, srcPath string) (string, error) {
 	}
 
 	cache := true
+	lookupPath := impPath
 
 	if strings.HasPrefix(impPath, "./") {
 		// relative import, no caching, need to change directory
@@ -813,7 +814,21 @@ func getPackageName(impPath, srcPath string) (string, error) {
 		cache = false
 	}
 
-	name, err := GetOutput("go", "list", "-f", "{{.Name}}", impPath)
+	if strings.HasPrefix(impPath, "_/") {
+		// outside of GOPATH, need to change directory and use "." for the
+		// lookup path
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		defer os.Chdir(cwd)
+
+		os.Chdir(impPath[1:])
+		lookupPath = "."
+	}
+
+	name, err := GetOutput("go", "list", "-f", "{{.Name}}", lookupPath)
 	if err != nil {
 		return "", fmt.Errorf("Failed to get name for '%s': %s", impPath, err)
 	}
