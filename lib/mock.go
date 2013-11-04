@@ -303,7 +303,6 @@ type mockGen struct {
 	mockByDefault bool
 	types         map[string]ast.Expr
 	recorders     map[string]string
-	inits         []string
 	data          io.ReaderAt
 	ifInfo        *ifInfo
 	scopes        map[string]bool
@@ -711,6 +710,18 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "\t_pkgMock = &_packageMock{}\n")
 	fmt.Fprintf(out, ")\n\n")
 
+	fmt.Fprintf(out, "func callInits(inits ...func()) {\n")
+	fmt.Fprintf(out, "\tmocked := _allMocked\n")
+	fmt.Fprintf(out, "\tenabledMocks := _enabledMocks\n")
+	fmt.Fprintf(out, "\t_allMocked = false\n")
+	fmt.Fprintf(out, "\t_enabledMocks = nil\n")
+	fmt.Fprintf(out, "\tfor _, f := range inits {\n")
+	fmt.Fprintf(out, "\t\tf()\n")
+	fmt.Fprintf(out, "\t}\n")
+	fmt.Fprintf(out, "\t_allMocked = mocked\n")
+	fmt.Fprintf(out, "\t_enabledMocks = enabledMocks\n")
+	fmt.Fprintf(out, "}\n\n")
+
 	fmt.Fprintf(out, "func %s() *_meta {\n", m.MOCK)
 	fmt.Fprintf(out, "\treturn nil\n")
 	fmt.Fprintf(out, "}\n")
@@ -868,6 +879,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 	}
 
 	imports := make(map[string]string)
+	inits := []string{}
 
 	fmt.Fprintf(out, "package %s\n\n", f.Name)
 
@@ -1039,9 +1051,9 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 			}
 
 			if fi.name == "init" && !fi.IsMethod() {
-				fi.name = fmt.Sprintf("_real_init_%d", len(m.inits))
+				fi.name = fmt.Sprintf("_real_init_%d", len(inits))
 				fi.writeReal(out)
-				m.inits = append(m.inits, fi.name)
+				inits = append(inits, fi.name)
 			} else {
 				fi.writeReal(out)
 			}
@@ -1057,6 +1069,11 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 
 	fmt.Fprintf(out, "\n// Make sure gomock is used\n")
 	fmt.Fprintf(out, "var _ = gomock.Any()\n")
+
+	fmt.Fprintf(out, "\n// Make sure inits are called\n")
+	fmt.Fprintf(out, "func init() {\n")
+	fmt.Fprintf(out, "\tcallInits(%s)\n", strings.Join(inits, ", "))
+	fmt.Fprintf(out, "}\n")
 
 	return nil
 }
