@@ -306,6 +306,7 @@ type mockGen struct {
 	data          io.ReaderAt
 	ifInfo        *ifInfo
 	scopes        map[string]bool
+	initCount     int
 	MOCK          string
 	EXPECT        string
 	ObjEXPECT     string
@@ -1051,9 +1052,10 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 			}
 
 			if fi.name == "init" && !fi.IsMethod() {
-				fi.name = fmt.Sprintf("_real_init_%d", len(inits))
+				fi.name = fmt.Sprintf("_real_init_%d", m.initCount)
 				fi.writeReal(out)
 				inits = append(inits, fi.name)
+				m.initCount++
 			} else {
 				fi.writeReal(out)
 			}

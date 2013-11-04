@@ -10,6 +10,10 @@ func init() {
 	foo = nil
 }
 
+func init() {
+	fmt.Println("second init does nothing important")
+}
+
 func Wibble() error {
 	return foo
 }
