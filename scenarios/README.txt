@@ -103,3 +103,7 @@ build_constraints - make sure that build constraints are respected.  This
 
 issue24         - If withmock/mocktest are used to test a package outside of
                   GOPATH, it fails.
+
+has_init	- If a package we are processing has init methods, then we
+		  need to make sure they are called when mocking is disabled -
+		  otherwise the package will not behave correctly.
