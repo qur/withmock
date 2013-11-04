@@ -4,6 +4,8 @@ cd "$(dirname "$0")"
 
 ret=0
 
+echo -n > test.log
+
 echo -e "\e[33;1mscenrios\e[0m"
 echo -e "========"
 echo -e "                    withmock\tmocktest"
@@ -14,7 +16,7 @@ for d in $(ls -vd *); do
     printf "%-20s" "${d}:"
     echo "=== ${d} ===" >> test.log
     if [ -x "${d}/test.withmock" ]; then
-        echo "--- withmock ---" > test.log
+        echo "--- withmock ---" >> test.log
         (cd $d; ./test.withmock) >> test.log 2>&1
         if [ $? -ne 0 ]; then
             echo -ne "\e[31;1mFAIL\e[0m\t"
@@ -26,7 +28,7 @@ for d in $(ls -vd *); do
         echo -ne "\e[33;1mSKIP\e[0m\t"
     fi
     if [ -x "${d}/test.mocktest" ]; then
-        echo "--- mocktest ---" > test.log
+        echo "--- mocktest ---" >> test.log
         (cd $d; ./test.mocktest) >> test.log 2>&1
         if [ $? -ne 0 ]; then
             echo -e "\e[31;1mFAIL\e[0m"
