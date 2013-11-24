@@ -312,7 +312,7 @@ type mockGen struct {
 	ObjEXPECT     string
 }
 
-// MakeMock writes a mock version of the package found at srcPath into dstPath.
+// MakePkg writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
 func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) error {
 	isGoFile := func(info os.FileInfo) bool {
