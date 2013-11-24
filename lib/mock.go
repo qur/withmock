@@ -636,6 +636,15 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 				if i > 0 {
 					s += ", "
 				}
+				if len(param.Names) > 0 {
+					for j, name := range param.Names {
+						if j > 0 {
+							s += ", "
+						}
+						s += name.Name
+					}
+					s += " "
+				}
 				s += m.exprString(param.Type)
 			}
 		}
