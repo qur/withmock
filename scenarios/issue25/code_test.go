@@ -15,10 +15,10 @@ func TestTryMe(t *testing.T) {
 	gcfg.MOCK().SetController(ctrl)
 
 	data := "This is some data to decode"
-	gcfg.EXPECT().ReadStringInfo(gomock.Any(), data).Return(nil)
+	gcfg.EXPECT().ReadStringInto(gomock.Any(), data).Return(nil)
 
 	// Run the function we want to test
-	err := TryMe()
+	err := TryMe(data)
 
 	if err != nil {
 		t.Errorf("Unexpected error return: %s", err)
