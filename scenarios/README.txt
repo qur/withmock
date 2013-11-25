@@ -107,3 +107,11 @@ issue24         - If withmock/mocktest are used to test a package outside of
 has_init	- If a package we are processing has init methods, then we
 		  need to make sure they are called when mocking is disabled -
 		  otherwise the package will not behave correctly.
+
+issue25		- If a package that is being mocked imports a non-existant
+                  package from a file that should be excluded by a build tag
+                  (e.g. using a package that only exists in a newer version of
+                  Go), then we will error out when trying to process that file
+                  as we will fail to find the import.  We should probably assume
+                  that the file won't be compiled - but try and setup a nice
+                  error in case it is ...
