@@ -84,7 +84,7 @@ func process(filename, goPath string) error {
 	}
 	data := &bytes.Buffer{}
 
-	if err := m.file(data, file, filename); err != nil {
+	if _, err := m.file(data, file, filename); err != nil {
 		return err
 	}
 

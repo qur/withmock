@@ -228,13 +228,7 @@ func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	err = MakePkg(src, dst, mock, cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Extract the imports from the package source
-	imports, err := GetImports(dst, false)
+	imports, err := MakePkg(src, dst, mock, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +245,7 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	if err != nil {
 		return err
 	}
-	err = MakePkg(src, dst, true, cfg)
+	_, err = MakePkg(src, dst, true, cfg)
 	if err != nil {
 		return err
 	}

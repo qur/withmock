@@ -314,7 +314,7 @@ type mockGen struct {
 
 // MakePkg writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
-func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) error {
+func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bool, error) {
 	isGoFile := func(info os.FileInfo) bool {
 		if info.IsDir() {
 			return false
@@ -328,8 +328,10 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) error {
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, srcPath, isGoFile, parser.ParseComments)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	imports := map[string]bool{}
 
 	interfaces := make(Interfaces)
 
@@ -354,13 +356,17 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) error {
 
 			out, err := os.Create(filename)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer out.Close()
 
-			err = m.file(out, file, srcFile)
+			i, err := m.file(out, file, srcFile)
 			if err != nil {
-				return err
+				return nil, err
+			}
+
+			for path := range i {
+				imports[path] = false
 			}
 
 			/*
@@ -376,20 +382,20 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) error {
 
 		out, err := os.Create(filename)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer out.Close()
 
 		err = m.pkg(out, name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// TODO: currently we need to use goimports to add missing imports, we
 		// need to sort out our own imports, then we can switch to gofmt.
 		err = fixup(filename)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// special case to deal with the fact that the runtime package injects
@@ -402,10 +408,10 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) error {
 	}
 
 	if err := genInterfaces(interfaces); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return imports, nil
 }
 
 func writeSigpipe(path string) error {
@@ -861,19 +867,22 @@ func getPackageName(impPath, srcPath string) (string, error) {
 	return name, nil
 }
 
-func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
+func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]bool, error) {
 	data, err := os.Open(filename)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer data.Close()
 
 	// Make sure data is available to exprString/literal
 	m.data = data
 
+	buildTags := false
+
 	if len(f.Comments) > 0 {
 		for _, cg := range f.Comments {
 			if strings.HasPrefix(cg.Text(), "+build") {
+				buildTags = true
 				for _, c := range cg.List {
 					fmt.Fprintf(out, "%s\n", c.Text)
 				}
@@ -918,11 +927,16 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 						imports[s.Name.String()] = impPath
 					} else {
 						name, err := getPackageName(impPath, m.srcPath)
-						if err != nil {
-							return err
+						if err == nil {
+							fmt.Fprintf(out, "%s ", name)
+							imports[name] = impPath
+						} else if !buildTags {
+							// We only return an error if there are no build
+							// tags.  If there are build tags then this file
+							// might not actually be compiled - so the package
+							// being missing may not be a problem ...
+							return nil, err
 						}
-						fmt.Fprintf(out, "%s ", name)
-						imports[name] = impPath
 					}
 					fmt.Fprintf(out, "%s\n\n", s.Path.Value)
 					continue
@@ -940,11 +954,16 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 						imports[s.Name.String()] = impPath
 					} else {
 						name, err := getPackageName(impPath, m.srcPath)
-						if err != nil {
-							return err
+						if err == nil {
+							fmt.Fprintf(out, "%s ", name)
+							imports[name] = impPath
+						} else if !buildTags {
+							// We only return an error if there are no build
+							// tags.  If there are build tags then this file
+							// might not actually be compiled - so the package
+							// being missing may not be a problem ...
+							return nil, err
 						}
-						fmt.Fprintf(out, "%s ", name)
-						imports[name] = impPath
 					}
 					fmt.Fprintf(out, "%s\n", s.Path.Value)
 				}
@@ -983,7 +1002,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					case 1:
 						fmt.Fprintf(out, " = %s", m.exprString(s.Values[0]))
 					default:
-						return fmt.Errorf("Multiple values for a var not implemented")
+						return nil, fmt.Errorf("Multiple values for a var not implemented")
 					}
 					fmt.Fprintf(out, "\n")
 				}
@@ -993,7 +1012,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 				for _, spec := range d.Specs {
 					s := spec.(*ast.ValueSpec)
 					if len(s.Names) != 1 {
-						return fmt.Errorf("Multiple names for a constant not implemented")
+						return nil, fmt.Errorf("Multiple names for a constant not implemented")
 					}
 					fmt.Fprintf(out, "\t%s", s.Names[0])
 					if s.Type != nil {
@@ -1004,7 +1023,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 					case 1:
 						fmt.Fprintf(out, " = %s", m.exprString(s.Values[0]))
 					default:
-						return fmt.Errorf("Multiple values for a constant not implemented")
+						return nil, fmt.Errorf("Multiple values for a constant not implemented")
 					}
 					fmt.Fprintf(out, "\n")
 				}
@@ -1056,7 +1075,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 				fi.body = make([]byte, pos2.Offset-pos1.Offset+1)
 				_, err := data.ReadAt(fi.body, int64(pos1.Offset))
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 
@@ -1086,7 +1105,15 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) error {
 	fmt.Fprintf(out, "\tcallInits(%s)\n", strings.Join(inits, ", "))
 	fmt.Fprintf(out, "}\n")
 
-	return nil
+	i := map[string]bool{
+		"code.google.com/p/gomock/gomock": false,
+	}
+
+	for _, impPath := range imports {
+		i[impPath] = false
+	}
+
+	return i, nil
 }
 
 func loadInterfaceInfo(impPath string) (*ifInfo, error) {
