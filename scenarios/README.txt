@@ -115,3 +115,9 @@ issue25		- If a package that is being mocked imports a non-existant
                   as we will fail to find the import.  We should probably assume
                   that the file won't be compiled - but try and setup a nice
                   error in case it is ...
+
+issue27         - If we create two instances of the same type of interface Mock,
+                  then they should be independant - and expectations registered
+                  against one instance should not be satisified by calls against
+                  the other (which they are when using struct{} as the
+                  underlying type for the instance mock).

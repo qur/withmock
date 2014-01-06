@@ -1,0 +1,10 @@
+#!/bin/bash
+
+withmock go test "$@"
+
+if [ $? -eq 0 ]; then
+    echo "withmock passed, when we expected failure!"
+    exit 1
+fi
+
+exit 0

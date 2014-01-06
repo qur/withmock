@@ -1,0 +1,10 @@
+#!/bin/bash
+
+mocktest "$@"
+
+if [ $? -eq 0 ]; then
+    echo "mocktest passed, when we expected failure!"
+    exit 1
+fi
+
+exit 0
