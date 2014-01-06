@@ -713,7 +713,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
 
 	fmt.Fprintf(out, "type _meta struct{}\n")
-	fmt.Fprintf(out, "type _packageMock struct{}\n")
+	fmt.Fprintf(out, "type _packageMock struct{int}\n")
 	fmt.Fprintf(out, "type _package_Rec struct{\n")
 	fmt.Fprintf(out, "\tmock *_packageMock\n")
 	fmt.Fprintf(out, "}\n\n")
