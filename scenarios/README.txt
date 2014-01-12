@@ -121,3 +121,7 @@ issue27         - If we create two instances of the same type of interface Mock,
                   against one instance should not be satisified by calls against
                   the other (which they are when using struct{} as the
                   underlying type for the instance mock).
+
+issue28         - If a package embeds a C library, then that library will not be
+                  setup inside the working directory - and so the package will
+                  not compile.
