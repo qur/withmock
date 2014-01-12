@@ -346,11 +346,7 @@ func symlinkPackage(src, dst string) error {
 
 		// Ignore every directory except src (which we need to mirror)
 		if info.Mode().IsDir() {
-			if path == src {
-				return os.MkdirAll(target, 0700)
-			} else {
-				return filepath.SkipDir
-			}
+			return os.MkdirAll(target, 0700)
 		}
 
 		return os.Symlink(path, target)
