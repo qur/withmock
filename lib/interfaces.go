@@ -31,10 +31,14 @@ func (id *ifDetails) addMethod(name string, f *ast.FuncType) []string {
 	}
 	if f.Params != nil {
 		for _, param := range f.Params.List {
-			field := field{
+			fi.params = append(fi.params, field{
 				expr: m.exprString(param.Type),
+			})
+			for i:=1; i<len(param.Names); i++ {
+				fi.params = append(fi.params, field{
+					expr: m.exprString(param.Type),
+				})
 			}
-			fi.params = append(fi.params, field)
 		}
 	}
 	if f.Results != nil {
