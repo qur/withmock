@@ -5,7 +5,7 @@ import (
 
 	"code.google.com/p/gomock/gomock"
 
-	"github.com/lunastorm/withmock/scenarios/issue29/lib" // mock
+	"github.com/qur/withmock/scenarios/issue29/lib" // mock
 )
 
 type Bar struct {
