@@ -31,13 +31,12 @@ func (id *ifDetails) addMethod(name string, f *ast.FuncType) []string {
 	}
 	if f.Params != nil {
 		for _, param := range f.Params.List {
-			fi.params = append(fi.params, field{
+			field := field{
 				expr: m.exprString(param.Type),
-			})
+			}
+			fi.params = append(fi.params, field)
 			for i:=1; i<len(param.Names); i++ {
-				fi.params = append(fi.params, field{
-					expr: m.exprString(param.Type),
-				})
+				fi.params = append(fi.params, field)
 			}
 		}
 	}
@@ -47,6 +46,9 @@ func (id *ifDetails) addMethod(name string, f *ast.FuncType) []string {
 				expr: m.exprString(result.Type),
 			}
 			fi.results = append(fi.results, field)
+			for i:=1; i<len(result.Names); i++ {
+				fi.results = append(fi.results, field)
+			}
 		}
 	}
 	id.methods = append(id.methods, fi)
