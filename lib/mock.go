@@ -605,6 +605,10 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 								s += ", "
 							}
 							s += m.exprString(param.Type)
+							for j:=1 ; j<len(param.Names); j++ {
+								s += ", "
+								s += m.exprString(param.Type)
+							}
 						}
 					}
 					s += ")"
