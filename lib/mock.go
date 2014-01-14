@@ -604,26 +604,42 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 							if i > 0 {
 								s += ", "
 							}
-							s += m.exprString(param.Type)
-							for j:=1 ; j<len(param.Names); j++ {
-								s += ", "
-								s += m.exprString(param.Type)
+							if len(param.Names) > 0 {
+								for j, name := range param.Names {
+									if j > 0 {
+										s += ", "
+									}
+									s += m.exprString(name)
+								}
+								s += " "
 							}
+							s += m.exprString(param.Type)
 						}
 					}
 					s += ")"
 					if v.Results != nil {
 						s += " "
-						if len(v.Results.List) > 1 {
+						if len(v.Results.List) > 1 ||
+							len(v.Results.List[0].Names) > 0 {
 							s += "("
 						}
 						for i, result := range v.Results.List {
 							if i > 0 {
 								s += ", "
 							}
+							if len(result.Names) > 0 {
+								for j, name := range result.Names {
+									if j > 0 {
+										s += ", "
+									}
+									s += m.exprString(name)
+								}
+								s += " "
+							}
 							s += m.exprString(result.Type)
 						}
-						if len(v.Results.List) > 1 {
+						if len(v.Results.List) > 1 ||
+							len(v.Results.List[0].Names) > 0 {
 							s += ")"
 						}
 					}
