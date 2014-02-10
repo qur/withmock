@@ -130,3 +130,5 @@ issue31         - When we generate a mock instance for an interface we don't
                   handle varidic methods correctly.
 
 issue32         - Unable to mock time package
+
+issue33         - Unable to mock bytes package
