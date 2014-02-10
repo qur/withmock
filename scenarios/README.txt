@@ -125,3 +125,6 @@ issue27         - If we create two instances of the same type of interface Mock,
 issue28         - If a package embeds a C library, then that library will not be
                   setup inside the working directory - and so the package will
                   not compile.
+
+issue31         - When we generate a mock instance for an interface we don't
+                  handle varidic methods correctly.
