@@ -128,3 +128,5 @@ issue28         - If a package embeds a C library, then that library will not be
 
 issue31         - When we generate a mock instance for an interface we don't
                   handle varidic methods correctly.
+
+issue32         - Unable to mock time package
