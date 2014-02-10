@@ -38,6 +38,7 @@ func (id *ifDetails) addMethod(name string, f *ast.FuncType) []string {
 			for i:=1; i<len(param.Names); i++ {
 				fi.params = append(fi.params, field)
 			}
+			_, fi.varidic = param.Type.(*ast.Ellipsis)
 		}
 	}
 	if f.Results != nil {
