@@ -3,6 +3,8 @@ package code
 import (
 	"testing"
 
+	"code.google.com/p/gomock/gomock"
+
 	"github.com/qur/withmock/scenarios/issue31/lib" //mock
 )
 
