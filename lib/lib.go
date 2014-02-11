@@ -245,6 +245,7 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	if err != nil {
 		return err
 	}
+	cfg.MockPrototypes = true
 	_, err = MakePkg(src, dst, true, cfg)
 	if err != nil {
 		return err

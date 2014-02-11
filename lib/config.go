@@ -38,6 +38,10 @@ func readPackages(path string) ([]string, error) {
 }
 
 type MockConfig struct {
+	// Local configuration
+	MockPrototypes bool
+
+	// File based configuration
 	MOCK      string `yaml:"MOCK"`
 	EXPECT    string `yaml:"EXPECT"`
 	ObjEXPECT string `yaml:"obj.EXPECT"`

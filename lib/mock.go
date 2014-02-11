@@ -68,6 +68,40 @@ func (fi *funcInfo) writeReal(out io.Writer) {
 	fmt.Fprintf(out, "\n")
 }
 
+func (fi *funcInfo) writeStub(out io.Writer) {
+	fmt.Fprintf(out, "func ")
+	if fi.IsMethod() {
+		fmt.Fprintf(out, "(%s %s) ", fi.recv.name, fi.recv.expr)
+	}
+	if ast.IsExported(fi.name) {
+		fmt.Fprintf(out, "_real_")
+	}
+	fmt.Fprintf(out, "%s(", fi.name)
+	for i, param := range fi.params {
+		if i > 0 {
+			fmt.Fprintf(out, ", ")
+		}
+		n := strings.Join(param.names, ", ")
+		fmt.Fprintf(out, "%s %s", n, param.expr)
+	}
+	fmt.Fprintf(out, ") ")
+	if len(fi.results) > 0 {
+		fmt.Fprintf(out, "(")
+		for i, result := range fi.results {
+			if i > 0 {
+				fmt.Fprintf(out, ", ")
+			}
+			n := strings.Join(result.names, ", ")
+			fmt.Fprintf(out, "%s %s", n, result.expr)
+		}
+		fmt.Fprintf(out, ") ")
+	}
+	fmt.Fprintf(out, "{\n")
+	fmt.Fprintf(out, "\tpanic(\"This is only a stub!\")\n")
+	fmt.Fprintf(out, "}\n")
+	fmt.Fprintf(out, "\n")
+}
+
 func (fi *funcInfo) countParams() int {
 	p := 0
 	for _, param := range fi.params {
@@ -298,18 +332,19 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 }
 
 type mockGen struct {
-	fset          *token.FileSet
-	srcPath       string
-	mockByDefault bool
-	types         map[string]ast.Expr
-	recorders     map[string]string
-	data          io.ReaderAt
-	ifInfo        *ifInfo
-	scopes        map[string]bool
-	initCount     int
-	MOCK          string
-	EXPECT        string
-	ObjEXPECT     string
+	fset           *token.FileSet
+	srcPath        string
+	mockByDefault  bool
+	mockPrototypes bool
+	types          map[string]ast.Expr
+	recorders      map[string]string
+	data           io.ReaderAt
+	ifInfo         *ifInfo
+	scopes         map[string]bool
+	initCount      int
+	MOCK           string
+	EXPECT         string
+	ObjEXPECT      string
 }
 
 // MakePkg writes a mock version of the package found at srcPath into dstPath.
@@ -337,15 +372,16 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 
 	for name, pkg := range pkgs {
 		m := &mockGen{
-			fset:          fset,
-			srcPath:       srcPath,
-			mockByDefault: mock,
-			types:         make(map[string]ast.Expr),
-			recorders:     make(map[string]string),
-			ifInfo:        newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go")),
-			MOCK:          cfg.MOCK,
-			EXPECT:        cfg.EXPECT,
-			ObjEXPECT:     cfg.ObjEXPECT,
+			fset:           fset,
+			srcPath:        srcPath,
+			mockByDefault:  mock,
+			mockPrototypes: cfg.MockPrototypes,
+			types:          make(map[string]ast.Expr),
+			recorders:      make(map[string]string),
+			ifInfo:         newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go")),
+			MOCK:           cfg.MOCK,
+			EXPECT:         cfg.EXPECT,
+			ObjEXPECT:      cfg.ObjEXPECT,
 		}
 
 		m.ifInfo.EXPECT = m.EXPECT
@@ -396,12 +432,6 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 		err = fixup(filename)
 		if err != nil {
 			return nil, err
-		}
-
-		// special case to deal with the fact that the runtime package injects
-		// the sigpipe function into os from a .c file.
-		if name == "os" {
-			writeSigpipe(dstPath)
 		}
 
 		interfaces[name] = m.ifInfo
@@ -1104,10 +1134,12 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				fi.writeReal(out)
 				inits = append(inits, fi.name)
 				m.initCount++
+			} else if d.Body == nil && m.mockPrototypes {
+				fi.writeStub(out)
 			} else {
 				fi.writeReal(out)
 			}
-			if d.Body != nil && d.Name.IsExported() {
+			if d.Name.IsExported() && (d.Body != nil || m.mockPrototypes) {
 				fi.writeMock(out)
 				fi.writeRecorder(out, recorder)
 			}

@@ -15,7 +15,7 @@ func TestMe(t *testing.T) {
 	b := &bytes.Buffer{}
 
 	bytes.MOCK().SetController(ctrl)
-	bytes.EXPECT().NewBuffer("foo").Return(b)
+	bytes.EXPECT().NewBuffer([]byte("foo")).Return(b)
 	b.EXPECT().String().Return("wibble")
 
 	if RunMe("foo") != "wibble" {
