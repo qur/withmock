@@ -444,25 +444,6 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 	return imports, nil
 }
 
-func writeSigpipe(path string) error {
-	filename := filepath.Join(path, "sigpipe.c")
-
-	out, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	fmt.Fprintf(out, "#include \"runtime.h\"\n")
-	fmt.Fprintf(out, "\n")
-	fmt.Fprintf(out, "void\n")
-	fmt.Fprintf(out, "·sigpipe(void) {\n")
-	fmt.Fprintf(out, "\tos·sigpipe();\n")
-	fmt.Fprintf(out, "}\n")
-
-	return nil
-}
-
 func (m *mockGen) literal(name string) (string, bool) {
 	exp := m.types[name]
 	switch v := exp.(type) {
