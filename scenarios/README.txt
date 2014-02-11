@@ -132,3 +132,5 @@ issue31         - When we generate a mock instance for an interface we don't
 issue32         - Unable to mock time package
 
 issue33         - Unable to mock bytes package
+
+issue34         - Unable to mock os/signal package
