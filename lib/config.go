@@ -40,6 +40,7 @@ func readPackages(path string) ([]string, error) {
 type MockConfig struct {
 	// Local configuration
 	MockPrototypes bool
+	IgnoreInits    bool
 
 	// File based configuration
 	MOCK      string `yaml:"MOCK"`

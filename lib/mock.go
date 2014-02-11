@@ -336,6 +336,7 @@ type mockGen struct {
 	srcPath        string
 	mockByDefault  bool
 	mockPrototypes bool
+	callInits      bool
 	types          map[string]ast.Expr
 	recorders      map[string]string
 	data           io.ReaderAt
@@ -376,6 +377,7 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 			srcPath:        srcPath,
 			mockByDefault:  mock,
 			mockPrototypes: cfg.MockPrototypes,
+			callInits:      !cfg.IgnoreInits,
 			types:          make(map[string]ast.Expr),
 			recorders:      make(map[string]string),
 			ifInfo:         newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go")),
@@ -1113,7 +1115,9 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 			if fi.name == "init" && !fi.IsMethod() {
 				fi.name = fmt.Sprintf("_real_init_%d", m.initCount)
 				fi.writeReal(out)
-				inits = append(inits, fi.name)
+				if m.callInits {
+					inits = append(inits, fi.name)
+				}
 				m.initCount++
 			} else if d.Body == nil && m.mockPrototypes {
 				fi.writeStub(out)
