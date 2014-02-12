@@ -152,6 +152,10 @@ func TestMockFile(t *testing.T) {
 	}
 
 	for i, path := range files {
+		if strings.Contains(path, "/badpkg/") {
+			fmt.Printf("SKIP    (%d/%d): %s\n", i+1, len(files), path)
+			continue
+		}
 		fmt.Printf("PROCESS (%d/%d): %s\n", i+1, len(files), path)
 		if err := process(path, tmpDir); err != nil {
 			t.Errorf("FAILED (%s):\n\t%s", path, err)
