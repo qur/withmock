@@ -39,8 +39,9 @@ func readPackages(path string) ([]string, error) {
 
 type MockConfig struct {
 	// Local configuration
-	MockPrototypes bool
-	IgnoreInits    bool
+	MockPrototypes bool // Mock prototypes (i.e. functions without bodies)
+	IgnoreInits    bool // Don't call the original init functions
+	MatchOSArch    bool // only use files for GOOS & GOARCH
 
 	// File based configuration
 	MOCK      string `yaml:"MOCK"`

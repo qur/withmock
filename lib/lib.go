@@ -247,6 +247,7 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	}
 	cfg.MockPrototypes = true
 	cfg.IgnoreInits = true
+	cfg.MatchOSArch = true
 	_, err = MakePkg(src, dst, true, cfg)
 	if err != nil {
 		return Cerr{"MakePkg", err}

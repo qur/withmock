@@ -337,6 +337,7 @@ type mockGen struct {
 	mockByDefault  bool
 	mockPrototypes bool
 	callInits      bool
+	matchOS        bool
 	types          map[string]ast.Expr
 	recorders      map[string]string
 	data           io.ReaderAt
@@ -378,6 +379,7 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 			mockByDefault:  mock,
 			mockPrototypes: cfg.MockPrototypes,
 			callInits:      !cfg.IgnoreInits,
+			matchOS:        cfg.MatchOSArch,
 			types:          make(map[string]ast.Expr),
 			recorders:      make(map[string]string),
 			ifInfo:         newIfInfo(filepath.Join(dstPath, name+"_ifmocks.go")),
@@ -391,6 +393,13 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 		for path, file := range pkg.Files {
 			srcFile := filepath.Join(srcPath, filepath.Base(path))
 			filename := filepath.Join(dstPath, filepath.Base(path))
+
+			// TODO: the check needs to include the embedded build contraints in
+			// the file too - but it doesn't currently ... (they should be
+			// available from file.Comments).
+			if cfg.MatchOSArch && !goodOSArchFile(path, nil) {
+				continue
+			}
 
 			out, err := os.Create(filename)
 			if err != nil {
