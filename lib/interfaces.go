@@ -144,6 +144,16 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 	methods = append(methods, t.methods...)
 
 	for _, n := range t.locals {
+		// Special case for error, which is a builtin interface type
+		if n == "error" {
+			methods = append(methods, &funcInfo{
+				name: "Error",
+				realDisabled: true,
+				varidic: false,
+				results: []field{{expr: "string"}},
+			})
+			continue
+		}
 		if _, ok := info.types[n]; !ok {
 			return nil, fmt.Errorf("Unknown type %s in package %s", n, name)
 		}
