@@ -134,3 +134,5 @@ issue32         - Unable to mock time package
 issue33         - Unable to mock bytes package
 
 issue34         - Unable to mock os/signal package
+
+issue35         - Unable to mock net package
