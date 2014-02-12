@@ -364,7 +364,7 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, srcPath, isGoFile, parser.ParseComments)
 	if err != nil {
-		return nil, err
+		return nil, Cerr{"parseDir", err}
 	}
 
 	imports := map[string]bool{}
@@ -394,13 +394,13 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 
 			out, err := os.Create(filename)
 			if err != nil {
-				return nil, err
+				return nil, Cerr{"os.Create", err}
 			}
 			defer out.Close()
 
 			i, err := m.file(out, file, srcFile)
 			if err != nil {
-				return nil, err
+				return nil, Cerr{"m.file", err}
 			}
 
 			for path := range i {
@@ -420,27 +420,27 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 
 		out, err := os.Create(filename)
 		if err != nil {
-			return nil, err
+			return nil, Cerr{"os.Create", err}
 		}
 		defer out.Close()
 
 		err = m.pkg(out, name)
 		if err != nil {
-			return nil, err
+			return nil, Cerr{"m.pkg", err}
 		}
 
 		// TODO: currently we need to use goimports to add missing imports, we
 		// need to sort out our own imports, then we can switch to gofmt.
 		err = fixup(filename)
 		if err != nil {
-			return nil, err
+			return nil, Cerr{"fixup", err}
 		}
 
 		interfaces[name] = m.ifInfo
 	}
 
 	if err := genInterfaces(interfaces); err != nil {
-		return nil, err
+		return nil, Cerr{"genInterfaces", err}
 	}
 
 	return imports, nil

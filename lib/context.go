@@ -236,7 +236,7 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				// this package has been specifically excluded from mocking, so
 				// we just link it, even if mocked is indicated.
 				if _, err := LinkPkg(c.goPath, c.tmpPath, name); err != nil {
-					return nil, err
+					return nil, Cerr{"LinkPkg", err}
 				}
 				continue
 			}
@@ -246,7 +246,7 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				if mock {
 					err := MockStandard(c.goRoot, c.tmpPath, name, cfg)
 					if err != nil {
-						return nil, err
+						return nil, Cerr{"MockStandard", err}
 					}
 				}
 				continue
@@ -258,7 +258,7 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 			// for now, since we can't currently deal with that request.
 			nonGoCode, err := hasNonGoCode(name)
 			if err != nil {
-				return nil, err
+				return nil, Cerr{"hasNonGoCode", err}
 			}
 
 			if nonGoCode {
@@ -269,7 +269,7 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				} else {
 					pkgImports, err := LinkPkg(c.goPath, c.tmpPath, name)
 					if err != nil {
-						return nil, err
+						return nil, Cerr{"LinkPkg", err}
 					}
 
 					// Update imports from the package we just processed, but it
@@ -282,7 +282,7 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 			// Process the package and get it's imports
 			pkgImports, err := GenPkg(c.goPath, c.tmpPath, name, mock, cfg)
 			if err != nil {
-				return nil, err
+				return nil, Cerr{"GenPkg", err}
 			}
 
 			// Update imports from the package we just processed, but it can
@@ -302,17 +302,17 @@ func (c *Context) LinkPackage(pkg string) error {
 func (c *Context) AddPackage(pkgName string) (string, error) {
 	path, err := LookupImportPath(pkgName)
 	if err != nil {
-		return "", err
+		return "", Cerr{"LookupImportPath", err}
 	}
 
 	imports, err := GetImports(path, true)
 	if err != nil {
-		return "", err
+		return "", Cerr{"GetImports", err}
 	}
 
 	importNames, err := c.installImports(imports)
 	if err != nil {
-		return "", err
+		return "", Cerr{"installImports", err}
 	}
 
 	newName := markImport(pkgName, testMark)
@@ -322,19 +322,19 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 	codeDest := filepath.Join(c.tmpPath, "src", newName)
 	codeSrc, err := filepath.Abs(path)
 	if err != nil {
-		return "", err
+		return "", Cerr{"filepath.Abs", err}
 	}
 
 	err = MockImports(codeSrc, codeDest, importNames, c.cfg)
 	if err != nil {
-		return "", err
+		return "", Cerr{"MockImports", err}
 	}
 
 	cfg := c.cfg.Mock(pkgName)
 
 	err = MockInterfaces(c.tmpPath, pkgName, cfg)
 	if err != nil {
-		return "", err
+		return "", Cerr{"MockInterfaces", err}
 	}
 
 	c.code = append(c.code, codeLoc{codeSrc, codeDest})

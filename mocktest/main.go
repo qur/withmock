@@ -23,6 +23,7 @@ var (
 	pkgFile  = flag.String("P", "", "install extra packages listed in the given file")
 	exclFile = flag.String("exclude", "", "any package listed in the given file will not be mocked, even if marked in test code.")
 	cfgFile  = flag.String("c", "", "load config from the specified file")
+	debug    = flag.Bool("debug", false, "enable extra output for debugging mock genertion issues")
 )
 
 func usage() {
@@ -42,6 +43,11 @@ func main() {
 	if exit, ok := err.(*exec.ExitError); ok {
 		ws := exit.Sys().(syscall.WaitStatus)
 		os.Exit(ws.ExitStatus())
+	}
+
+	if c, ok := err.(lib.Cerr); *debug && ok {
+		fmt.Fprintf(os.Stderr, "ERROR(%s): %s\n", c.Context(), err)
+		os.Exit(1)
 	}
 
 	if err != nil {
@@ -68,7 +74,7 @@ func doit() error {
 	for _, arg := range args {
 		list, err := lib.GetOutput("go", "list", arg)
 		if err != nil {
-			return err
+			return lib.Cerr{"go list", err}
 		}
 		for _, pkg := range strings.Split(list, "\n") {
 			pkg = strings.TrimSpace(pkg)
@@ -88,7 +94,7 @@ func doit() error {
 
 	ctxt, err := lib.NewContext()
 	if err != nil {
-		return err
+		return lib.Cerr{"NewContext", err}
 	}
 	defer ctxt.Close()
 
@@ -104,7 +110,7 @@ func doit() error {
 
 	if *exclFile != "" {
 		if err := ctxt.ExcludePackagesFromFile(*exclFile); err != nil {
-			return err
+			return lib.Cerr{"ExcludePackagesFromFile", err}
 		}
 	}
 
@@ -112,7 +118,7 @@ func doit() error {
 
 	if *cfgFile != "" {
 		if err := ctxt.LoadConfig(*cfgFile); err != nil {
-			return err
+			return lib.Cerr{"LoadConfig", err}
 		}
 	}
 
@@ -130,7 +136,7 @@ func doit() error {
 	for _, pkg := range pkgs {
 		name, err := ctxt.AddPackage(pkg)
 		if err != nil {
-			return err
+			return lib.Cerr{"AddPackage", err}
 		}
 		args = append(args, name)
 	}
@@ -139,7 +145,7 @@ func doit() error {
 
 	if *pkgFile != "" {
 		if err := ctxt.LinkPackagesFromFile(*pkgFile); err != nil {
-			return err
+			return lib.Cerr{"LinkPackagesFromFile", err}
 		}
 	}
 
@@ -147,12 +153,16 @@ func doit() error {
 
 	if *gocov {
 		if err := ctxt.LinkPackage("github.com/axw/gocov"); err != nil {
-			return err
+			return lib.Cerr{"LinkPackage(gocov)", err}
 		}
 		command = "gocov"
 	}
 
 	// Finally we can run the command inside the context
 
-	return ctxt.Run(command, args...)
+	if err := ctxt.Run(command, args...); err != nil {
+		return lib.Cerr{"Run", err}
+	}
+
+	return nil
 }

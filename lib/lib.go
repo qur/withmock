@@ -243,13 +243,13 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	dst := filepath.Join(dstRoot, "src", markImport(name, mockMark))
 	err := os.MkdirAll(dst, 0700)
 	if err != nil {
-		return err
+		return Cerr{"MkdirAll", err}
 	}
 	cfg.MockPrototypes = true
 	cfg.IgnoreInits = true
 	_, err = MakePkg(src, dst, true, cfg)
 	if err != nil {
-		return err
+		return Cerr{"MakePkg", err}
 	}
 
 	// Done

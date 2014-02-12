@@ -21,6 +21,7 @@ var (
 	pkgFile  = flag.String("P", "", "install extra packages listed in the given file")
 	exclFile = flag.String("exclude", "", "any package listed in the given file will not be mocked, even if marked in test code.")
 	cfgFile  = flag.String("c", "", "load config from the specified file")
+	debug    = flag.Bool("debug", false, "enable extra output for debugging mock genertion issues")
 )
 
 func usage() {
@@ -40,6 +41,11 @@ func main() {
 	if exit, ok := err.(*exec.ExitError); ok {
 		ws := exit.Sys().(syscall.WaitStatus)
 		os.Exit(ws.ExitStatus())
+	}
+
+	if c, ok := err.(lib.Cerr); *debug && ok {
+		fmt.Fprintf(os.Stderr, "ERROR(%s): %s\n", c.Context(), err)
+		os.Exit(1)
 	}
 
 	if err != nil {

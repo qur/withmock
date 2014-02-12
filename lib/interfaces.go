@@ -149,7 +149,7 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 		}
 		m, err := i.getMethods(name, n)
 		if err != nil {
-			return nil, err
+			return nil, Cerr{"i.getMethods", err}
 		}
 		methods = append(methods, m...)
 	}
@@ -158,14 +158,14 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 		if _, ok := i[e.name]; !ok {
 			info, err := loadInterfaceInfo(e.impPath)
 			if err != nil {
-				return nil, err
+				return nil, Cerr{"loadInterfaceInfo", err}
 			}
 			i[e.name] = info
 		}
 
 		m, err := i.getMethods(e.name, e.selector)
 		if err != nil {
-			return nil, err
+			return nil, Cerr{"i.getMethods", err}
 		}
 		methods = append(methods, m...)
 	}
@@ -178,7 +178,7 @@ func (i Interfaces) genInterface(name string) error {
 
 	out, err := os.Create(info.filename)
 	if err != nil {
-		return err
+		return Cerr{"os.Create", err}
 	}
 	defer out.Close()
 
@@ -208,7 +208,7 @@ func (i Interfaces) genInterface(name string) error {
 
 		methods, err := i.getMethods(name, tname)
 		if err != nil {
-			return err
+			return Cerr{"getMethods", err}
 		}
 
 		for _, m := range methods {
@@ -288,13 +288,13 @@ func genInterfaces(interfaces Interfaces) error {
 		}
 
 		if err := interfaces.genInterface(name); err != nil {
-			return err
+			return Cerr{"genInterface", err}
 		}
 
 		// TODO: currently we need to use goimports to add missing imports, we
 		// need to sort out our own imports, then we can switch to gofmt.
 		if err := fixup(i.filename); err != nil {
-			return err
+			return Cerr{"fixup", err}
 		}
 	}
 
