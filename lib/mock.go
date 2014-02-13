@@ -393,12 +393,14 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 		processed := 0
 
 		for path, file := range pkg.Files {
-			srcFile := filepath.Join(srcPath, filepath.Base(path))
-			filename := filepath.Join(dstPath, filepath.Base(path))
+			base := filepath.Base(path)
+
+			srcFile := filepath.Join(srcPath, base)
+			filename := filepath.Join(dstPath, base)
 
 			// If only considering files for this OS/Arch, then reject files
 			// that aren't for this OS/Arch based on filename.
-			if cfg.MatchOSArch && !goodOSArchFile(path, nil) {
+			if cfg.MatchOSArch && !goodOSArchFile(base, nil) {
 				continue
 			}
 
