@@ -390,16 +390,26 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 
 		m.ifInfo.EXPECT = m.EXPECT
 
+		processed := 0
+
 		for path, file := range pkg.Files {
 			srcFile := filepath.Join(srcPath, filepath.Base(path))
 			filename := filepath.Join(dstPath, filepath.Base(path))
 
-			// TODO: the check needs to include the embedded build contraints in
-			// the file too - but it doesn't currently ... (they should be
-			// available from file.Comments).
+			// If only considering files for this OS/Arch, then reject files
+			// that aren't for this OS/Arch based on filename.
 			if cfg.MatchOSArch && !goodOSArchFile(path, nil) {
 				continue
 			}
+
+			// If only considering files for this OS/Arch, then reject files
+			// that aren't for this OS/Arch based on build constraint (also
+			// excludes files with an ignore build constraint).
+			if cfg.MatchOSArch && !goodOSArchConstraints(file) {
+				continue
+			}
+
+			processed++
 
 			out, err := os.Create(filename)
 			if err != nil {
@@ -423,6 +433,12 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 					return err
 				}
 			*/
+		}
+
+		// If we skipped over all the files for this package, then ignore it
+		// entirely.
+		if processed == 0 {
+			continue
 		}
 
 		filename := filepath.Join(dstPath, name+"_mock.go")
