@@ -1,0 +1,46 @@
+#!/bin/bash
+
+ret=0
+
+test_file="code_test.go"
+
+for pkg in $(go list std); do
+    case ${pkg} in
+        cmd/*)
+            continue
+            ;;
+        *)
+            ;;
+    esac
+
+    echo -n "${pkg}: "
+
+    echo "package code" > ${test_file}
+    echo >> ${test_file}
+    echo "import (" >> ${test_file}
+    echo -e "\t\"testing\"" >> ${test_file}
+    echo -e "\t\"${pkg}\" //mock" >> ${test_file}
+    echo >> ${test_file}
+    echo -e "\t\"code.google.com/p/gomock/gomock\"" >> ${test_file}
+    echo ")" >> ${test_file}
+    echo >> ${test_file}
+    echo "func TestMe(t *testing.T) {" >> ${test_file}
+    echo -e "\tctrl := gomock.NewController(t)" >> ${test_file}
+    echo -e "\tdefer ctrl.Finish()" >> ${test_file}
+    echo "}" >> ${test_file}
+
+    output=$("$@" 2>&1)
+    if [ "$?" -eq 0 ]; then
+        echo "pass"
+    else
+        ret=1
+        echo "fail"
+        echo "----------------------------------------------------"
+        echo -e "$output"
+        echo "----------------------------------------------------"
+    fi
+done
+
+rm -r ${test_file}
+
+exit $ret
