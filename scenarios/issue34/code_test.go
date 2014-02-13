@@ -13,7 +13,7 @@ func TestMe(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	notify := func(ch chan<- os.Signal, signals ...os.Signal) {
+	notify := func(ch chan<- os.Signal, signal os.Signal) {
 		ch <- os.Kill
 	}
 
