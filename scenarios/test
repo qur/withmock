@@ -6,8 +6,8 @@ ret=0
 
 echo -n > test.log
 
-echo -e "\e[33;1mscenrios\e[0m"
-echo -e "========"
+echo -e "\e[33;1mscenarios\e[0m"
+echo -e "========="
 echo -e "                    withmock\tmocktest"
 for d in $(ls -vd *); do
     if [ ! -d "${d}" ]; then
