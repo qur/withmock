@@ -1,0 +1,27 @@
+#!/bin/bash
+
+mydir="$(dirname "$0")"
+mydir="$(cd "${mydir}"; pwd)"
+
+gopath="${mydir}/tst"
+code="${gopath}/src/code"
+
+mkdir -p "${code}"
+
+version="$1"
+shift;
+
+cd "${mydir}"
+
+goroot="${version}/go"
+
+export GOROOT="${mydir}/${goroot}"
+export GOPATH="${gopath}"
+export PATH="$GOROOT/bin:$PATH"
+
+echo "==== ${version} ===="
+(cd "${code}"; "${mydir}/runtest" mocktest "$@")
+ret=$?
+echo
+
+exit $ret
