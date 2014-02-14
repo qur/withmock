@@ -1,0 +1,41 @@
+#!/bin/bash
+
+mydir="$(dirname "$0")"
+mydir="$(cd "${mydir}"; pwd)"
+
+gopath="${mydir}/tst"
+code="${gopath}/src/code"
+
+mkdir -p "${code}"
+
+echo -e "\033[33;1mstdlib\033[0m"
+echo "======"
+echo
+
+cd "${mydir}"
+exec 3>&1 1>test.log 2>&1
+
+result=0
+
+for goroot in $(ls -vd */go); do
+    version=${goroot///go/}
+    echo -ne "${version}: " >&3
+
+    export GOROOT="${mydir}/${goroot}"
+    export GOPATH="${gopath}"
+    export PATH="$GOROOT/bin:$PATH"
+
+    echo "==== ${version} ===="
+    (cd "${code}"; "${mydir}/runtest" mocktest "$@")
+    ret=$?
+    echo
+
+    if [ $ret -eq 0 ]; then
+        echo -e "\033[32;1mPASS\033[0m" >&3
+    else
+        echo -e "\033[31;1mFAIL\033[0m" >&3
+        result=1
+    fi
+done
+
+exit $result

@@ -1,0 +1,87 @@
+#!/bin/bash
+
+mydir="$(dirname "$0")"
+mydir="$(cd "${mydir}"; pwd)"
+
+exec 3>&1 1>setup.log 2>&1
+
+versions=(1.0.3 1.1.0 1.1.1 1.1.2 1.2.0)
+
+declare -A url
+url=(
+    [1.0.0]="https://go.googlecode.com/files/go.go1.src.tar.gz"
+    [1.0.1]="https://go.googlecode.com/files/go1.0.1.src.tar.gz"
+    [1.0.2]="https://go.googlecode.com/files/go1.0.2.src.tar.gz"
+    [1.0.3]="https://go.googlecode.com/files/go1.0.3.src.tar.gz"
+    [1.1.0]="https://go.googlecode.com/files/go1.1.src.tar.gz"
+    [1.1.1]="https://go.googlecode.com/files/go1.1.1.src.tar.gz"
+    [1.1.2]="https://go.googlecode.com/files/go1.1.2.src.tar.gz"
+    [1.2.0]="https://go.googlecode.com/files/go1.2.src.tar.gz"
+)
+
+mkdir -p src
+
+gr="$GOROOT"
+
+for version in "${versions[@]}"; do
+    echo "==== ${version} ====" >&3
+
+    tarball="dl/${version}.tgz"
+
+    echo "====== DOWNLOAD ======"
+    if ! [ -f "${tarball}" ]; then
+        echo -n "  download: " >&3
+        wget -O "${tarball}" "${url[$version]}"
+        if [ $? -eq 0 ]; then
+            echo "ok" >&3
+        else
+            echo "fail" >&3
+            continue
+        fi
+    fi
+    echo "===================="
+    echo
+
+    echo "====== UNPACK ======"
+    if ! [ -d "${version}/go" ]; then
+        mkdir -p "${version}"
+        echo -n "  unpack: " >&3
+        tar xf "${tarball}" -C "${version}"
+        if [ $? -eq 0 ]; then
+            echo "ok" >&3
+        else
+            echo "fail" >&3
+            continue
+        fi
+    fi
+    echo "===================="
+    echo
+
+    echo "====== BUILD ======"
+    if ! [ -f "${version}/go/bin/go" ]; then
+        echo -n "  build: " >&3
+        goroot="$(cd "${version}/go"; pwd)"
+        export GOROOT="${goroot}"
+        (cd "${version}/go/src"; ./make.bash)
+        if [ $? -eq 0 ]; then
+            echo "ok" >&3
+        else
+            echo "fail" >&3
+            continue
+        fi
+    fi
+    echo "===================="
+    echo
+done
+
+echo "==== gomock ====" >&3
+mkdir -p "tst/src"
+export GOROOT="${gr}"
+export GOPATH="${mydir}/tst"
+echo -n "  download: " >&3
+go get -d code.google.com/p/gomock/gomock
+if [ $? -eq 0 ]; then
+    echo "ok" >&3
+else
+    echo "fail" >&3
+fi
