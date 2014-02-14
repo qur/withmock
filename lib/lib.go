@@ -276,13 +276,13 @@ func LinkPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
 	dst := filepath.Join(dstRoot, "src", name)
 	err := symlinkPackage(src, dst)
 	if err != nil {
-		return nil, err
+		return nil, Cerr{"symlinkPackage", err}
 	}
 
 	// Extract the imports from the package source
 	imports, err := GetImports(src, false)
 	if err != nil {
-		return nil, err
+		return nil, Cerr{"GetImports", err}
 	}
 
 	// Done
