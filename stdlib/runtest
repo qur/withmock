@@ -9,6 +9,9 @@ for pkg in $(go list std); do
         cmd/*)
             continue
             ;;
+        testing)
+            continue
+            ;;
         *)
             ;;
     esac
