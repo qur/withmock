@@ -34,13 +34,16 @@ func LookupImportPath(impPath string) (string, error) {
 }
 
 func GetOutput(name string, args ...string) (string, error) {
+	return GetCmdOutput(exec.Command(name, args...))
+}
+
+func GetCmdOutput(cmd *exec.Cmd) (string, error) {
 	buf := &bytes.Buffer{}
-	cmd := exec.Command(name, args...)
 	cmd.Stderr = buf
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("External program '%s' failed (%s), with "+
-			"output:\n%s", name, err, buf.String())
+			"output:\n%s", cmd.Args[0], err, buf.String())
 	}
 	return strings.TrimSpace(string(out)), nil
 }

@@ -116,15 +116,23 @@ func (c *Context) LoadConfig(path string) (err error) {
 	return
 }
 
-func (c *Context) setGOPATH() error {
-	if err := os.Setenv("GOPATH", c.tmpPath); err != nil {
-		return err
-	}
-	if err := os.Setenv("ORIG_GOPATH", c.origPath); err != nil {
-		return err
+func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
+	env := os.Environ()
+
+	// remove any current GOPATH from the environment
+	for i := range env {
+		if strings.HasPrefix(env[i], "GOPATH=") {
+			env[i] = "__IGNORE="
+		}
 	}
 
-	return nil
+	// Setup the environment variables that we want
+	env = append(env, "GOPATH=" + c.tmpPath)
+	env = append(env, "ORIG_GOPATH=" + c.origPath)
+
+	cmd := exec.Command(command, args...)
+	cmd.Env = env
+	return cmd
 }
 
 func (c *Context) installPackages() error {
@@ -134,24 +142,12 @@ func (c *Context) installPackages() error {
 			continue
 		}
 
-		cmd := exec.Command("go", "install", name)
+		cmd := c.insideCommand("go", "install", name)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
 				name, err, out)
 		}
-	}
-
-	return nil
-}
-
-func (c *Context) activate() error {
-	if err := c.setGOPATH(); err != nil {
-		return err
-	}
-
-	if err := c.installPackages(); err != nil {
-		return err
 	}
 
 	return nil
@@ -371,16 +367,15 @@ func (c *Context) ExcludePackagesFromFile(path string) error {
 }
 
 func (c *Context) Run(command string, args ...string) error {
-	// Activate the context, which will update the environment to use our new
-	// GOPATH, and cd into the appropriate path for the code of interest.
+	// Install the packages inside the context
 
-	if err := c.activate(); err != nil {
+	if err := c.installPackages(); err != nil {
 		return err
 	}
 
 	// Create a Command object
 
-	cmd := exec.Command(command, args...)
+	cmd := c.insideCommand(command, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
