@@ -18,6 +18,7 @@ import (
 var (
 	raw      = flag.Bool("raw", false, "don't rewrite the test output")
 	work     = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting")
+	compile  = flag.Bool("compile", false, "just compile the test binary, i.e. go test -c")
 	gocov    = flag.Bool("gocov", false, "run tests using gocov instead of go")
 	verbose  = flag.Bool("v", false, "add '-v' to the command run, so the tests are run in verbose mode")
 	pkgFile  = flag.String("P", "", "install extra packages listed in the given file")
@@ -129,6 +130,9 @@ func doit() error {
 	if *verbose {
 		args = append(args, "-v")
 	}
+	if *compile {
+		args = append(args, "-c")
+	}
 
 	// Now we add the packages that we want to test to the context, this will
 	// install the imports used by those packages (mocking them as approprite).
@@ -152,6 +156,9 @@ func doit() error {
 	// Add in the gocov library, so that we can run with gocov if we want.
 
 	if *gocov {
+		if *compile {
+			return fmt.Errorf("gocov doesn't provide a compiliation only mode.")
+		}
 		if err := ctxt.LinkPackage("github.com/axw/gocov"); err != nil {
 			return lib.Cerr{"LinkPackage(gocov)", err}
 		}
