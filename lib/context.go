@@ -274,9 +274,9 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 			// we can't rewrite them.  If not marked for mocking then we just
 			// link it.  If it is marked for mocking, then we will just error
 			// for now, since we can't currently deal with that request.
-			nonGoCode, err := hasNonGoCode(name)
+			nonGoCode, err := pkg.HasNonGoCode()
 			if err != nil {
-				return nil, Cerr{"hasNonGoCode", err}
+				return nil, Cerr{"pkg.HasNonGoCode", err}
 			}
 
 			if nonGoCode {

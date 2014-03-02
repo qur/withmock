@@ -13,6 +13,7 @@ type Package interface {
 	NewName() string
 	Path() string
 	Loc() codeLoc
+	HasNonGoCode() (bool, error)
 
 	GetImports() (map[string]bool, error)
 	MockImports(map[string]string, *Config) error
@@ -71,6 +72,10 @@ func (p *realPackage) Path() string {
 
 func (p *realPackage) Loc() codeLoc {
 	return codeLoc{p.src, p.dst}
+}
+
+func (p *realPackage) HasNonGoCode() (bool, error) {
+	return hasNonGoCode(p.name)
 }
 
 func (p *realPackage) GetImports() (map[string]bool, error) {
