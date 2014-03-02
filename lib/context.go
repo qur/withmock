@@ -36,10 +36,16 @@ type Context struct {
 	code []codeLoc
 
 	cfg *Config
+
+	cache *Cache
 }
 
 type codeLoc struct {
 	src, dst string
+}
+
+func getTmpPath(tmpDir string) string {
+	return filepath.Join(tmpDir, "path")
 }
 
 func NewContext() (*Context, error) {
@@ -67,13 +73,17 @@ func NewContext() (*Context, error) {
 		return nil, err
 	}
 
+	// Setup a cache for our build area
+
+	cache := NewCache(tmpDir)
+
 	// Build and return the context
 
 	return &Context{
 		goPath:         goPath,
 		goRoot:         goRoot,
 		origPath:       os.Getenv("GOPATH"),
-		tmpPath:        filepath.Join(tmpDir, "path"),
+		tmpPath:        getTmpPath(tmpDir),
 		tmpDir:         tmpDir,
 		stdlibImports:  stdlibImports,
 		removeTmp:      true,
@@ -81,6 +91,7 @@ func NewContext() (*Context, error) {
 		importRewrites: make(map[string]string),
 		doRewrite:      true,
 		cfg:            &Config{},
+		cache:          cache,
 		// create excludes already including gomock, as we can't mock it.
 		excludes: map[string]bool{"code.google.com/p/gomock/gomock": true},
 	}, nil
@@ -296,14 +307,21 @@ func (c *Context) LinkPackage(pkg string) error {
 }
 
 func (c *Context) AddPackage(pkgName string) (string, error) {
-	path, err := LookupImportPath(pkgName)
+	pkg, err := c.cache.Fetch(pkgName)
 	if err != nil {
-		return "", Cerr{"LookupImportPath", err}
+		return "", Cerr{"cache.Fetch", err}
 	}
 
-	imports, err := GetImports(path, true)
+	if pkg == nil {
+		pkg, err = NewPackage(pkgName, c.tmpDir)
+		if err != nil {
+			return "", Cerr{"NewPackage", err}
+		}
+	}
+
+	imports, err := pkg.GetImports()
 	if err != nil {
-		return "", Cerr{"GetImports", err}
+		return "", Cerr{"pkg.GetImports", err}
 	}
 
 	importNames, err := c.installImports(imports)
@@ -311,17 +329,11 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 		return "", Cerr{"installImports", err}
 	}
 
-	newName := markImport(pkgName, testMark)
+	newName := pkg.NewName()
 	c.importRewrites[newName] = pkgName
 	importNames[pkgName] = newName
 
-	codeDest := filepath.Join(c.tmpPath, "src", newName)
-	codeSrc, err := filepath.Abs(path)
-	if err != nil {
-		return "", Cerr{"filepath.Abs", err}
-	}
-
-	err = MockImports(codeSrc, codeDest, importNames, c.cfg)
+	err = pkg.MockImports(importNames, c.cfg)
 	if err != nil {
 		return "", Cerr{"MockImports", err}
 	}
@@ -333,7 +345,7 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 		return "", Cerr{"MockInterfaces", err}
 	}
 
-	c.code = append(c.code, codeLoc{codeSrc, codeDest})
+	c.code = append(c.code, pkg.Loc())
 
 	return newName, nil
 }
