@@ -239,6 +239,11 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				mock = true
 			}
 
+			if c.stdlibImports[name] && !mock {
+				// Ignore standard packages that we aren't mocking
+				continue
+			}
+
 			pkg, err := c.getPkg(name)
 			if err != nil {
 				return nil, Cerr{"context.getPkg", err}
@@ -256,12 +261,11 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 			}
 
 			if c.stdlibImports[name] {
-				// Ignore standard packages unless mocked
-				if mock {
-					err := MockStandard(c.goRoot, c.tmpPath, name, cfg)
-					if err != nil {
-						return nil, Cerr{"MockStandard", err}
-					}
+				// We already checked earlier for unmocked stdlib, so
+				// this is mocked stdlib
+				err := MockStandard(c.goRoot, c.tmpPath, name, cfg)
+				if err != nil {
+					return nil, Cerr{"MockStandard", err}
 				}
 				continue
 			}
