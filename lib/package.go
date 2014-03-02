@@ -13,8 +13,12 @@ type Package interface {
 	NewName() string
 	Path() string
 	Loc() codeLoc
+
 	GetImports() (map[string]bool, error)
 	MockImports(map[string]string, *Config) error
+
+	Link() (map[string]bool, error)
+	Gen(mock bool, cfg *MockConfig) (map[string]bool, error)
 }
 
 type realPackage struct {
@@ -24,9 +28,10 @@ type realPackage struct {
 	src, dst string
 	tmpDir string
 	tmpPath string
+	goPath string
 }
 
-func NewPackage(pkgName, tmpDir string) (Package, error) {
+func NewPackage(pkgName, tmpDir, goPath string) (Package, error) {
 	path, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
@@ -48,6 +53,7 @@ func NewPackage(pkgName, tmpDir string) (Package, error) {
 		dst: filepath.Join(tmpPath, "src", newName),
 		tmpDir: tmpDir,
 		tmpPath: tmpPath,
+		goPath: goPath,
 	}, nil
 }
 
@@ -73,4 +79,12 @@ func (p *realPackage) GetImports() (map[string]bool, error) {
 
 func (p *realPackage) MockImports(importNames map[string]string, cfg *Config) error {
 	return MockImports(p.src, p.dst, importNames, cfg)
+}
+
+func (p *realPackage) Link() (map[string]bool, error) {
+	return LinkPkg(p.goPath, p.tmpPath, p.name)
+}
+
+func (p *realPackage) Gen(mock bool, cfg *MockConfig) (map[string]bool, error) {
+	return GenPkg(p.goPath, p.tmpPath, p.name, mock, cfg)
 }

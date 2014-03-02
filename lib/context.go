@@ -38,6 +38,7 @@ type Context struct {
 	cfg *Config
 
 	cache *Cache
+	packages map[string]Package
 }
 
 type codeLoc struct {
@@ -92,6 +93,7 @@ func NewContext() (*Context, error) {
 		doRewrite:      true,
 		cfg:            &Config{},
 		cache:          cache,
+		packages:       make(map[string]Package),
 		// create excludes already including gomock, as we can't mock it.
 		excludes: map[string]bool{"code.google.com/p/gomock/gomock": true},
 	}, nil
@@ -237,13 +239,18 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 				mock = true
 			}
 
+			pkg, err := c.getPkg(name)
+			if err != nil {
+				return nil, Cerr{"context.getPkg", err}
+			}
+
 			cfg := c.cfg.Mock(name)
 
 			if c.excludes[name] {
 				// this package has been specifically excluded from mocking, so
 				// we just link it, even if mocked is indicated.
-				if _, err := LinkPkg(c.goPath, c.tmpPath, name); err != nil {
-					return nil, Cerr{"LinkPkg", err}
+				if _, err := pkg.Link(); err != nil {
+					return nil, Cerr{"pkg.Link", err}
 				}
 				continue
 			}
@@ -274,9 +281,9 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 						"Mocking packages with non-Go code is not "+
 						"currently supported.", name)
 				} else {
-					pkgImports, err := LinkPkg(c.goPath, c.tmpPath, name)
+					pkgImports, err := pkg.Link()
 					if err != nil {
-						return nil, Cerr{"LinkPkg", err}
+						return nil, Cerr{"pkg.Link", err}
 					}
 
 					// Update imports from the package we just processed, but it
@@ -287,7 +294,7 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 			}
 
 			// Process the package and get it's imports
-			pkgImports, err := GenPkg(c.goPath, c.tmpPath, name, mock, cfg)
+			pkgImports, err := pkg.Gen(mock, cfg)
 			if err != nil {
 				return nil, Cerr{"GenPkg", err}
 			}
@@ -301,22 +308,38 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 	return names, nil
 }
 
+func (c *Context) getPkg(pkgName string) (Package, error) {
+	pkg, found := c.packages[pkgName]
+	if found {
+		return pkg, nil
+	}
+
+	pkg, err := c.cache.Fetch(pkgName)
+	if err != nil {
+		return nil, Cerr{"cache.Fetch", err}
+	}
+
+	if pkg == nil {
+		pkg, err = NewPackage(pkgName, c.tmpDir, c.goPath)
+		if err != nil {
+			return nil, Cerr{"NewPackage", err}
+		}
+	}
+
+	c.packages[pkgName] = pkg
+
+	return pkg, nil
+}
+
 func (c *Context) LinkPackage(pkg string) error {
 	_, err := LinkPkg(c.goPath, c.tmpPath, pkg)
 	return err
 }
 
 func (c *Context) AddPackage(pkgName string) (string, error) {
-	pkg, err := c.cache.Fetch(pkgName)
+	pkg, err := c.getPkg(pkgName)
 	if err != nil {
-		return "", Cerr{"cache.Fetch", err}
-	}
-
-	if pkg == nil {
-		pkg, err = NewPackage(pkgName, c.tmpDir)
-		if err != nil {
-			return "", Cerr{"NewPackage", err}
-		}
+		return "", Cerr{"context.getPkg", err}
 	}
 
 	imports, err := pkg.GetImports()
