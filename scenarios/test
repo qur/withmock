@@ -4,6 +4,28 @@ cd "$(dirname "$0")"
 
 ret=0
 
+function check() {
+    if [ -e "$2/.bug" ]; then
+	if [ $1 -ne 0 ]; then
+            echo -ne "\e[35;1mBUG \e[0m"
+	else
+            echo -ne "\e[36;1mBUG_PASS\e[0m"
+	fi
+    else
+	if [ $1 -ne 0 ]; then
+	    local ignore="WITHMOCK_TEST_IGNORE_${2}"
+	    if [ -n "${!ignore}" ]; then
+		echo -ne "\e[30;1mIGNORE\e[0m"
+	    else
+		echo -ne "\e[31;1mFAIL\e[0m"
+		ret=1
+	    fi
+	else
+            echo -ne "\e[32;1mPASS\e[0m"
+	fi
+    fi
+}
+
 echo -n > test.log
 
 echo -e "\e[33;1mscenarios\e[0m"
@@ -18,24 +40,16 @@ for d in $(ls -vd *); do
     if [ -x "${d}/test.withmock" ]; then
         echo "--- withmock ---" >> test.log
         (cd $d; ./test.withmock) >> test.log 2>&1
-        if [ $? -ne 0 ]; then
-            echo -ne "\e[31;1mFAIL\e[0m\t"
-            ret=1
-        else
-            echo -ne "\e[32;1mPASS\e[0m\t"
-        fi
+	check $? $d
+	echo -ne "\t"
     else
         echo -ne "\e[33;1mSKIP\e[0m\t"
     fi
     if [ -x "${d}/test.mocktest" ]; then
         echo "--- mocktest ---" >> test.log
         (cd $d; ./test.mocktest) >> test.log 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "\e[31;1mFAIL\e[0m"
-            ret=1
-        else
-            echo -e "\e[32;1mPASS\e[0m"
-        fi
+	check $? $d
+	echo ""
     else
         echo -e "\e[33;1mSKIP\e[0m"
     fi
