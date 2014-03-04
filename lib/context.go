@@ -176,12 +176,49 @@ func (c *Context) Chdir(pkg string) error {
 	return nil
 }
 
-func (c *Context) wantToProcess(mockAllowed bool, imports map[string]bool) map[string]string {
+const (
+	importNormal importMode = iota
+	importMock
+	importReplace
+)
+
+type importMode int
+type importCfg struct {
+	mode importMode
+	path string
+}
+type importSet map[string]importCfg
+
+func (i importCfg) IsMock() bool {
+	return i.mode == importMock
+}
+
+func (i importCfg) IsReplace() bool {
+	return i.mode == importReplace
+}
+
+func (s importSet) Set(path string, mode importMode, path2 string) error {
+	i := s[path]
+
+	if mode != importNormal {
+		if i.mode != importNormal && i.mode != mode {
+			return fmt.Errorf("Cannot change mode from %s to %s", i.mode, mode)
+		}
+
+		i.mode = mode
+		i.path = path2
+	}
+
+	s[path] = i
+	return nil
+}
+
+func (c *Context) wantToProcess(mockAllowed bool, imports importSet) map[string]string {
 	names := make(map[string]string)
 
-	for name, mock := range imports {
+	for name, cfg := range imports {
 		label := markImport(name, normalMark)
-		if mock && mockAllowed && c.stdlibImports[name] {
+		if cfg.IsMock() && mockAllowed && c.stdlibImports[name] {
 			label = markImport(name, mockMark)
 		}
 		names[name] = label
@@ -207,7 +244,7 @@ func (c *Context) wantToProcess(mockAllowed bool, imports map[string]bool) map[s
 	return names
 }
 
-func (c *Context) installImports(imports map[string]bool) (map[string]string, error) {
+func (c *Context) installImports(imports importSet) (map[string]string, error) {
 	// Start by updating processed to include anything in imports we haven't
 	// seen before, this also gives us the name rewrite map we need to return
 
@@ -232,11 +269,27 @@ func (c *Context) installImports(imports map[string]bool) (map[string]string, er
 			c.processed[label] = true
 
 			name := label
-			mock := imports[name]
+			mock := imports[name].IsMock()
 
 			if n, found := c.importRewrites[label]; found {
 				name = n
 				mock = true
+			}
+
+			if imports[name].IsReplace() {
+				// Install the requested package in place of the
+				// package that the code thinks it wants.
+				srcPath := imports[name].path
+				pkgImports, err := ReplacePkg(c.goPath, c.tmpPath, srcPath, label)
+				if err != nil {
+					return nil, Cerr{"ReplacePkg", err}
+				}
+
+				// Update imports from the package we just processed, but it
+				// can only add actual packages, not mocks
+				c.wantToProcess(false, pkgImports)
+			
+				continue
 			}
 
 			if c.stdlibImports[name] && !mock {

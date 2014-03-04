@@ -82,8 +82,8 @@ func hasNonGoCode(impPath string) (bool, error) {
 	return nonGoCode, filepath.Walk(src, fn)
 }
 
-func GetImports(path string, tests bool) (map[string]bool, error) {
-	imports := make(map[string]bool)
+func GetImports(path string, tests bool) (importSet, error) {
+	imports := make(importSet)
 
 	isGoFile := func(info os.FileInfo) bool {
 		if info.IsDir() {
@@ -107,12 +107,26 @@ func GetImports(path string, tests bool) (map[string]bool, error) {
 			for _, i := range file.Imports {
 				path := strings.Trim(i.Path.Value, "\"")
 				comment := strings.TrimSpace(i.Comment.Text())
-				mock := strings.ToLower(comment) == "mock"
+
 				if strings.HasPrefix(path, "_mock_/") {
 					path = path[7:]
-					mock = true
+					comment = "mock"
 				}
-				imports[path] = imports[path] || mock
+
+				mode := importNormal
+				path2 := ""
+				switch {
+				case strings.ToLower(comment) == "mock":
+					mode = importMock
+				case strings.HasPrefix(comment, "replace("):
+					mode = importReplace
+					path2 = comment[8:len(comment)-1]
+				}
+
+				err := imports.Set(path, mode, path2)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -179,20 +193,22 @@ func getStdlibImports(path string) (map[string]bool, error) {
 //  _ : mock
 //  + : normal (no mark actually applied)
 //  @ : test
+//  = : replace
 type mark string
 
 const (
-	noMark     mark = ""
-	normalMark mark = "+"
-	mockMark   mark = "_"
-	testMark   mark = "@"
+	noMark      mark = ""
+	normalMark  mark = "+"
+	mockMark    mark = "_"
+	testMark    mark = "@"
+	replaceMark mark = "="
 )
 
 func markImport(name string, m mark) string {
 	switch m {
 	case noMark, normalMark:
 		return name
-	case mockMark, testMark:
+	case mockMark, testMark, replaceMark:
 		return string(m) + name[1:]
 	default:
 		panic(fmt.Sprintf("Unknown import mark: %s", m))
@@ -205,12 +221,14 @@ func getMark(label string) mark {
 		return mockMark
 	case testMark[0]:
 		return testMark
+	case replaceMark[0]:
+		return replaceMark
 	default:
 		return normalMark
 	}
 }
 
-func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (map[string]bool, error) {
+func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSet, error) {
 	// Find the package source, it may be in any entry in srcPath
 	srcRoot := ""
 	for _, src := range filepath.SplitList(srcPath) {
@@ -260,7 +278,39 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	return nil
 }
 
-func LinkPkg(srcPath, dstRoot, name string) (map[string]bool, error) {
+func ReplacePkg(srcPath, dstRoot, from, as string) (importSet, error) {
+	// Find the package source, it may be in any entry in srcPath
+	srcRoot := ""
+	for _, src := range filepath.SplitList(srcPath) {
+		if exists(filepath.Join(src, "src", from)) {
+			srcRoot = src
+			break
+		}
+	}
+	if srcRoot == "" {
+		return nil, fmt.Errorf("Package '%s' not found in any of '%s'.", from,
+			srcPath)
+	}
+
+	// Copy the package source
+	src := filepath.Join(srcRoot, "src", from)
+	dst := filepath.Join(dstRoot, "src", as)
+	err := symlinkPackage(src, dst)
+	if err != nil {
+		return nil, Cerr{"symlinkPackage", err}
+	}
+
+	// Extract the imports from the package source
+	imports, err := GetImports(src, false)
+	if err != nil {
+		return nil, Cerr{"GetImports", err}
+	}
+
+	// Done
+	return imports, nil
+}
+
+func LinkPkg(srcPath, dstRoot, name string) (importSet, error) {
 	// Find the package source, it may be in any entry in srcPath
 	srcRoot := ""
 	for _, src := range filepath.SplitList(srcPath) {

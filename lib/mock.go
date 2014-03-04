@@ -351,7 +351,7 @@ type mockGen struct {
 
 // MakePkg writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
-func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bool, error) {
+func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (importSet, error) {
 	isGoFile := func(info os.FileInfo) bool {
 		if info.IsDir() {
 			return false
@@ -368,7 +368,7 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 		return nil, Cerr{"parseDir", err}
 	}
 
-	imports := map[string]bool{}
+	imports := make(importSet)
 
 	interfaces := make(Interfaces)
 
@@ -425,7 +425,7 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (map[string]bo
 			}
 
 			for path := range i {
-				imports[path] = false
+				imports.Set(path, importNormal, "")
 			}
 
 			/*

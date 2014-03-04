@@ -137,5 +137,7 @@ issue34         - Unable to mock os/signal package
 
 issue35         - Unable to mock net package
 
-stdlib          - Try and mock all the stdlib packages (except the cmd/...
-                  ones).
+readme          - Add new mechanism for mocking packages by replacing with
+                  alternative sources (i.e. manually written mocks for packages
+                  we can't automatically mock).  This also provides a workaround
+                  for things that we can't mock dues to bugs etc.

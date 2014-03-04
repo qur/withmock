@@ -15,11 +15,11 @@ type Package interface {
 	Loc() codeLoc
 	HasNonGoCode() (bool, error)
 
-	GetImports() (map[string]bool, error)
+	GetImports() (importSet, error)
 	MockImports(map[string]string, *Config) error
 
-	Link() (map[string]bool, error)
-	Gen(mock bool, cfg *MockConfig) (map[string]bool, error)
+	Link() (importSet, error)
+	Gen(mock bool, cfg *MockConfig) (importSet, error)
 }
 
 type realPackage struct {
@@ -78,7 +78,7 @@ func (p *realPackage) HasNonGoCode() (bool, error) {
 	return hasNonGoCode(p.name)
 }
 
-func (p *realPackage) GetImports() (map[string]bool, error) {
+func (p *realPackage) GetImports() (importSet, error) {
 	return GetImports(p.path, true)
 }
 
@@ -86,10 +86,10 @@ func (p *realPackage) MockImports(importNames map[string]string, cfg *Config) er
 	return MockImports(p.src, p.dst, importNames, cfg)
 }
 
-func (p *realPackage) Link() (map[string]bool, error) {
+func (p *realPackage) Link() (importSet, error) {
 	return LinkPkg(p.goPath, p.tmpPath, p.name)
 }
 
-func (p *realPackage) Gen(mock bool, cfg *MockConfig) (map[string]bool, error) {
+func (p *realPackage) Gen(mock bool, cfg *MockConfig) (importSet, error) {
 	return GenPkg(p.goPath, p.tmpPath, p.name, mock, cfg)
 }
