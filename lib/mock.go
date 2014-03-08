@@ -905,7 +905,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 			if cast {
 				fmt.Fprintf(out, "func (_ *_meta) New%s(val %s) %s {\n",
 					name, lit, retType)
-				fmt.Fprintf(out, "\treturn %s%s{(%s)(val)}\n", mod, mock, base)
+				fmt.Fprintf(out, "\treturn %s%s{(%s)(val)}\n", mod, mock, name)
 			} else {
 				fmt.Fprintf(out, "func (_ *_meta) New%s() %s {\n", name,
 					retType)
