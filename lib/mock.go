@@ -499,7 +499,8 @@ func (m *mockGen) literal(name string) (string, bool) {
 	case *ast.Ident:
 		alias := v.String()
 		if _, ok := m.types[alias]; ok && alias != name {
-			return m.literal(alias)
+			lit, cast := m.literal(alias)
+			return fmt.Sprintf("(%s)(%s)", name, lit), cast
 		}
 		switch alias {
 		case "int", "int8", "int16", "int32", "int64":
