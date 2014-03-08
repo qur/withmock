@@ -177,7 +177,9 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 		if err != nil {
 			return nil, Cerr{"i.getMethods", err}
 		}
-		methods = append(methods, m...)
+		for _, method := range m {
+			methods = append(methods, method.AddScope(e.name))
+		}
 	}
 
 	return methods, nil

@@ -16,6 +16,41 @@ import (
 	"strings"
 )
 
+func isLocalExpr(expr string) bool {
+	switch expr {
+	case "int", "int8", "int16", "int32", "int64":
+		return false
+	case "uint", "uint8", "uint16", "uint32", "uint64":
+		return false
+	case "rune", "byte", "uintptr", "float32", "float64":
+		return false
+	case "string", "bool", "error", "complex64", "complex128":
+		return false
+	}
+	return !strings.Contains(expr, ".")
+}
+
+func scopeName(name, scope string) string {
+	if strings.HasPrefix(name, "[]") {
+		return "[]" + scopeName(name[2:], scope)
+	}
+	if isLocalExpr(name) {
+		return scope + "." + name
+	}
+	return name
+}
+
+func scopeFields(fields []field, scope string) []field {
+	newFields := make([]field, len(fields))
+	for i, f := range fields {
+		newFields[i] = field{
+			names: f.names,
+			expr: scopeName(f.expr, scope),
+		}
+	}
+	return newFields
+}
+
 type field struct {
 	names []string
 	expr  string
@@ -30,6 +65,21 @@ type funcInfo struct {
 	}
 	params, results []field
 	body            []byte
+}
+
+func (fi *funcInfo) AddScope(scope string) *funcInfo {
+	return &funcInfo{
+		name: fi.name,
+		varidic: fi.varidic,
+		realDisabled: fi.realDisabled,
+		recv: struct{name, expr string}{
+			fi.recv.name,
+			scopeName(fi.recv.expr, scope),
+		},
+		params: scopeFields(fi.params, scope),
+		results: scopeFields(fi.results, scope),
+		body: fi.body,
+	}
 }
 
 func (fi *funcInfo) IsMethod() bool {
