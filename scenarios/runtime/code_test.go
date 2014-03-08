@@ -5,7 +5,7 @@ import (
 
 	"github.com/qur/withmock/scenarios/runtime/dep"
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/qur/gomock/gomock"
 )
 
 func TestTryMe(t *testing.T) {

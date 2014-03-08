@@ -3,7 +3,7 @@ package dep1
 import (
 	"fmt"
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/qur/gomock/gomock"
 )
 
 var _ = gomock.Any()

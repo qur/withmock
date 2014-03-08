@@ -5,7 +5,7 @@ import (
 
 	"os" // mock
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/qur/gomock/gomock"
 
 	"github.com/qur/withmock/scenarios/build_constraints/lib" // mock
 )

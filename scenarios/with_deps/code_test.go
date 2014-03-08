@@ -7,7 +7,7 @@ import (
 
 	"fmt" // mock
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/qur/gomock/gomock"
 )
 
 func testDataPath() string {

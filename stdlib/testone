@@ -54,7 +54,7 @@ echo "import (" >> ${test_file}
 echo -e "\t\"testing\"" >> ${test_file}
 echo -e "\t\"${pkg}\" //mock" >> ${test_file}
 echo >> ${test_file}
-echo -e "\t\"code.google.com/p/gomock/gomock\"" >> ${test_file}
+echo -e "\t\"github.com/qur/gomock/gomock\"" >> ${test_file}
 echo ")" >> ${test_file}
 echo >> ${test_file}
 echo "func TestMe(t *testing.T) {" >> ${test_file}

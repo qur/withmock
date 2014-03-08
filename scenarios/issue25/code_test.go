@@ -5,7 +5,7 @@ import (
 
 	"code.google.com/p/gcfg" // mock
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/qur/gomock/gomock"
 )
 
 func TestTryMe(t *testing.T) {

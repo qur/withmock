@@ -3,7 +3,7 @@ package code_test
 import (
 	"testing"
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/qur/gomock/gomock"
 
 	"github.com/qur/withmock/scenarios/interface_pkg/lib" // mock
 

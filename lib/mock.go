@@ -362,7 +362,7 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 			fmt.Fprintf(out, " interface{}")
 		}
 	}
-	fmt.Fprintf(out, ") *gomock.Call {\n")
+	fmt.Fprintf(out, ") __gmif.Call {\n")
 	if fi.varidic {
 		fmt.Fprintf(out, "\targs := append([]interface{}{")
 		for i := 0; i < args-1; i++ {
@@ -894,7 +894,7 @@ func fixup(filename string) error {
 func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "package %s\n\n", name)
 
-	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
+	fmt.Fprintf(out, "import __gmif \"github.com/qur/gomock/interfaces\"\n\n")
 
 	fmt.Fprintf(out, "type _meta struct{}\n")
 	fmt.Fprintf(out, "type _packageMock struct{int}\n")
@@ -906,7 +906,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "\t_allMocked = false\n")
 	fmt.Fprintf(out, "\t_enabledMocks = make(map[string]bool)\n")
 	fmt.Fprintf(out, "\t_disabledMocks = make(map[string]bool)\n")
-	fmt.Fprintf(out, "\t_ctrl *gomock.Controller\n")
+	fmt.Fprintf(out, "\t_ctrl __gmif.MockController\n")
 	fmt.Fprintf(out, "\t_pkgMock = &_packageMock{}\n")
 	fmt.Fprintf(out, ")\n\n")
 
@@ -926,7 +926,7 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "\treturn nil\n")
 	fmt.Fprintf(out, "}\n")
 
-	fmt.Fprintf(out, "func (_ *_meta) SetController(controller *gomock.Controller) {\n")
+	fmt.Fprintf(out, "func (_ *_meta) SetController(controller __gmif.MockController) {\n")
 	fmt.Fprintf(out, "\t_ctrl = controller\n")
 	fmt.Fprintf(out, "}\n")
 
@@ -1086,7 +1086,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 
 	fmt.Fprintf(out, "package %s\n\n", f.Name)
 
-	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
+	fmt.Fprintf(out, "import __gmif \"github.com/qur/gomock/interfaces\"\n\n")
 
 	for _, decl := range f.Decls {
 		switch d := decl.(type) {
@@ -1099,7 +1099,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				if len(d.Specs) == 1 {
 					s := d.Specs[0].(*ast.ImportSpec)
 					impPath := strings.Trim(s.Path.Value, "\"")
-					if impPath == "code.google.com/p/gomock/gomock" {
+					if impPath == "github.com/qur/gomock/interfaces" {
 						continue
 					}
 					if s.Doc != nil {
@@ -1129,7 +1129,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				for _, spec := range d.Specs {
 					s := spec.(*ast.ImportSpec)
 					impPath := strings.Trim(s.Path.Value, "\"")
-					if impPath == "code.google.com/p/gomock/gomock" {
+					if impPath == "github.com/qur/gomock/interfaces" {
 						continue
 					}
 					fmt.Fprintf(out, "\t")
@@ -1292,8 +1292,8 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 		}
 	}
 
-	fmt.Fprintf(out, "\n// Make sure gomock is used\n")
-	fmt.Fprintf(out, "var _ = gomock.Any()\n")
+	fmt.Fprintf(out, "\n// Make sure __gmif is used\n")
+	fmt.Fprintf(out, "var _ __gmif.Call = nil\n")
 
 	fmt.Fprintf(out, "\n// Make sure inits are called\n")
 	fmt.Fprintf(out, "func init() {\n")
@@ -1301,7 +1301,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 	fmt.Fprintf(out, "}\n")
 
 	i := map[string]bool{
-		"code.google.com/p/gomock/gomock": false,
+		"github.com/qur/gomock/interfaces": false,
 	}
 
 	for _, impPath := range imports {

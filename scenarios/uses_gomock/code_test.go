@@ -3,7 +3,7 @@ package withdeps
 import (
 	"testing"
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/qur/gomock/gomock"
 
 	"github.com/qur/withmock/scenarios/uses_gomock/dep1" // mock
 )
