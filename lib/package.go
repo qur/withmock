@@ -117,28 +117,36 @@ func (p *realPackage) insideCommand(command string, args ...string) *exec.Cmd {
 	return cmd
 }
 
+func (p *realPackage) needsInstall() (bool, error) {
+	d, err := os.Open(p.dst)
+	if err != nil {
+		return false, Cerr{"os.Open", err}
+	}
+	defer d.Close()
+
+	files, err := d.Readdirnames(-1)
+	if err != nil {
+		return false, Cerr{"d.Readdirnames", err}
+	}
+
+	for _, name := range files {
+		if strings.HasSuffix(name, ".go") {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (p *realPackage) Install() error {
 	if getMark(p.label) == testMark {
 		// we don't install packages marked for test
 		return nil
 	}
 
-	d, err := os.Open(p.dst)
+	needsInstall, err := p.needsInstall()
 	if err != nil {
-		return Cerr{"os.Open", err}
-	}
-	defer d.Close()
-
-	files, err := d.Readdirnames(-1)
-	if err != nil {
-	}
-
-	needsInstall := false
-	for _, name := range files {
-		if strings.HasSuffix(name, ".go") {
-			needsInstall = true
-			break
-		}
+		return Cerr{"p.needsInstall", err}
 	}
 
 	if !needsInstall {
