@@ -141,3 +141,8 @@ readme          - Add new mechanism for mocking packages by replacing with
                   alternative sources (i.e. manually written mocks for packages
                   we can't automatically mock).  This also provides a workaround
                   for things that we can't mock dues to bugs etc.
+
+stdlib_cross    - Currently we can mock stdlib packages, but you can't pass the
+                  values from a mocked stdlib package to another package because
+                  that package is using the real version (and the types are
+                  actually different).
