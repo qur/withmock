@@ -150,7 +150,7 @@ func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
 
 func (c *Context) installPackages() error {
 	for _, pkg := range c.packages {
-		if c.stdlibImports[pkg.NewName()] {
+		if c.stdlibImports[pkg.Label()] {
 			// stdlib imports don't need installing
 			continue
 		}
@@ -294,7 +294,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				continue
 			}
 
-			pkg, err := c.getPkg(name)
+			pkg, err := c.getPkg(name, label)
 			if err != nil {
 				return nil, Cerr{"context.getPkg", err}
 			}
@@ -336,8 +336,8 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 	return names, nil
 }
 
-func (c *Context) getPkg(pkgName string) (Package, error) {
-	pkg, found := c.packages[pkgName]
+func (c *Context) getPkg(pkgName, label string) (Package, error) {
+	pkg, found := c.packages[label]
 	if found {
 		return pkg, nil
 	}
@@ -348,13 +348,13 @@ func (c *Context) getPkg(pkgName string) (Package, error) {
 	}
 
 	if pkg == nil {
-		pkg, err = NewPackage(pkgName, c.tmpDir, c.goPath)
+		pkg, err = NewPackage(pkgName, label, c.tmpDir, c.goPath)
 		if err != nil {
 			return nil, Cerr{"NewPackage", err}
 		}
 	}
 
-	c.packages[pkgName] = pkg
+	c.packages[label] = pkg
 
 	return pkg, nil
 }
@@ -365,7 +365,7 @@ func (c *Context) LinkPackage(pkg string) error {
 }
 
 func (c *Context) AddPackage(pkgName string) (string, error) {
-	pkg, err := c.getPkg(pkgName)
+	pkg, err := c.getPkg(pkgName, markImport(pkgName, testMark))
 	if err != nil {
 		return "", Cerr{"context.getPkg", err}
 	}
@@ -380,7 +380,7 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 		return "", Cerr{"installImports", err}
 	}
 
-	newName := pkg.NewName()
+	newName := pkg.Label()
 	c.importRewrites[newName] = pkgName
 	importNames[pkgName] = newName
 

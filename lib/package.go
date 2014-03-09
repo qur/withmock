@@ -14,7 +14,7 @@ import (
 
 type Package interface {
 	Name() string
-	NewName() string
+	Label() string
 	Path() string
 	Loc() codeLoc
 	HasNonGoCode() (bool, error)
@@ -31,7 +31,7 @@ type Package interface {
 
 type realPackage struct {
 	name string
-	newName string
+	label string
 	path string
 	src, dst string
 	tmpDir string
@@ -40,7 +40,7 @@ type realPackage struct {
 	instName string
 }
 
-func NewPackage(pkgName, tmpDir, goPath string) (Package, error) {
+func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
 	path, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
@@ -51,15 +51,14 @@ func NewPackage(pkgName, tmpDir, goPath string) (Package, error) {
 		return nil, Cerr{"filepath.Abs", err}
 	}
 
-	newName := markImport(pkgName, testMark)
 	tmpPath := getTmpPath(tmpDir)
 
 	return &realPackage{
 		name: pkgName,
-		newName: newName,
+		label: label,
 		path: path,
 		src: codeSrc,
-		dst: filepath.Join(tmpPath, "src", newName),
+		dst: filepath.Join(tmpPath, "src", label),
 		tmpDir: tmpDir,
 		tmpPath: tmpPath,
 		goPath: goPath,
@@ -70,8 +69,8 @@ func (p *realPackage) Name() string {
 	return p.name
 }
 
-func (p *realPackage) NewName() string {
-	return p.newName
+func (p *realPackage) Label() string {
+	return p.label
 }
 
 func (p *realPackage) InstallAs(name string) {
@@ -158,7 +157,7 @@ func (p *realPackage) Install() error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
-			p.newName, err, out)
+			p.label, err, out)
 	}
 	return nil
 }
