@@ -58,6 +58,7 @@ type field struct {
 
 type funcInfo struct {
 	name         string
+	export       string
 	varidic      bool
 	realDisabled bool
 	recv         struct {
@@ -87,6 +88,9 @@ func (fi *funcInfo) IsMethod() bool {
 }
 
 func (fi *funcInfo) writeReal(out io.Writer) {
+	if fi.export != "" {
+		fmt.Fprintf(out, "//export %s\n", fi.export)
+	}
 	fmt.Fprintf(out, "func ")
 	if fi.IsMethod() {
 		fmt.Fprintf(out, "(%s %s) ", fi.recv.name, fi.recv.expr)
@@ -1213,6 +1217,10 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 			}
 		case *ast.FuncDecl:
 			fi := &funcInfo{name: d.Name.String()}
+			docstring := d.Doc.Text()
+			if strings.HasPrefix(docstring, "export ") {
+				fi.export = strings.TrimSpace(docstring[7:])
+			}
 			recorder := "_package_Rec"
 			if d.Recv != nil {
 				if len(d.Recv.List[0].Names) > 0 {
