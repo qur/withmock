@@ -149,17 +149,14 @@ func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
 }
 
 func (c *Context) installPackages() error {
-	for name := range c.processed {
-		if c.stdlibImports[name] {
+	for _, pkg := range c.packages {
+		if c.stdlibImports[pkg.NewName()] {
 			// stdlib imports don't need installing
 			continue
 		}
 
-		cmd := c.insideCommand("go", "install", name)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
-				name, err, out)
+		if err := pkg.Install(); err != nil {
+			return Cerr{"pkg.Install", err}
 		}
 	}
 
@@ -301,6 +298,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			if err != nil {
 				return nil, Cerr{"context.getPkg", err}
 			}
+			pkg.InstallAs(label)
 
 			cfg := c.cfg.Mock(name)
 
