@@ -1,0 +1,78 @@
+#!/bin/bash
+
+ret=0
+
+test_file="code_test.go"
+
+mydir="$(dirname "$0")"
+mydir="$(cd "${mydir}"; pwd)"
+
+gopath="${mydir}/tst"
+code="${gopath}/src/code"
+
+mkdir -p "${code}"
+
+if [ $# -lt 2 ]; then
+    echo "usage: $0 <version> <package>" >&2
+    exit 1
+fi
+
+version="$1"
+shift
+
+pkg="$1"
+shift
+
+echo -n "${pkg}: "
+
+case ${pkg} in
+    "")
+        echo "need package name"
+        exit 1
+        ;;
+    cmd/*)
+        echo "not supported"
+        exit 1
+        ;;
+    testing)
+        echo "not supported"
+        exit 1
+        ;;
+    *)
+        ;;
+esac
+
+export GOROOT="${mydir}/${version}/go"
+export GOPATH="${gopath}"
+export PATH="$GOROOT/bin:$PATH"
+
+cd "${code}"
+
+echo "package code" > ${test_file}
+echo >> ${test_file}
+echo "import (" >> ${test_file}
+echo -e "\t\"testing\"" >> ${test_file}
+echo -e "\t\"${pkg}\" //mock" >> ${test_file}
+echo >> ${test_file}
+echo -e "\t\"code.google.com/p/gomock/gomock\"" >> ${test_file}
+echo ")" >> ${test_file}
+echo >> ${test_file}
+echo "func TestMe(t *testing.T) {" >> ${test_file}
+echo -e "\tctrl := gomock.NewController(t)" >> ${test_file}
+echo -e "\tdefer ctrl.Finish()" >> ${test_file}
+echo "}" >> ${test_file}
+
+output=$(mocktest "$@" 2>&1)
+if [ "$?" -eq 0 ]; then
+    echo "pass"
+else
+    ret=1
+    echo "fail"
+    echo "----------------------------------------------------"
+    echo -e "$output"
+    echo "----------------------------------------------------"
+fi
+
+rm -r ${test_file}
+
+exit $ret
