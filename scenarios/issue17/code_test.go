@@ -52,8 +52,8 @@ func TestTryMeC2(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	lib_asm2.MOCK().SetController(ctrl)
-	lib_asm2.EXPECT().Wibble().Return(true)
+	lib_c2.MOCK().SetController(ctrl)
+	lib_c2.EXPECT().Wibble().Return(true)
 
 	// Run the function we want to test
 	ret := TryMeC2()
