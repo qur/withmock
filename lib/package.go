@@ -19,8 +19,6 @@ type Package interface {
 	Loc() codeLoc
 	HasNonGoCode() (bool, error)
 
-	InstallAs(name string)
-
 	GetImports() (importSet, error)
 	MockImports(map[string]string, *Config) error
 
@@ -37,7 +35,6 @@ type realPackage struct {
 	tmpDir string
 	tmpPath string
 	goPath string
-	instName string
 }
 
 func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
@@ -71,10 +68,6 @@ func (p *realPackage) Name() string {
 
 func (p *realPackage) Label() string {
 	return p.label
-}
-
-func (p *realPackage) InstallAs(name string) {
-	p.instName = name
 }
 
 func (p *realPackage) Path() string {
@@ -125,13 +118,12 @@ func (p *realPackage) insideCommand(command string, args ...string) *exec.Cmd {
 }
 
 func (p *realPackage) Install() error {
-	if p.instName == "" {
+	if getMark(p.label) == testMark {
+		// we don't install packages marked for test
 		return nil
 	}
 
-	path := filepath.Join(p.tmpPath, "src", p.instName)
-
-	d, err := os.Open(path)
+	d, err := os.Open(p.dst)
 	if err != nil {
 		return Cerr{"os.Open", err}
 	}
@@ -153,7 +145,7 @@ func (p *realPackage) Install() error {
 		return nil
 	}
 
-	cmd := p.insideCommand("go", "install", p.instName)
+	cmd := p.insideCommand("go", "install", p.label)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",

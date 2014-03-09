@@ -298,7 +298,6 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			if err != nil {
 				return nil, Cerr{"context.getPkg", err}
 			}
-			pkg.InstallAs(label)
 
 			cfg := c.cfg.Mock(name)
 
