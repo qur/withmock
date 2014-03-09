@@ -323,33 +323,6 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				continue
 			}
 
-			// We have to take care with packages that include non-go code, as
-			// we can't rewrite them.  If not marked for mocking then we just
-			// link it.  If it is marked for mocking, then we will just error
-			// for now, since we can't currently deal with that request.
-			nonGoCode, err := pkg.HasNonGoCode()
-			if err != nil {
-				return nil, Cerr{"pkg.HasNonGoCode", err}
-			}
-
-			if nonGoCode {
-				if mock {
-					return nil, fmt.Errorf("Unable to mock \"%s\".\n"+
-						"Mocking packages with non-Go code is not "+
-						"currently supported.", name)
-				} else {
-					pkgImports, err := pkg.Link()
-					if err != nil {
-						return nil, Cerr{"pkg.Link", err}
-					}
-
-					// Update imports from the package we just processed, but it
-					// can only add actual packages, not mocks
-					c.wantToProcess(false, pkgImports)
-				}
-				continue
-			}
-
 			// Process the package and get it's imports
 			pkgImports, err := pkg.Gen(mock, cfg)
 			if err != nil {

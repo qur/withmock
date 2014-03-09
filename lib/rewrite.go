@@ -7,6 +7,7 @@ package lib
 import (
 	"bytes"
 	"io"
+	"os"
 )
 
 type rewriter struct {
@@ -59,6 +60,10 @@ func (r *rewriter) flushLines() error {
 }
 
 func (r *rewriter) flush() error {
+	if r.buf.Len() == 0 {
+		return nil
+	}
+
 	line := r.buf.Bytes()
 	for _, rw := range r.rewrites {
 		line = bytes.Replace(line, rw.match, rw.replace, -1)
@@ -81,4 +86,41 @@ func (r *rewriter) Write(p []byte) (int, error) {
 
 func (r *rewriter) Close() error {
 	return r.flush()
+}
+
+func (r *rewriter) Change(w io.Writer) error {
+	err := r.Close()
+	if err != nil {
+		return err
+	}
+
+	r.w = w
+	return nil
+}
+
+func (rw *rewriter) Copy(src, dst string) error {
+	r, err := os.Open(src)
+	if err != nil {
+		return Cerr{"os.Open", err}
+	}
+	defer r.Close()
+
+	w, err := os.Create(dst)
+	if err != nil {
+		return Cerr{"os.Create", err}
+	}
+	defer w.Close()
+
+	err = rw.Change(w)
+	if err != nil {
+		return Cerr{"rw.Change", err}
+	}
+	defer rw.Close()
+
+	_, err = io.Copy(rw, r)
+	if err != nil {
+		return Cerr{"io.Copy", err}
+	}
+
+	return nil
 }

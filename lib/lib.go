@@ -249,7 +249,7 @@ func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSe
 	if err != nil {
 		return nil, err
 	}
-	imports, err := MakePkg(src, dst, mock, cfg)
+	imports, err := MakePkg(src, dst, name, mock, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,8 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	cfg.MockPrototypes = true
 	cfg.IgnoreInits = true
 	cfg.MatchOSArch = true
-	_, err = MakePkg(src, dst, true, cfg)
+	cfg.IgnoreNonGoFiles = true
+	_, err = MakePkg(src, dst, name, true, cfg)
 	if err != nil {
 		return Cerr{"MakePkg", err}
 	}

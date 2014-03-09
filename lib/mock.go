@@ -386,6 +386,7 @@ type mockGen struct {
 	srcPath        string
 	mockByDefault  bool
 	mockPrototypes bool
+	extFunctions   []string
 	callInits      bool
 	matchOS        bool
 	types          map[string]ast.Expr
@@ -401,7 +402,7 @@ type mockGen struct {
 
 // MakePkg writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
-func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (importSet, error) {
+func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (importSet, error) {
 	isGoFile := func(info os.FileInfo) bool {
 		if info.IsDir() {
 			return false
@@ -419,6 +420,40 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (importSet, er
 	}
 
 	imports := make(importSet)
+
+	d, err := os.Open(srcPath)
+	if err != nil {
+		return nil, Cerr{"os.Open", err}
+	}
+	defer d.Close()
+
+	files, err := d.Readdir(-1)
+	if err != nil {
+		return nil, Cerr{"Readdirnames", err}
+	}
+
+	nonGoSources := []string{}
+	nonGoFiles := []string{}
+	for _, entry := range files {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+		if entry.IsDir() {
+			imports.Set(filepath.Join(pkgName, name), importNormal, "")
+			continue
+		}
+		if entry.IsDir() || strings.HasSuffix(name, ".go") {
+			continue
+		}
+		if !strings.HasSuffix(name, ".s") && !strings.HasSuffix(name, ".c") {
+			nonGoFiles = append(nonGoFiles, name)
+			continue
+		}
+		nonGoSources = append(nonGoSources, name)
+	}
+
+	externalFunctions := []string{}
 
 	interfaces := make(Interfaces)
 
@@ -513,11 +548,45 @@ func MakePkg(srcPath, dstPath string, mock bool, cfg *MockConfig) (importSet, er
 			return nil, Cerr{"fixup", err}
 		}
 
+		externalFunctions = append(externalFunctions, m.extFunctions...)
+
 		interfaces[name] = m.ifInfo
 	}
 
 	if err := genInterfaces(interfaces); err != nil {
 		return nil, Cerr{"genInterfaces", err}
+	}
+
+	if cfg.IgnoreNonGoFiles {
+		return imports, nil
+	}
+
+	// Load up a rewriter with the rewrites for the external functions
+	rw := NewRewriter(nil)
+	for _, name := range externalFunctions {
+		rw.Rewrite("·" + name + "(", "·_real_" + name + "(")
+	}
+
+	// Now copy the non go source files through the rewriter
+	for _, name := range nonGoSources {
+		input := filepath.Join(srcPath, name)
+		output := filepath.Join(dstPath, name)
+
+		err := rw.Copy(input, output)
+		if err != nil {
+			return nil, Cerr{"rw.Copy", err}
+		}
+	}
+
+	// Symlink non source files
+	for _, name := range nonGoFiles {
+		input := filepath.Join(srcPath, name)
+		output := filepath.Join(dstPath, name)
+
+		err := os.Symlink(input, output)
+		if err != nil {
+			return nil, Cerr{"os.Symlink", err}
+		}
 	}
 
 	return imports, nil
@@ -1202,7 +1271,10 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 			} else {
 				fi.writeReal(out)
 			}
-			if d.Name.IsExported() && (d.Body != nil || m.mockPrototypes) {
+			if d.Name.IsExported() {
+				if d.Body == nil {
+					m.extFunctions = append(m.extFunctions, d.Name.Name)
+				}
 				fi.writeMock(out)
 				fi.writeRecorder(out, recorder)
 			}
