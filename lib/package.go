@@ -62,6 +62,31 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
 	}, nil
 }
 
+func NewStdlibPackage(pkgName, label, tmpDir, goRoot string) (Package, error) {
+	path, err := LookupImportPath(pkgName)
+	if err != nil {
+		return nil, Cerr{"LookupImportPath", err}
+	}
+
+	codeSrc, err := filepath.Abs(path)
+	if err != nil {
+		return nil, Cerr{"filepath.Abs", err}
+	}
+
+	tmpRoot := getTmpRoot(tmpDir)
+
+	return &realPackage{
+		name: pkgName,
+		label: label,
+		path: path,
+		src: codeSrc,
+		dst: filepath.Join(tmpRoot, "src", "pkg", label),
+		tmpDir: tmpDir,
+		tmpPath: tmpRoot,
+		goPath: goRoot,
+	}, nil
+}
+
 func (p *realPackage) Name() string {
 	return p.name
 }
@@ -106,10 +131,14 @@ func (p *realPackage) insideCommand(command string, args ...string) *exec.Cmd {
 		if strings.HasPrefix(env[i], "GOPATH=") {
 			env[i] = "__IGNORE="
 		}
+		if strings.HasPrefix(env[i], "GOROOT=") {
+			env[i] = "__IGNORE="
+		}
 	}
 
 	// Setup the environment variables that we want
 	env = append(env, "GOPATH=" + p.tmpPath)
+	env = append(env, "GOROOT=" + getTmpRoot(p.tmpDir))
 	//env = append(env, "ORIG_GOPATH=" + c.origPath)
 
 	cmd := exec.Command(command, args...)

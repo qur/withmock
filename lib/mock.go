@@ -481,6 +481,8 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 
 		processed := 0
 
+		cfg.MatchOSArch = true
+
 		for path, file := range pkg.Files {
 			base := filepath.Base(path)
 

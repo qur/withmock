@@ -32,7 +32,6 @@ func LookupImportPath(impPath string) (string, error) {
 
 	return path, nil
 }
-
 func GetOutput(name string, args ...string) (string, error) {
 	return GetCmdOutput(exec.Command(name, args...))
 }
@@ -229,11 +228,18 @@ func getMark(label string) mark {
 }
 
 func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSet, error) {
+	sub := "src"
+
 	// Find the package source, it may be in any entry in srcPath
 	srcRoot := ""
 	for _, src := range filepath.SplitList(srcPath) {
 		if exists(filepath.Join(src, "src", name)) {
 			srcRoot = src
+			break
+		}
+		if exists(filepath.Join(src, "src/pkg", name)) {
+			srcRoot = src
+			sub = "src/pkg"
 			break
 		}
 	}
@@ -243,8 +249,8 @@ func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSe
 	}
 
 	// Write a mock version of the package
-	src := filepath.Join(srcRoot, "src", name)
-	dst := filepath.Join(dstRoot, "src", name)
+	src := filepath.Join(srcRoot, sub, name)
+	dst := filepath.Join(dstRoot, sub, name)
 	err := os.MkdirAll(dst, 0700)
 	if err != nil {
 		return nil, err
@@ -318,11 +324,18 @@ func ReplacePkg(srcPath, dstRoot, from, as string) (importSet, error) {
 }
 
 func LinkPkg(srcPath, dstRoot, name string) (importSet, error) {
+	sub := "src"
+
 	// Find the package source, it may be in any entry in srcPath
 	srcRoot := ""
 	for _, src := range filepath.SplitList(srcPath) {
 		if exists(filepath.Join(src, "src", name)) {
 			srcRoot = src
+			break
+		}
+		if exists(filepath.Join(src, "src/pkg", name)) {
+			srcRoot = src
+			sub = "src/pkg"
 			break
 		}
 	}
@@ -332,8 +345,8 @@ func LinkPkg(srcPath, dstRoot, name string) (importSet, error) {
 	}
 
 	// Copy the package source
-	src := filepath.Join(srcRoot, "src", name)
-	dst := filepath.Join(dstRoot, "src", name)
+	src := filepath.Join(srcRoot, sub, name)
+	dst := filepath.Join(dstRoot, sub, name)
 	err := symlinkPackage(src, dst)
 	if err != nil {
 		return nil, Cerr{"symlinkPackage", err}
@@ -410,6 +423,16 @@ func symlinkPackage(src, dst string) error {
 		// Ignore every directory except src (which we need to mirror)
 		if info.Mode().IsDir() {
 			return os.MkdirAll(target, 0700)
+		}
+
+		// TODO: we shouldn't be doing this.  This is just a hack to work around
+		// the fact that I actually want a non-recursive alternative to GenPkg
+		// for the unsafe and runtime packages.  Eventually I should be using a
+		// copy & rewrite function, but for now I am using this - so I need to
+		// hack around the recursive nature ...
+		_, err = os.Lstat(target)
+		if err == nil {
+			os.Remove(target)
 		}
 
 		return os.Symlink(path, target)

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"log"
 )
 
 type Context struct {
@@ -19,6 +20,8 @@ type Context struct {
 
 	tmpPath  string
 	origPath string
+
+	tmpRoot string
 
 	tmpDir    string
 	removeTmp bool
@@ -47,6 +50,10 @@ type codeLoc struct {
 
 func getTmpPath(tmpDir string) string {
 	return filepath.Join(tmpDir, "path")
+}
+
+func getTmpRoot(tmpDir string) string {
+	return filepath.Join(tmpDir, "root")
 }
 
 func NewContext() (*Context, error) {
@@ -85,6 +92,7 @@ func NewContext() (*Context, error) {
 		goRoot:         goRoot,
 		origPath:       os.Getenv("GOPATH"),
 		tmpPath:        getTmpPath(tmpDir),
+		tmpRoot:        getTmpRoot(tmpDir),
 		tmpDir:         tmpDir,
 		stdlibImports:  stdlibImports,
 		removeTmp:      true,
@@ -132,7 +140,7 @@ func (c *Context) LoadConfig(path string) (err error) {
 	return
 }
 
-func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
+func (c *Context) insideCommandX(command string, args ...string) *exec.Cmd {
 	env := os.Environ()
 
 	// remove any current GOPATH from the environment
@@ -151,6 +159,29 @@ func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
 	return cmd
 }
 
+func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
+	env := os.Environ()
+
+	// remove any current GOPATH from the environment
+	for i := range env {
+		if strings.HasPrefix(env[i], "GOPATH=") {
+			env[i] = "__IGNORE="
+		}
+		if strings.HasPrefix(env[i], "GOROOT=") {
+			env[i] = "__IGNORE="
+		}
+	}
+
+	// Setup the environment variables that we want
+	env = append(env, "GOPATH=" + c.tmpPath)
+	env = append(env, "GOROOT=" + c.tmpRoot)
+	env = append(env, "ORIG_GOPATH=" + c.origPath)
+
+	cmd := exec.Command(command, args...)
+	cmd.Env = env
+	return cmd
+}
+
 func (c *Context) installPackages() error {
 	for _, pkg := range c.packages {
 		if c.stdlibImports[pkg.Label()] {
@@ -161,6 +192,172 @@ func (c *Context) installPackages() error {
 		if err := pkg.Install(); err != nil {
 			return Cerr{"pkg.Install", err}
 		}
+	}
+
+	return nil
+}
+
+func (c *Context) mockStdlib() error {
+	list, err := GetOutput("go", "list", "std")
+	if err != nil {
+		return Cerr{"GetOutput(\"go list std\")", err}
+	}
+
+	pkgs := make(map[string]Package)
+	deps := make(map[string]map[string]bool)
+
+	for _, line := range strings.Split(list, "\n") {
+		pkgName := strings.TrimSpace(line)
+		label := markImport(pkgName, normalMark)
+
+		if strings.HasPrefix(pkgName, "cmd/") {
+			// Ignore commands
+			continue
+		}
+
+		pkg, err := NewStdlibPackage(pkgName, label, c.tmpDir, c.goRoot)
+		if err != nil {
+			return Cerr{"NewPackage", err}
+		}
+
+		pkgs[pkgName] = pkg
+		deps[pkgName] = make(map[string]bool)
+	}
+
+	for pkgName, pkg := range pkgs {
+		if pkgName == "runtime" || pkgName == "unsafe" {
+			// We need special handling for the unsafe and runtime packages.
+			// All packages (apart from unsafe and runtime) get an automatic
+			// dependancy on runtime, which itself depends on unsafe.  This
+			// means we can't mock either of these packages.  In addition the
+			// runtime package actually injects functions into other packages in
+			// the stdlib - so we need to know what they are so that we can
+			// rename them when we setup our copy of runtime.
+			continue
+		}
+
+		cfg := c.cfg.Mock(pkgName)
+		_, err := pkg.Gen(false, cfg)
+		if err != nil {
+			return Cerr{"pkg.Gen", err}
+		}
+
+		imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)
+		if err != nil {
+			return Cerr{"GetOuput(go list .Deps)", err}
+		}
+
+		for _, name := range strings.Split(imports, "\n") {
+			name = strings.TrimSpace(name)
+
+			if name == "github.com/qur/gomock/interfaces" {
+				continue
+			}
+			_, found := deps[name]
+			if !found {
+				log.Printf("odd dep: %s", name)
+				continue
+			}
+			deps[pkgName][name] = true
+		}
+	}
+
+	// Now that we have done all the other packages we can do the runtime and
+	// unsafe packages.
+	for _, pkgName := range []string{"unsafe", "runtime"} {
+		pkg := pkgs[pkgName]
+
+		_, err = pkg.Link()
+		if err != nil {
+			return Cerr{"pkg.Link", err}
+		}
+
+		imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)
+		if err != nil {
+			return Cerr{"GetOuput(go list .Deps)", err}
+		}
+
+		for _, name := range strings.Split(imports, "\n") {
+			if name == "github.com/qur/gomock/interfaces" {
+				continue
+			}
+			_, found := deps[name]
+			if !found {
+				log.Printf("odd dep: %s", name)
+				continue
+			}
+			deps[pkgName][name] = true
+		}
+	}
+
+	// Before we can install the packages we need to get the toolchain
+	toolSrc := filepath.Join(c.goRoot, "pkg", "tool")
+	toolDst := filepath.Join(c.tmpRoot, "pkg", "tool")
+	symlinkPackage(toolSrc, toolDst)
+
+	// Apparently runtime/cgo needs cmd/cgo ...
+	cgoSrc := filepath.Join(c.goRoot, "src", "cmd", "cgo")
+	cgoDst := filepath.Join(c.tmpRoot, "src", "cmd", "cgo")
+	symlinkPackage(cgoSrc, cgoDst)
+
+	// We also need some apparently random extra stuff
+	for _, path := range []string{
+		"pkg/linux_amd64/runtime.h",
+		"pkg/linux_amd64/cgocall.h",
+		"src/cmd/ld/textflag.h",
+	} {
+		src := filepath.Join(c.goRoot, path)
+		dst := filepath.Join(c.tmpRoot, path)
+
+		dstDir := filepath.Dir(dst)
+		log.Printf("mkdir: %s", dstDir)
+
+		if err := os.MkdirAll(dstDir, 0700); err != nil {
+			return Cerr{"os.MkDirAll", err}
+		}
+
+		if err := os.Symlink(src, dst); err != nil {
+			return Cerr{"os.Symlink", err}
+		}
+	}
+
+	// Install the packages in reverse depedency order
+	last := len(deps)
+	for len(deps) > 0 {
+		inst := []string{}
+		for name, needs := range deps {
+			if len(needs) > 0 {
+				continue
+			}
+			log.Printf("install %s", name)
+
+			cmd := c.insideCommand("go", "install", name)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
+					name, err, out)
+			}
+
+			inst = append(inst, name)
+		}
+
+		// remove installed packages from deps
+		for _, name := range inst {
+			delete(deps, name)
+		}
+
+		// remove installed packages from any needs
+		for _, needs := range deps {
+			for _, name := range inst {
+				delete(needs, name)
+			}
+		}
+
+		if len(deps) == last {
+			return fmt.Errorf("Unable to resolve dependencies for stdlib")
+		}
+
+		last = len(deps)
 	}
 
 	return nil
@@ -437,10 +634,16 @@ func (c *Context) ExcludePackagesFromFile(path string) error {
 }
 
 func (c *Context) Run(command string, args ...string) error {
+	// Create a mocked version of the stdlib
+
+	if err := c.mockStdlib(); err != nil {
+		return Cerr{"c.mockStdlib", err}
+	}
+
 	// Install the packages inside the context
 
 	if err := c.installPackages(); err != nil {
-		return err
+		return Cerr{"c.installPackages", err}
 	}
 
 	// Create a Command object
