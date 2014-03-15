@@ -251,7 +251,6 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 	}
 	if fi.varidic {
 		if !fi.realDisabled {
-			fmt.Fprintf(out, "\tprintln(\"mocked: \", \"%s\")\n", scopedName)
 			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) "+
 				"|| _disabledMocks[\"%s\"] || __gmrt.MockingDisabled() {\n",
 				scopedName, scopedName)
@@ -291,7 +290,6 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		fmt.Fprintf(out, "_ctrl.Call(_m, \"%s\", args...)\n", fi.name)
 	} else {
 		if !fi.realDisabled {
-			fmt.Fprintf(out, "\tprintln(\"mocked: \", \"%s\")\n", scopedName)
 			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) "+
 				"|| _disabledMocks[\"%s\"] || __gmrt.MockingDisabled() {\n",
 				scopedName, scopedName)

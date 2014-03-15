@@ -19,7 +19,6 @@ extern G* _real_newproc1(FuncVal *fn, byte *argp, int32 narg, int32 nret, void *
 G*
 runtime·newproc1(FuncVal *fn, byte *argp, int32 narg, int32 nret, void *callerpc) {
 	G *gp = _real_newproc1(fn, argp, narg, nret, callerpc);
-	runtime·printf("newproc1: %p\n", gp);
 	·copyMocking((uintptr)g, (uintptr)gp);
 	return gp;
 }
@@ -33,12 +32,10 @@ func getG() uintptr
 var mockDisabled = map[uintptr]bool{}
 
 func MockingDisabled() bool {
-	println("get: ", getG(), mockDisabled[getG()])
 	return mockDisabled[getG()]
 }
 
 func copyMocking(src, dst uintptr) {
-	println("copy mocking: from=", src, " to=", dst)
 	if mockDisabled[src] {
 		mockDisabled[dst] = true
 	}
@@ -52,7 +49,6 @@ func EnableMocking() bool {
 	id := getG()
 	old := mockDisabled[id]
 	delete(mockDisabled, id)
-	println("enable: id=", id, "old=", old)
 	return old
 }
 
@@ -60,7 +56,6 @@ func DisableMocking() bool {
 	id := getG()
 	old := mockDisabled[id]
 	mockDisabled[id] = true
-	println("disable: id=", id, "old=", old)
 	return old
 }
 
