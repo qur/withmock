@@ -1324,7 +1324,21 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 	return i, nil
 }
 
-//func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]bool, error) {
+func copyData(a, b token.Pos, fset *token.FileSet, data io.ReadSeeker, out io.Writer) error {
+	start := int64(fset.Position(a).Offset)
+	end := int64(fset.Position(b).Offset)
+
+	if _, err := data.Seek(start, 0); err != nil {
+		return Cerr{"data.Seek", err}
+	}
+
+	if _, err := io.CopyN(out, data, end - start); err != nil {
+		return Cerr{"io.CopyN", err}
+	}
+
+	return nil
+}
+
 func addMockDisables(src, dst string) error {
 	fset := token.NewFileSet()
 
@@ -1361,35 +1375,35 @@ func addMockDisables(src, dst string) error {
 		if f, ok := decl.(*ast.FuncDecl); ok {
 			t := f.Type
 
-			start := int64(fset.Position(t.Pos()).Offset)
-			end := int64(fset.Position(t.End()).Offset)
-
-			if _, err := data.Seek(start, 0); err != nil {
-				return Cerr{"data.Seek", err}
-			}
-
-			if _, err := io.CopyN(out, data, end - start); err != nil {
-				return Cerr{"io.CopyN", err}
+			if err := copyData(t.Pos(), t.End(), fset, data, out); err != nil {
+				return Cerr{"copyData", err}
 			}
 
 			fmt.Fprintf(out, " {\n")
 
 			if f.Name.IsExported() {
-				fmt.Fprintf(out, "\t__gmrt.DisableMocking()\n")
-				fmt.Fprintf(out, "\tdefer __gmrt.EnableMocking()\n")
+				fmt.Fprintf(out, "\t__mockState := __gmrt.DisableMocking()\n")
+				fmt.Fprintf(out, "\tdefer __gmrt.RestoreMocking(__mockState)\n")
 			}
 
-			body := f.Body
-
-			start = int64(fset.Position(body.Lbrace).Offset) + 1
-			end = int64(fset.Position(body.Rbrace).Offset)
-
-			if _, err := data.Seek(start, 0); err != nil {
-				return Cerr{"data.Seek", err}
-			}
-
-			if _, err := io.CopyN(out, data, end - start); err != nil {
-				return Cerr{"io.CopyN", err}
+			if f.Name.Name == "tRunner" {
+				for _, line := range f.Body.List[:len(f.Body.List)-1] {
+					if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
+						return Cerr{"copyData", err}
+					}
+					fmt.Fprintf(out, "\n")
+				}
+				fmt.Fprintf(out, "\n")
+				fmt.Fprintf(out, "\t__mockState := __gmrt.EnableMocking()\n")
+				fmt.Fprintf(out, "\tdefer __gmrt.RestoreMocking(__mockState)\n")
+				fmt.Fprintf(out, "\ttest.F(t)\n")
+			} else {
+				for _, line := range f.Body.List {
+					if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
+						return Cerr{"copyData", err}
+					}
+					fmt.Fprintf(out, "\n")
+				}
 			}
 
 			fmt.Fprintf(out, "\n}")
