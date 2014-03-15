@@ -23,6 +23,7 @@ type Package interface {
 	MockImports(map[string]string, *Config) error
 
 	Link() (importSet, error)
+	Rewrite() (importSet, error)
 	Gen(mock bool, cfg *MockConfig) (importSet, error)
 	Install() error
 }
@@ -35,6 +36,7 @@ type realPackage struct {
 	tmpDir string
 	tmpPath string
 	goPath string
+	rw *rewriter
 }
 
 func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
@@ -59,10 +61,11 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
 		tmpDir: tmpDir,
 		tmpPath: tmpPath,
 		goPath: goPath,
+		rw: nil,
 	}, nil
 }
 
-func NewStdlibPackage(pkgName, label, tmpDir, goRoot string) (Package, error) {
+func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (Package, error) {
 	path, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
@@ -84,6 +87,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string) (Package, error) {
 		tmpDir: tmpDir,
 		tmpPath: tmpRoot,
 		goPath: goRoot,
+		rw: rw,
 	}, nil
 }
 
@@ -119,8 +123,12 @@ func (p *realPackage) Link() (importSet, error) {
 	return LinkPkg(p.goPath, p.tmpPath, p.name)
 }
 
+func (p *realPackage) Rewrite() (importSet, error) {
+	return RewritePkg(p.goPath, p.tmpPath, p.name, p.rw)
+}
+
 func (p *realPackage) Gen(mock bool, cfg *MockConfig) (importSet, error) {
-	return GenPkg(p.goPath, p.tmpPath, p.name, mock, cfg)
+	return GenPkg(p.goPath, p.tmpPath, p.name, mock, cfg, p.rw)
 }
 
 func (p *realPackage) insideCommand(command string, args ...string) *exec.Cmd {

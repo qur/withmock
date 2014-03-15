@@ -19,7 +19,7 @@ func main() {
 		EXPECT: "EXPECT",
 	}
 
-	_, err := lib.MakePkg(srcPath, dstPath, impPath, true, cfg)
+	_, err := lib.MakePkg(srcPath, dstPath, impPath, true, cfg, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(1)

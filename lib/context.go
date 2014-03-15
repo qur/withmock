@@ -206,6 +206,8 @@ func (c *Context) mockStdlib() error {
 	pkgs := make(map[string]Package)
 	deps := make(map[string]map[string]bool)
 
+	runtimerw := NewRewriter(nil)
+
 	for _, line := range strings.Split(list, "\n") {
 		pkgName := strings.TrimSpace(line)
 		label := markImport(pkgName, normalMark)
@@ -215,7 +217,7 @@ func (c *Context) mockStdlib() error {
 			continue
 		}
 
-		pkg, err := NewStdlibPackage(pkgName, label, c.tmpDir, c.goRoot)
+		pkg, err := NewStdlibPackage(pkgName, label, c.tmpDir, c.goRoot, runtimerw)
 		if err != nil {
 			return Cerr{"NewPackage", err}
 		}
@@ -225,7 +227,7 @@ func (c *Context) mockStdlib() error {
 	}
 
 	for pkgName, pkg := range pkgs {
-		if pkgName == "runtime" || pkgName == "unsafe" {
+		if  pkgName == "runtime" || pkgName == "unsafe" || strings.HasPrefix(pkgName, "runtime/"){
 			// We need special handling for the unsafe and runtime packages.
 			// All packages (apart from unsafe and runtime) get an automatic
 			// dependancy on runtime, which itself depends on unsafe.  This
@@ -267,9 +269,9 @@ func (c *Context) mockStdlib() error {
 	for _, pkgName := range []string{"unsafe", "runtime"} {
 		pkg := pkgs[pkgName]
 
-		_, err = pkg.Link()
+		_, err = pkg.Rewrite()
 		if err != nil {
-			return Cerr{"pkg.Link", err}
+			return Cerr{"pkg.Rewrite", err}
 		}
 
 		imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)

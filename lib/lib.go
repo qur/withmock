@@ -227,7 +227,7 @@ func getMark(label string) mark {
 	}
 }
 
-func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSet, error) {
+func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig, rw *rewriter) (importSet, error) {
 	sub := "src"
 
 	// Find the package source, it may be in any entry in srcPath
@@ -255,7 +255,7 @@ func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSe
 	if err != nil {
 		return nil, err
 	}
-	imports, err := MakePkg(src, dst, name, mock, cfg)
+	imports, err := MakePkg(src, dst, name, mock, cfg, rw)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) (importSet, er
 	cfg.IgnoreInits = true
 	cfg.MatchOSArch = true
 	cfg.IgnoreNonGoFiles = true
-	_, err = MakePkg(src, dst, name, true, cfg)
+	_, err = MakePkg(src, dst, name, true, cfg, nil)
 	if err != nil {
 		return nil, Cerr{"MakePkg", err}
 	}
@@ -350,6 +350,45 @@ func LinkPkg(srcPath, dstRoot, name string) (importSet, error) {
 	err := symlinkPackage(src, dst)
 	if err != nil {
 		return nil, Cerr{"symlinkPackage", err}
+	}
+
+	// Extract the imports from the package source
+	imports, err := GetImports(src, false)
+	if err != nil {
+		return nil, Cerr{"GetImports", err}
+	}
+
+	// Done
+	return imports, nil
+}
+
+func RewritePkg(srcPath, dstRoot, name string, rw *rewriter) (importSet, error) {
+	sub := "src"
+
+	// Find the package source, it may be in any entry in srcPath
+	srcRoot := ""
+	for _, src := range filepath.SplitList(srcPath) {
+		if exists(filepath.Join(src, "src", name)) {
+			srcRoot = src
+			break
+		}
+		if exists(filepath.Join(src, "src/pkg", name)) {
+			srcRoot = src
+			sub = "src/pkg"
+			break
+		}
+	}
+	if srcRoot == "" {
+		return nil, fmt.Errorf("Package '%s' not found in any of '%s'.", name,
+			srcPath)
+	}
+
+	// Copy the package source
+	src := filepath.Join(srcRoot, sub, name)
+	dst := filepath.Join(dstRoot, sub, name)
+	err := rewritePackage(src, dst, rw)
+	if err != nil {
+		return nil, Cerr{"rewritePackage", err}
 	}
 
 	// Extract the imports from the package source
@@ -436,6 +475,31 @@ func symlinkPackage(src, dst string) error {
 		}
 
 		return os.Symlink(path, target)
+	}
+
+	// Now use walk to process the files in src
+	return filepath.Walk(src, fn)
+}
+
+func rewritePackage(src, dst string, rw *rewriter) error {
+	fn := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		target := filepath.Join(dst, rel)
+
+		// Make sure target directories exist
+		if info.Mode().IsDir() {
+			return os.MkdirAll(target, 0700)
+		}
+
+		return rw.Copy(path, target)
 	}
 
 	// Now use walk to process the files in src

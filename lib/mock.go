@@ -406,7 +406,7 @@ type mockGen struct {
 
 // MakePkg writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
-func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (importSet, error) {
+func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig, extrw *rewriter) (importSet, error) {
 	isGoFile := func(info os.FileInfo) bool {
 		if info.IsDir() {
 			return false
@@ -457,7 +457,7 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 		nonGoSources = append(nonGoSources, name)
 	}
 
-	externalFunctions := []string{}
+	externalFunctions := map[string][]string{}
 
 	interfaces := make(Interfaces)
 
@@ -554,7 +554,7 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 			return nil, Cerr{"fixup", err}
 		}
 
-		externalFunctions = append(externalFunctions, m.extFunctions...)
+		externalFunctions[name] = m.extFunctions
 
 		interfaces[name] = m.ifInfo
 	}
@@ -569,8 +569,14 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 
 	// Load up a rewriter with the rewrites for the external functions
 	rw := NewRewriter(nil)
-	for _, name := range externalFunctions {
-		rw.Rewrite("·" + name + "(", "·_real_" + name + "(")
+	for pkg, funcs := range externalFunctions {
+		for _, name := range funcs {
+			rw.Rewrite("·" + name + "(", "·_real_" + name + "(")
+			if extrw != nil {
+				extrw.Rewrite(pkg + "·" + name + "(",
+					pkg + "·_real_" + name + "(")
+			}
+		}
 	}
 
 	// Now copy the non go source files through the rewriter
