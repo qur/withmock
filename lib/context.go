@@ -40,7 +40,7 @@ type Context struct {
 	cfg *Config
 
 	cache *Cache
-	packages map[string]Package
+	packages map[string]*Package
 }
 
 type codeLoc struct {
@@ -100,7 +100,7 @@ func NewContext() (*Context, error) {
 		doRewrite:      true,
 		cfg:            &Config{},
 		cache:          cache,
-		packages:       make(map[string]Package),
+		packages:       make(map[string]*Package),
 		// create excludes already including gomock, as we can't mock it.
 		excludes: map[string]bool{
 			"github.com/qur/gomock/gomock": true,
@@ -183,7 +183,7 @@ func (c *Context) mockStdlib() error {
 		return Cerr{"GetOutput(\"go list std\")", err}
 	}
 
-	pkgs := make(map[string]Package)
+	pkgs := make(map[string]*Package)
 	deps := make(map[string]map[string]bool)
 
 	runtimerw := NewRewriter(nil)
@@ -499,22 +499,15 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 	return names, nil
 }
 
-func (c *Context) getPkg(pkgName, label string) (Package, error) {
+func (c *Context) getPkg(pkgName, label string) (*Package, error) {
 	pkg, found := c.packages[label]
 	if found {
 		return pkg, nil
 	}
 
-	pkg, err := c.cache.Fetch(pkgName)
+	pkg, err := NewPackage(pkgName, label, c.tmpDir, c.goPath)
 	if err != nil {
-		return nil, Cerr{"cache.Fetch", err}
-	}
-
-	if pkg == nil {
-		pkg, err = NewPackage(pkgName, label, c.tmpDir, c.goPath)
-		if err != nil {
-			return nil, Cerr{"NewPackage", err}
-		}
+		return nil, Cerr{"NewPackage", err}
 	}
 
 	c.packages[label] = pkg

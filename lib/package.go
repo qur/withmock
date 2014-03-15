@@ -12,24 +12,7 @@ import (
 	"strings"
 )
 
-type Package interface {
-	Name() string
-	Label() string
-	Path() string
-	Loc() codeLoc
-	HasNonGoCode() (bool, error)
-
-	GetImports() (importSet, error)
-	MockImports(map[string]string, *Config) error
-
-	Link() (importSet, error)
-	Rewrite() (importSet, error)
-	DisableAllMocks() error
-	Gen(mock bool, cfg *MockConfig) (importSet, error)
-	Install() error
-}
-
-type realPackage struct {
+type Package struct {
 	name string
 	label string
 	path string
@@ -40,7 +23,7 @@ type realPackage struct {
 	rw *rewriter
 }
 
-func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
+func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 	path, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
@@ -53,7 +36,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
 
 	tmpPath := getTmpPath(tmpDir)
 
-	return &realPackage{
+	return &Package{
 		name: pkgName,
 		label: label,
 		path: path,
@@ -66,7 +49,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
 	}, nil
 }
 
-func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (Package, error) {
+func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Package, error) {
 	path, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
@@ -79,7 +62,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (Pack
 
 	tmpRoot := getTmpRoot(tmpDir)
 
-	return &realPackage{
+	return &Package{
 		name: pkgName,
 		label: label,
 		path: path,
@@ -92,51 +75,51 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (Pack
 	}, nil
 }
 
-func (p *realPackage) Name() string {
+func (p *Package) Name() string {
 	return p.name
 }
 
-func (p *realPackage) Label() string {
+func (p *Package) Label() string {
 	return p.label
 }
 
-func (p *realPackage) Path() string {
+func (p *Package) Path() string {
 	return p.path
 }
 
-func (p *realPackage) Loc() codeLoc {
+func (p *Package) Loc() codeLoc {
 	return codeLoc{p.src, p.dst}
 }
 
-func (p *realPackage) HasNonGoCode() (bool, error) {
+func (p *Package) HasNonGoCode() (bool, error) {
 	return hasNonGoCode(p.name)
 }
 
-func (p *realPackage) GetImports() (importSet, error) {
+func (p *Package) GetImports() (importSet, error) {
 	return GetImports(p.path, true)
 }
 
-func (p *realPackage) MockImports(importNames map[string]string, cfg *Config) error {
+func (p *Package) MockImports(importNames map[string]string, cfg *Config) error {
 	return MockImports(p.src, p.dst, importNames, cfg)
 }
 
-func (p *realPackage) Link() (importSet, error) {
+func (p *Package) Link() (importSet, error) {
 	return LinkPkg(p.goPath, p.tmpPath, p.name)
 }
 
-func (p *realPackage) Rewrite() (importSet, error) {
+func (p *Package) Rewrite() (importSet, error) {
 	return RewritePkg(p.goPath, p.tmpPath, p.name, p.rw)
 }
 
-func (p *realPackage) DisableAllMocks() error {
+func (p *Package) DisableAllMocks() error {
 	return DisableAllMocks(p.goPath, p.tmpPath, p.name)
 }
 
-func (p *realPackage) Gen(mock bool, cfg *MockConfig) (importSet, error) {
+func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {
 	return GenPkg(p.goPath, p.tmpPath, p.name, mock, cfg, p.rw)
 }
 
-func (p *realPackage) insideCommand(command string, args ...string) *exec.Cmd {
+func (p *Package) insideCommand(command string, args ...string) *exec.Cmd {
 	env := os.Environ()
 
 	// remove any current GOPATH from the environment
@@ -159,7 +142,7 @@ func (p *realPackage) insideCommand(command string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-func (p *realPackage) needsInstall() (bool, error) {
+func (p *Package) needsInstall() (bool, error) {
 	d, err := os.Open(p.dst)
 	if err != nil {
 		return false, Cerr{"os.Open", err}
@@ -180,7 +163,7 @@ func (p *realPackage) needsInstall() (bool, error) {
 	return false, nil
 }
 
-func (p *realPackage) Install() error {
+func (p *Package) Install() error {
 	if getMark(p.label) == testMark {
 		// we don't install packages marked for test
 		return nil

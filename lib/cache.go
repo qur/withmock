@@ -34,31 +34,3 @@ func NewCache(tmpDir string) *Cache {
 		tmpDir: tmpDir,
 	}
 }
-
-func (c *Cache) Store(path string) error {
-	if !c.enabled {
-		return nil
-	}
-
-	// TODO: ...
-
-	return nil
-}
-
-func (c *Cache) Fetch(path string) (Package, error) {
-	if !c.enabled {
-		return nil, nil
-	}
-
-	// TODO: ...
-
-	return nil, nil
-}
-
-// ----------------------------------------------------------------------------
-// cachePackage
-// ----------------------------------------------------------------------------
-
-type cachePackage struct {
-}
-
