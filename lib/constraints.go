@@ -8,6 +8,7 @@ import (
 	"go/build"
 	"go/ast"
 	"strings"
+	"log"
 )
 
 var (
@@ -39,6 +40,17 @@ func goodOSArchConstraints(file *ast.File) (ok bool) {
 		for _, cmt := range comment.List {
 			line := cmt.Text
 			line = strings.TrimLeft(line, "/")
+			line = strings.TrimSpace(line)
+
+			if len(line) == 0 {
+				continue
+			}
+
+			if !strings.HasPrefix(line, "+build ") {
+				log.Printf("Can't parse: '%s'", line)
+				panic("Unable to parse build constraints: " + file.Name.Name)
+			}
+
 			line = strings.TrimSpace(line)[7:]
 
 			satisfied := false
