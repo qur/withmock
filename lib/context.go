@@ -635,7 +635,44 @@ func (c *Context) ExcludePackagesFromFile(path string) error {
 	return nil
 }
 
+func (c *Context) addRequiredPackage(name string) error {
+	label := markImport(name, normalMark)
+
+	if _, found := c.packages[label]; found {
+		return nil
+	}
+
+	pkg, err := c.getPkg(name, label)
+	if err != nil {
+		return Cerr{"context.getPkg", err}
+	}
+
+	if _, err := pkg.Link(); err != nil {
+		return Cerr{"pkg.Link", err}
+	}
+
+	return nil
+}
+
+func (c *Context) addRequiredPackages() error {
+	for _, name := range []string{
+		"github.com/qur/gomock/interfaces",
+	} {
+		if err := c.addRequiredPackage(name); err != nil {
+			return Cerr{"c.addRequiredPackage", err}
+		}
+	}
+
+	return nil
+}
+
 func (c *Context) Run(command string, args ...string) error {
+	// Make sure required packages are installed
+
+	if err := c.addRequiredPackages(); err != nil {
+		return Cerr{"c.addRequiredPackages", err}
+	}
+
 	// Create a mocked version of the stdlib
 
 	if err := c.mockStdlib(); err != nil {
