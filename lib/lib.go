@@ -401,6 +401,39 @@ func RewritePkg(srcPath, dstRoot, name string, rw *rewriter) (importSet, error) 
 	return imports, nil
 }
 
+func DisableAllMocks(srcPath, dstRoot, name string) error {
+	sub := "src"
+
+	// Find the package source, it may be in any entry in srcPath
+	srcRoot := ""
+	for _, src := range filepath.SplitList(srcPath) {
+		if exists(filepath.Join(src, "src", name)) {
+			srcRoot = src
+			break
+		}
+		if exists(filepath.Join(src, "src/pkg", name)) {
+			srcRoot = src
+			sub = "src/pkg"
+			break
+		}
+	}
+	if srcRoot == "" {
+		return fmt.Errorf("Package '%s' not found in any of '%s'.", name,
+			srcPath)
+	}
+
+	// Copy the package source
+	src := filepath.Join(srcRoot, sub, name)
+	dst := filepath.Join(dstRoot, sub, name)
+	err := disableAllMocks(src, dst)
+	if err != nil {
+		return Cerr{"rewritePackage", err}
+	}
+
+	// Done
+	return nil
+}
+
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -500,6 +533,35 @@ func rewritePackage(src, dst string, rw *rewriter) error {
 		}
 
 		return rw.Copy(path, target)
+	}
+
+	// Now use walk to process the files in src
+	return filepath.Walk(src, fn)
+}
+
+func disableAllMocks(src, dst string) error {
+	fn := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		target := filepath.Join(dst, rel)
+
+		// Make sure target directories exist
+		if info.Mode().IsDir() {
+			return os.MkdirAll(target, 0700)
+		}
+
+		if strings.HasSuffix(path, ".go") {
+			return addMockDisables(path, target)
+		}
+
+		return os.Symlink(path, target)
 	}
 
 	// Now use walk to process the files in src

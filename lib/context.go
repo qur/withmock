@@ -208,6 +208,9 @@ func (c *Context) mockStdlib() error {
 
 	runtimerw := NewRewriter(nil)
 
+	// We want to intercept goroutine creation
+	runtimerw.Rewrite("runtime·newproc1(FuncVal ", "_real_newproc1(FuncVal ")
+
 	for _, line := range strings.Split(list, "\n") {
 		pkgName := strings.TrimSpace(line)
 		label := markImport(pkgName, normalMark)
@@ -227,23 +230,6 @@ func (c *Context) mockStdlib() error {
 	}
 
 	for pkgName, pkg := range pkgs {
-		if  pkgName == "runtime" || pkgName == "unsafe" || strings.HasPrefix(pkgName, "runtime/"){
-			// We need special handling for the unsafe and runtime packages.
-			// All packages (apart from unsafe and runtime) get an automatic
-			// dependancy on runtime, which itself depends on unsafe.  This
-			// means we can't mock either of these packages.  In addition the
-			// runtime package actually injects functions into other packages in
-			// the stdlib - so we need to know what they are so that we can
-			// rename them when we setup our copy of runtime.
-			continue
-		}
-
-		cfg := c.cfg.Mock(pkgName)
-		_, err := pkg.Gen(false, cfg)
-		if err != nil {
-			return Cerr{"pkg.Gen", err}
-		}
-
 		imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)
 		if err != nil {
 			return Cerr{"GetOuput(go list .Deps)", err}
@@ -262,6 +248,29 @@ func (c *Context) mockStdlib() error {
 			}
 			deps[pkgName][name] = true
 		}
+
+		if  pkgName == "runtime" || pkgName == "unsafe" || strings.HasPrefix(pkgName, "runtime/") {
+			// We need special handling for the unsafe and runtime packages.
+			// All packages (apart from unsafe and runtime) get an automatic
+			// dependancy on runtime, which itself depends on unsafe.  This
+			// means we can't mock either of these packages.  In addition the
+			// runtime package actually injects functions into other packages in
+			// the stdlib - so we need to know what they are so that we can
+			// rename them when we setup our copy of runtime.
+			continue
+		}
+
+		if pkgName == "testing" || strings.HasPrefix(pkgName, "testing/") {
+			// We don't want to mock testing - that just doesn't make sense ...
+			if err := pkg.DisableAllMocks();  err != nil {
+				return Cerr{"pkg.Link", err}
+			}
+		} else {
+			cfg := c.cfg.Mock(pkgName)
+			if _, err := pkg.Gen(false, cfg); err != nil {
+				return Cerr{"pkg.Gen", err}
+			}
+		}
 	}
 
 	// Now that we have done all the other packages we can do the runtime and
@@ -273,23 +282,12 @@ func (c *Context) mockStdlib() error {
 		if err != nil {
 			return Cerr{"pkg.Rewrite", err}
 		}
+	}
 
-		imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)
-		if err != nil {
-			return Cerr{"GetOuput(go list .Deps)", err}
-		}
-
-		for _, name := range strings.Split(imports, "\n") {
-			if name == "github.com/qur/gomock/interfaces" {
-				continue
-			}
-			_, found := deps[name]
-			if !found {
-				log.Printf("odd dep: %s", name)
-				continue
-			}
-			deps[pkgName][name] = true
-		}
+	// Add some code to enable/disable mocking to the runtime package
+	loc := pkgs["runtime"].Loc()
+	if err := addMockController(loc.dst); err != nil {
+		return Cerr{"addMockController", err}
 	}
 
 	// Before we can install the packages we need to get the toolchain
@@ -415,11 +413,14 @@ func (s importSet) Set(path string, mode importMode, path2 string) error {
 func (c *Context) wantToProcess(mockAllowed bool, imports importSet) map[string]string {
 	names := make(map[string]string)
 
-	for name, cfg := range imports {
+	for name := range imports {
+//	for name, cfg := range imports {
 		label := markImport(name, normalMark)
+/*
 		if cfg.IsMock() && mockAllowed && c.stdlibImports[name] {
 			label = markImport(name, mockMark)
 		}
+*/
 		names[name] = label
 
 		c.processed[label] = c.processed[label] || false
@@ -491,8 +492,8 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				continue
 			}
 
-			if c.stdlibImports[name] && !mock {
-				// Ignore standard packages that we aren't mocking
+			if c.stdlibImports[name] {
+				// Ignore stdlib packages, we deal with them separately.
 				continue
 			}
 
@@ -512,6 +513,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				continue
 			}
 
+/*
 			if c.stdlibImports[name] {
 				// We already checked earlier for unmocked stdlib, so
 				// this is mocked stdlib
@@ -526,6 +528,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 
 				continue
 			}
+*/
 
 			// Process the package and get it's imports
 			pkgImports, err := pkg.Gen(mock, cfg)

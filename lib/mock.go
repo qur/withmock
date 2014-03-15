@@ -251,8 +251,10 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 	}
 	if fi.varidic {
 		if !fi.realDisabled {
+			fmt.Fprintf(out, "\tprintln(\"mocked: \", \"%s\")\n", scopedName)
 			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) "+
-				"|| _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
+				"|| _disabledMocks[\"%s\"] || __gmrt.MockingDisabled() {\n",
+				scopedName, scopedName)
 			fmt.Fprintf(out, "\t\t")
 			if len(fi.results) > 0 {
 				fmt.Fprintf(out, "return ")
@@ -289,8 +291,10 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 		fmt.Fprintf(out, "_ctrl.Call(_m, \"%s\", args...)\n", fi.name)
 	} else {
 		if !fi.realDisabled {
+			fmt.Fprintf(out, "\tprintln(\"mocked: \", \"%s\")\n", scopedName)
 			fmt.Fprintf(out, "\tif (!_allMocked && !_enabledMocks[\"%s\"]) "+
-				"||  _disabledMocks[\"%s\"] {\n", scopedName, scopedName)
+				"|| _disabledMocks[\"%s\"] || __gmrt.MockingDisabled() {\n",
+				scopedName, scopedName)
 			fmt.Fprintf(out, "\t\t")
 			if len(fi.results) > 0 {
 				fmt.Fprintf(out, "return ")
@@ -1094,7 +1098,10 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 
 	fmt.Fprintf(out, "package %s\n\n", f.Name)
 
-	fmt.Fprintf(out, "import __gmif \"github.com/qur/gomock/interfaces\"\n\n")
+	fmt.Fprintf(out, "import (\n")
+	fmt.Fprintf(out, "\t__gmrt \"runtime\"\n")
+	fmt.Fprintf(out, "\t__gmif \"github.com/qur/gomock/interfaces\"\n")
+	fmt.Fprintf(out, ")\n\n")
 
 	for _, decl := range f.Decls {
 		switch d := decl.(type) {
@@ -1107,9 +1114,6 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				if len(d.Specs) == 1 {
 					s := d.Specs[0].(*ast.ImportSpec)
 					impPath := strings.Trim(s.Path.Value, "\"")
-					if impPath == "github.com/qur/gomock/interfaces" {
-						continue
-					}
 					if s.Doc != nil {
 						fmt.Fprintf(out, "%s", s.Doc.Text())
 					}
@@ -1300,8 +1304,9 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 		}
 	}
 
-	fmt.Fprintf(out, "\n// Make sure __gmif is used\n")
+	fmt.Fprintf(out, "\n// Make sure __gmif and __gmrt are used\n")
 	fmt.Fprintf(out, "var _ __gmif.Call = nil\n")
+	fmt.Fprintf(out, "var _ __gmrt.Error = nil\n")
 
 	fmt.Fprintf(out, "\n// Make sure inits are called\n")
 	fmt.Fprintf(out, "func init() {\n")
@@ -1317,6 +1322,97 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 	}
 
 	return i, nil
+}
+
+//func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]bool, error) {
+func addMockDisables(src, dst string) error {
+	fset := token.NewFileSet()
+
+	f, err := parser.ParseFile(fset, src, nil, 0)
+	if err != nil {
+		return Cerr{"ParseFile", err}
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return Cerr{"os.Create", err}
+	}
+	defer out.Close()
+
+	data, err := os.Open(src)
+	if err != nil {
+		return Cerr{"os.Open", err}
+	}
+	defer data.Close()
+
+	if f.Doc != nil {
+		for _, cmt := range f.Doc.List {
+			fmt.Fprintf(out, "%s\n", cmt.Text)
+		}
+	}
+
+	fmt.Fprintf(out, "package %s\n\n", f.Name)
+
+	fmt.Fprintf(out, "import (\n")
+	fmt.Fprintf(out, "\t__gmrt \"runtime\"\n")
+	fmt.Fprintf(out, ")\n\n")
+
+	for _, decl := range f.Decls {
+		if f, ok := decl.(*ast.FuncDecl); ok {
+			t := f.Type
+
+			start := int64(fset.Position(t.Pos()).Offset)
+			end := int64(fset.Position(t.End()).Offset)
+
+			if _, err := data.Seek(start, 0); err != nil {
+				return Cerr{"data.Seek", err}
+			}
+
+			if _, err := io.CopyN(out, data, end - start); err != nil {
+				return Cerr{"io.CopyN", err}
+			}
+
+			fmt.Fprintf(out, " {\n")
+
+			if f.Name.IsExported() {
+				fmt.Fprintf(out, "\t__gmrt.DisableMocking()\n")
+				fmt.Fprintf(out, "\tdefer __gmrt.EnableMocking()\n")
+			}
+
+			body := f.Body
+
+			start = int64(fset.Position(body.Lbrace).Offset) + 1
+			end = int64(fset.Position(body.Rbrace).Offset)
+
+			if _, err := data.Seek(start, 0); err != nil {
+				return Cerr{"data.Seek", err}
+			}
+
+			if _, err := io.CopyN(out, data, end - start); err != nil {
+				return Cerr{"io.CopyN", err}
+			}
+
+			fmt.Fprintf(out, "\n}")
+		} else {
+			start := int64(fset.Position(decl.Pos()).Offset)
+			end := int64(fset.Position(decl.End()).Offset)
+
+			if _, err := data.Seek(start, 0); err != nil {
+				return Cerr{"data.Seek", err}
+			}
+
+			if _, err := io.CopyN(out, data, end - start); err != nil {
+				return Cerr{"io.CopyN", err}
+			}
+		}
+
+		fmt.Fprintf(out, "\n")
+	}
+
+	fmt.Fprintf(out, "\n// Make sure __gmif and __gmrt are used\n")
+	fmt.Fprintf(out, "var _ __gmrt.Error = nil\n")
+
+	return nil
 }
 
 func loadInterfaceInfo(impPath string) (*ifInfo, error) {

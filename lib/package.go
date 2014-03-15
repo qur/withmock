@@ -24,6 +24,7 @@ type Package interface {
 
 	Link() (importSet, error)
 	Rewrite() (importSet, error)
+	DisableAllMocks() error
 	Gen(mock bool, cfg *MockConfig) (importSet, error)
 	Install() error
 }
@@ -125,6 +126,10 @@ func (p *realPackage) Link() (importSet, error) {
 
 func (p *realPackage) Rewrite() (importSet, error) {
 	return RewritePkg(p.goPath, p.tmpPath, p.name, p.rw)
+}
+
+func (p *realPackage) DisableAllMocks() error {
+	return DisableAllMocks(p.goPath, p.tmpPath, p.name)
 }
 
 func (p *realPackage) Gen(mock bool, cfg *MockConfig) (importSet, error) {
