@@ -139,25 +139,6 @@ func (c *Context) LoadConfig(path string) (err error) {
 	return
 }
 
-func (c *Context) insideCommandX(command string, args ...string) *exec.Cmd {
-	env := os.Environ()
-
-	// remove any current GOPATH from the environment
-	for i := range env {
-		if strings.HasPrefix(env[i], "GOPATH=") {
-			env[i] = "__IGNORE="
-		}
-	}
-
-	// Setup the environment variables that we want
-	env = append(env, "GOPATH=" + c.tmpPath)
-	env = append(env, "ORIG_GOPATH=" + c.origPath)
-
-	cmd := exec.Command(command, args...)
-	cmd.Env = env
-	return cmd
-}
-
 func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
 	env := os.Environ()
 
@@ -410,13 +391,7 @@ func (c *Context) wantToProcess(mockAllowed bool, imports importSet) map[string]
 	names := make(map[string]string)
 
 	for name := range imports {
-//	for name, cfg := range imports {
 		label := markImport(name, normalMark)
-/*
-		if cfg.IsMock() && mockAllowed && c.stdlibImports[name] {
-			label = markImport(name, mockMark)
-		}
-*/
 		names[name] = label
 
 		c.processed[label] = c.processed[label] || false
@@ -508,23 +483,6 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				}
 				continue
 			}
-
-/*
-			if c.stdlibImports[name] {
-				// We already checked earlier for unmocked stdlib, so
-				// this is mocked stdlib
-				pkgImports, err := MockStandard(c.goRoot, c.tmpPath, name, cfg)
-				if err != nil {
-					return nil, Cerr{"MockStandard", err}
-				}
-
-				// Update imports from the package we just processed, but it can
-				// only add actual packages, not mocks
-				c.wantToProcess(false, pkgImports)
-
-				continue
-			}
-*/
 
 			// Process the package and get it's imports
 			pkgImports, err := pkg.Gen(mock, cfg)
