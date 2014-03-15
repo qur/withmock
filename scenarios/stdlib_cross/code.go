@@ -15,7 +15,6 @@ func RunMe(Addr string) error {
 	if err != nil {
 		return err
 	}
-	defer ln.Close()
 
 	go s.Serve(ln)
 
