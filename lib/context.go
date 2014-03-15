@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"log"
 )
 
 type Context struct {
@@ -238,13 +237,12 @@ func (c *Context) mockStdlib() error {
 		for _, name := range strings.Split(imports, "\n") {
 			name = strings.TrimSpace(name)
 
-			if name == "github.com/qur/gomock/interfaces" {
+			if name == "" || name == "github.com/qur/gomock/interfaces" {
 				continue
 			}
 			_, found := deps[name]
 			if !found {
-				log.Printf("odd dep: %s", name)
-				continue
+				return fmt.Errorf("missing dependency %s for %s", name, pkgName)
 			}
 			deps[pkgName][name] = true
 		}
@@ -310,7 +308,6 @@ func (c *Context) mockStdlib() error {
 		dst := filepath.Join(c.tmpRoot, path)
 
 		dstDir := filepath.Dir(dst)
-		log.Printf("mkdir: %s", dstDir)
 
 		if err := os.MkdirAll(dstDir, 0700); err != nil {
 			return Cerr{"os.MkDirAll", err}
@@ -329,7 +326,6 @@ func (c *Context) mockStdlib() error {
 			if len(needs) > 0 {
 				continue
 			}
-			log.Printf("install %s", name)
 
 			cmd := c.insideCommand("go", "install", name)
 			out, err := cmd.CombinedOutput()
