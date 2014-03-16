@@ -264,33 +264,6 @@ func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig, rw *rewri
 	return imports, nil
 }
 
-func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) (importSet, error) {
-	// Write a mock version of the package
-	src := filepath.Join(srcRoot, "src/pkg", name)
-	dst := filepath.Join(dstRoot, "src", markImport(name, mockMark))
-	err := os.MkdirAll(dst, 0700)
-	if err != nil {
-		return nil, Cerr{"MkdirAll", err}
-	}
-	cfg.MockPrototypes = true
-	cfg.IgnoreInits = true
-	cfg.MatchOSArch = true
-	cfg.IgnoreNonGoFiles = true
-	_, err = MakePkg(src, dst, name, true, cfg, nil)
-	if err != nil {
-		return nil, Cerr{"MakePkg", err}
-	}
-
-	// The import a stdlib mock is allowed to add (has to add in fact), is on
-	// gomock/interfaces - and that is just a normal dependancy.
-	imports := importSet{
-		"github.com/qur/gomock/interfaces" : importCfg{mode: importNormal},
-	}
-
-	// Done
-	return imports, nil
-}
-
 func ReplacePkg(srcPath, dstRoot, from, as string) (importSet, error) {
 	// Find the package source, it may be in any entry in srcPath
 	srcRoot := ""
