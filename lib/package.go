@@ -15,7 +15,6 @@ import (
 type Package struct {
 	name string
 	label string
-	path string
 	src, dst string
 	tmpDir string
 	tmpPath string
@@ -24,14 +23,9 @@ type Package struct {
 }
 
 func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
-	path, err := LookupImportPath(pkgName)
+	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
-	}
-
-	codeSrc, err := filepath.Abs(path)
-	if err != nil {
-		return nil, Cerr{"filepath.Abs", err}
 	}
 
 	tmpPath := getTmpPath(tmpDir)
@@ -39,7 +33,6 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 	return &Package{
 		name: pkgName,
 		label: label,
-		path: path,
 		src: codeSrc,
 		dst: filepath.Join(tmpPath, "src", label),
 		tmpDir: tmpDir,
@@ -50,14 +43,9 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 }
 
 func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Package, error) {
-	path, err := LookupImportPath(pkgName)
+	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
-	}
-
-	codeSrc, err := filepath.Abs(path)
-	if err != nil {
-		return nil, Cerr{"filepath.Abs", err}
 	}
 
 	tmpRoot := getTmpRoot(tmpDir)
@@ -65,7 +53,6 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Pac
 	return &Package{
 		name: pkgName,
 		label: label,
-		path: path,
 		src: codeSrc,
 		dst: filepath.Join(tmpRoot, "src", "pkg", label),
 		tmpDir: tmpDir,
@@ -83,10 +70,6 @@ func (p *Package) Label() string {
 	return p.label
 }
 
-func (p *Package) Path() string {
-	return p.path
-}
-
 func (p *Package) Loc() codeLoc {
 	return codeLoc{p.src, p.dst}
 }
@@ -96,7 +79,7 @@ func (p *Package) HasNonGoCode() (bool, error) {
 }
 
 func (p *Package) GetImports() (importSet, error) {
-	return GetImports(p.path, true)
+	return GetImports(p.src, true)
 }
 
 func (p *Package) MockImports(importNames map[string]string, cfg *Config) error {
@@ -104,19 +87,44 @@ func (p *Package) MockImports(importNames map[string]string, cfg *Config) error 
 }
 
 func (p *Package) Link() (importSet, error) {
-	return LinkPkg(p.goPath, p.tmpPath, p.name)
+	if err := symlinkPackage(p.src, p.dst); err != nil {
+		return nil, Cerr{"symlinkPackage", err}
+	}
+
+	return GetImports(p.src, false)
+}
+
+func (p *Package) Replace(with string) (importSet, error) {
+	src, err := LookupImportPath(with)
+	if err != nil {
+		return nil, Cerr{"LookupImportPath", err}
+	}
+
+	if err := symlinkPackage(src, p.dst); err != nil {
+		return nil, Cerr{"symlinkPackage", err}
+	}
+
+	return GetImports(src, false)
 }
 
 func (p *Package) Rewrite() (importSet, error) {
-	return RewritePkg(p.goPath, p.tmpPath, p.name, p.rw)
+	if err := rewritePackage(p.src, p.dst, p.rw); err != nil {
+		return nil, Cerr{"symlinkPackage", err}
+	}
+
+	return GetImports(p.src, false)
 }
 
 func (p *Package) DisableAllMocks() error {
-	return DisableAllMocks(p.goPath, p.tmpPath, p.name)
+	return disableAllMocks(p.src, p.dst)
 }
 
 func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {
-	return GenPkg(p.goPath, p.tmpPath, p.name, mock, cfg, p.rw)
+	if err := os.MkdirAll(p.dst, 0700); err != nil {
+		return nil, Cerr{"os.MkdirAll", err}
+	}
+
+	return MakePkg(p.src, p.dst, p.name, mock, cfg, p.rw)
 }
 
 func (p *Package) insideCommand(command string, args ...string) *exec.Cmd {

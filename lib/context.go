@@ -447,22 +447,6 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				mock = true
 			}
 
-			if imports[name].IsReplace() {
-				// Install the requested package in place of the
-				// package that the code thinks it wants.
-				srcPath := imports[name].path
-				pkgImports, err := ReplacePkg(c.goPath, c.tmpPath, srcPath, label)
-				if err != nil {
-					return nil, Cerr{"ReplacePkg", err}
-				}
-
-				// Update imports from the package we just processed, but it
-				// can only add actual packages, not mocks
-				c.wantToProcess(false, pkgImports)
-			
-				continue
-			}
-
 			if c.stdlibImports[name] {
 				// Ignore stdlib packages, we deal with them separately.
 				continue
@@ -484,10 +468,26 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				continue
 			}
 
+			if imports[name].IsReplace() {
+				// Install the requested package in place of the
+				// package that the code thinks it wants.
+				srcPath := imports[name].path
+				pkgImports, err := pkg.Replace(srcPath)
+				if err != nil {
+					return nil, Cerr{"pkg.Replace", err}
+				}
+
+				// Update imports from the package we just processed, but it
+				// can only add actual packages, not mocks
+				c.wantToProcess(false, pkgImports)
+
+				continue
+			}
+
 			// Process the package and get it's imports
 			pkgImports, err := pkg.Gen(mock, cfg)
 			if err != nil {
-				return nil, Cerr{"GenPkg", err}
+				return nil, Cerr{"pkg.Gen", err}
 			}
 
 			// Update imports from the package we just processed, but it can
@@ -515,8 +515,13 @@ func (c *Context) getPkg(pkgName, label string) (*Package, error) {
 	return pkg, nil
 }
 
-func (c *Context) LinkPackage(pkg string) error {
-	_, err := LinkPkg(c.goPath, c.tmpPath, pkg)
+func (c *Context) LinkPackage(pkgName string) error {
+	pkg, err := c.getPkg(pkgName, markImport(pkgName, normalMark))
+	if err != nil {
+		return Cerr{"c.getPkg", err}
+	}
+
+	_, err = pkg.Link()
 	return err
 }
 
