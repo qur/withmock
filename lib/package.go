@@ -86,9 +86,31 @@ func (p *Package) MockImports(importNames map[string]string, cfg *Config) error 
 	return MockImports(p.src, p.dst, importNames, cfg)
 }
 
+func (p *Package) symlinkFile(path, rel string) error {
+	target := filepath.Join(p.dst, rel)
+
+	return os.Symlink(path, target)
+}
+
+func (p *Package) rewriteFile(path, rel string) error {
+	target := filepath.Join(p.dst, rel)
+
+	return p.rw.Copy(path, target)
+}
+
+func (p *Package) disableFile(path, rel string) error {
+	target := filepath.Join(p.dst, rel)
+
+	if strings.HasSuffix(path, ".go") {
+		return addMockDisables(path, target)
+	}
+
+	return os.Symlink(path, target)
+}
+
 func (p *Package) Link() (importSet, error) {
-	if err := symlinkPackage(p.src, p.dst); err != nil {
-		return nil, Cerr{"symlinkPackage", err}
+	if err := processTree(p.src, p.dst, p.symlinkFile); err != nil {
+		return nil, Cerr{"processTree", err}
 	}
 
 	return GetImports(p.src, false)
@@ -100,23 +122,23 @@ func (p *Package) Replace(with string) (importSet, error) {
 		return nil, Cerr{"LookupImportPath", err}
 	}
 
-	if err := symlinkPackage(src, p.dst); err != nil {
-		return nil, Cerr{"symlinkPackage", err}
+	if err := processTree(src, p.dst, p.symlinkFile); err != nil {
+		return nil, Cerr{"processTree", err}
 	}
 
 	return GetImports(src, false)
 }
 
 func (p *Package) Rewrite() (importSet, error) {
-	if err := rewritePackage(p.src, p.dst, p.rw); err != nil {
-		return nil, Cerr{"symlinkPackage", err}
+	if err := processTree(p.src, p.dst, p.rewriteFile); err != nil {
+		return nil, Cerr{"processTree", err}
 	}
 
 	return GetImports(p.src, false)
 }
 
 func (p *Package) DisableAllMocks() error {
-	return disableAllMocks(p.src, p.dst)
+	return processTree(p.src, p.dst, p.disableFile)
 }
 
 func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {

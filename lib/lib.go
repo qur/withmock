@@ -277,7 +277,7 @@ func MockImports(src, dst string, names map[string]string, cfg *Config) error {
 	return filepath.Walk(src, fn)
 }
 
-func symlinkPackage(src, dst string) error {
+func processTree(src, dst string, processFile func(path, rel string) error) error {
 	fn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -295,73 +295,15 @@ func symlinkPackage(src, dst string) error {
 			return os.MkdirAll(target, 0700)
 		}
 
-		// TODO: we shouldn't be doing this.  This is just a hack to work around
-		// the fact that I actually want a non-recursive alternative to GenPkg
-		// for the unsafe and runtime packages.  Eventually I should be using a
-		// copy & rewrite function, but for now I am using this - so I need to
-		// hack around the recursive nature ...
-		_, err = os.Lstat(target)
-		if err == nil {
-			os.Remove(target)
-		}
-
-		return os.Symlink(path, target)
+		return processFile(path, rel)
 	}
 
 	// Now use walk to process the files in src
 	return filepath.Walk(src, fn)
 }
 
-func rewritePackage(src, dst string, rw *rewriter) error {
-	fn := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-
-		target := filepath.Join(dst, rel)
-
-		// Make sure target directories exist
-		if info.Mode().IsDir() {
-			return os.MkdirAll(target, 0700)
-		}
-
-		return rw.Copy(path, target)
-	}
-
-	// Now use walk to process the files in src
-	return filepath.Walk(src, fn)
-}
-
-func disableAllMocks(src, dst string) error {
-	fn := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-
-		target := filepath.Join(dst, rel)
-
-		// Make sure target directories exist
-		if info.Mode().IsDir() {
-			return os.MkdirAll(target, 0700)
-		}
-
-		if strings.HasSuffix(path, ".go") {
-			return addMockDisables(path, target)
-		}
-
-		return os.Symlink(path, target)
-	}
-
-	// Now use walk to process the files in src
-	return filepath.Walk(src, fn)
+func symlinkTree(src, dst string) error {
+	return processTree(src, dst, func(path, rel string) error {
+		return os.Symlink(path, filepath.Join(dst, rel))
+	})
 }

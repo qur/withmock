@@ -272,12 +272,12 @@ func (c *Context) mockStdlib() error {
 	// Before we can install the packages we need to get the toolchain
 	toolSrc := filepath.Join(c.goRoot, "pkg", "tool")
 	toolDst := filepath.Join(c.tmpRoot, "pkg", "tool")
-	symlinkPackage(toolSrc, toolDst)
+	symlinkTree(toolSrc, toolDst)
 
 	// Apparently runtime/cgo needs cmd/cgo ...
 	cgoSrc := filepath.Join(c.goRoot, "src", "cmd", "cgo")
 	cgoDst := filepath.Join(c.tmpRoot, "src", "cmd", "cgo")
-	symlinkPackage(cgoSrc, cgoDst)
+	symlinkTree(cgoSrc, cgoDst)
 
 	// We also need some apparently random extra stuff
 	for _, path := range []string{
