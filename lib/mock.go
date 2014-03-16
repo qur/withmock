@@ -406,6 +406,44 @@ type mockGen struct {
 	ObjEXPECT      string
 }
 
+func getNonGoFiles(path string) ([]string, []string, []string, error) {
+	d, err := os.Open(path)
+	if err != nil {
+		return nil, nil, nil, Cerr{"os.Open", err}
+	}
+	defer d.Close()
+
+	files, err := d.Readdir(-1)
+	if err != nil {
+		return nil, nil, nil, Cerr{"Readdirnames", err}
+	}
+
+	nonGoSources := []string{}
+	nonGoFiles := []string{}
+	subDirs := []string{}
+
+	for _, entry := range files {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+		if entry.IsDir() {
+			subDirs = append(subDirs, name)
+			continue
+		}
+		if entry.IsDir() || strings.HasSuffix(name, ".go") {
+			continue
+		}
+		if !strings.HasSuffix(name, ".s") && !strings.HasSuffix(name, ".c") {
+			nonGoFiles = append(nonGoFiles, name)
+			continue
+		}
+		nonGoSources = append(nonGoSources, name)
+	}
+
+	return nonGoSources, nonGoFiles, subDirs, nil
+}
+
 // MakePkg writes a mock version of the package found at srcPath into dstPath.
 // If dstPath already exists, bad things will probably happen.
 func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig, extrw *rewriter) (importSet, error) {
@@ -427,36 +465,13 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig, extrw
 
 	imports := make(importSet)
 
-	d, err := os.Open(srcPath)
+	nonGoSources, nonGoFiles, subDirs, err := getNonGoFiles(srcPath)
 	if err != nil {
-		return nil, Cerr{"os.Open", err}
-	}
-	defer d.Close()
-
-	files, err := d.Readdir(-1)
-	if err != nil {
-		return nil, Cerr{"Readdirnames", err}
+		return nil, Cerr{"getNonGoFiles", err}
 	}
 
-	nonGoSources := []string{}
-	nonGoFiles := []string{}
-	for _, entry := range files {
-		name := entry.Name()
-		if strings.HasPrefix(name, ".") {
-			continue
-		}
-		if entry.IsDir() {
-			imports.Set(filepath.Join(pkgName, name), importNormal, "")
-			continue
-		}
-		if entry.IsDir() || strings.HasSuffix(name, ".go") {
-			continue
-		}
-		if !strings.HasSuffix(name, ".s") && !strings.HasSuffix(name, ".c") {
-			nonGoFiles = append(nonGoFiles, name)
-			continue
-		}
-		nonGoSources = append(nonGoSources, name)
+	for _, name := range subDirs {
+		imports.Set(filepath.Join(pkgName, name), importNormal, "")
 	}
 
 	externalFunctions := map[string][]string{}
