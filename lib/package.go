@@ -6,6 +6,8 @@ package lib
 
 import (
 	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -74,8 +76,60 @@ func (p *Package) Loc() codeLoc {
 	return codeLoc{p.src, p.dst}
 }
 
+func (p *Package) getImports(tests bool) (importSet, error) {
+	imports := make(importSet)
+
+	isGoFile := func(info os.FileInfo) bool {
+		if info.IsDir() {
+			return false
+		}
+		if !tests && strings.HasSuffix(info.Name(), "_test.go") {
+			return false
+		}
+		return strings.HasSuffix(info.Name(), ".go")
+	}
+
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, p.src, isGoFile,
+		parser.ImportsOnly|parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			for _, i := range file.Imports {
+				path := strings.Trim(i.Path.Value, "\"")
+				comment := strings.TrimSpace(i.Comment.Text())
+
+				if strings.HasPrefix(path, "_mock_/") {
+					path = path[7:]
+					comment = "mock"
+				}
+
+				mode := importNormal
+				path2 := ""
+				switch {
+				case strings.ToLower(comment) == "mock":
+					mode = importMock
+				case strings.HasPrefix(comment, "replace("):
+					mode = importReplace
+					path2 = comment[8:len(comment)-1]
+				}
+
+				err := imports.Set(path, mode, path2)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	return imports, nil
+}
+
 func (p *Package) GetImports() (importSet, error) {
-	return GetImports(p.src, true)
+	return p.getImports(true)
 }
 
 func (p *Package) MockImports(importNames map[string]string, cfg *Config) error {
@@ -109,7 +163,7 @@ func (p *Package) Link() (importSet, error) {
 		return nil, Cerr{"processTree", err}
 	}
 
-	return GetImports(p.src, false)
+	return p.getImports(false)
 }
 
 func (p *Package) Replace(with string) (importSet, error) {
@@ -122,7 +176,7 @@ func (p *Package) Replace(with string) (importSet, error) {
 		return nil, Cerr{"processTree", err}
 	}
 
-	return GetImports(src, false)
+	return p.getImports(false)
 }
 
 func (p *Package) Rewrite() (importSet, error) {
@@ -130,7 +184,7 @@ func (p *Package) Rewrite() (importSet, error) {
 		return nil, Cerr{"processTree", err}
 	}
 
-	return GetImports(p.src, false)
+	return p.getImports(false)
 }
 
 func (p *Package) DisableAllMocks() error {

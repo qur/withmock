@@ -52,58 +52,6 @@ func GetCmdOutput(cmd *exec.Cmd) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func GetImports(path string, tests bool) (importSet, error) {
-	imports := make(importSet)
-
-	isGoFile := func(info os.FileInfo) bool {
-		if info.IsDir() {
-			return false
-		}
-		if !tests && strings.HasSuffix(info.Name(), "_test.go") {
-			return false
-		}
-		return strings.HasSuffix(info.Name(), ".go")
-	}
-
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, path, isGoFile,
-		parser.ImportsOnly|parser.ParseComments)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, pkg := range pkgs {
-		for _, file := range pkg.Files {
-			for _, i := range file.Imports {
-				path := strings.Trim(i.Path.Value, "\"")
-				comment := strings.TrimSpace(i.Comment.Text())
-
-				if strings.HasPrefix(path, "_mock_/") {
-					path = path[7:]
-					comment = "mock"
-				}
-
-				mode := importNormal
-				path2 := ""
-				switch {
-				case strings.ToLower(comment) == "mock":
-					mode = importMock
-				case strings.HasPrefix(comment, "replace("):
-					mode = importReplace
-					path2 = comment[8:len(comment)-1]
-				}
-
-				err := imports.Set(path, mode, path2)
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
-
-	return imports, nil
-}
-
 func GetMockedPackages(path string) (map[string]string, error) {
 	imports := make(map[string]string)
 
