@@ -74,10 +74,6 @@ func (p *Package) Loc() codeLoc {
 	return codeLoc{p.src, p.dst}
 }
 
-func (p *Package) HasNonGoCode() (bool, error) {
-	return hasNonGoCode(p.name)
-}
-
 func (p *Package) GetImports() (importSet, error) {
 	return GetImports(p.src, true)
 }
