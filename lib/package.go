@@ -205,7 +205,7 @@ func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {
 		return nil, Cerr{"os.MkdirAll", err}
 	}
 
-	return MakePkg(p.src, p.dst, p.name, mock, cfg, p.rw)
+	return p.makePkg(mock, cfg)
 }
 
 func (p *Package) insideCommand(command string, args ...string) *exec.Cmd {

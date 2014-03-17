@@ -12,14 +12,20 @@ import (
 )
 
 func main() {
-	srcPath, dstPath, impPath := os.Args[1], os.Args[2], os.Args[3]
+	impPath, dstPath := os.Args[1], os.Args[2]
 
 	cfg := &lib.MockConfig{
 		MOCK:   "MOCK",
 		EXPECT: "EXPECT",
 	}
 
-	_, err := lib.MakePkg(srcPath, dstPath, impPath, true, cfg, nil)
+	pkg, err := lib.NewPackage(impPath, impPath, dstPath, os.Getenv("GOROOT"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
+		os.Exit(1)
+	}
+
+	_, err = pkg.Gen(true, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(1)
