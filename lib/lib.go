@@ -157,7 +157,9 @@ func exists(path string) bool {
 	panic(err)
 }
 
-func MockImports(src, dst string, names map[string]string, cfg *Config) error {
+type procFunc func(path, rel string) error
+
+func walk(src, dst string, processDir procFunc, processFile procFunc) error {
 	fn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -168,45 +170,8 @@ func MockImports(src, dst string, names map[string]string, cfg *Config) error {
 			return err
 		}
 
-		target := filepath.Join(dst, rel)
-
-		// Ignore every directory except src (which we need to mirror)
 		if info.Mode().IsDir() {
-			if path == src {
-				return os.MkdirAll(target, 0700)
-			} else {
-				return filepath.SkipDir
-			}
-		}
-
-		// Non-code we leave alone, code may need modification
-		if !strings.HasSuffix(path, ".go") {
-			return os.Symlink(path, target)
-		} else {
-			return mockFileImports(path, target, names, cfg)
-		}
-	}
-
-	// Now use walk to process the files in src
-	return filepath.Walk(src, fn)
-}
-
-func processTree(src, dst string, processFile func(path, rel string) error) error {
-	fn := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-
-		target := filepath.Join(dst, rel)
-
-		// Ignore every directory except src (which we need to mirror)
-		if info.Mode().IsDir() {
-			return os.MkdirAll(target, 0700)
+			return processDir(path, rel)
 		}
 
 		return processFile(path, rel)
@@ -214,6 +179,23 @@ func processTree(src, dst string, processFile func(path, rel string) error) erro
 
 	// Now use walk to process the files in src
 	return filepath.Walk(src, fn)
+}
+
+func processSingleDir(src, dst string, processFile procFunc) error {
+	return walk(src, dst, func(path, rel string) error {
+		// Ignore every directory except src (which we need to mirror)
+		if path != src {
+			return filepath.SkipDir
+		}
+
+		return os.MkdirAll(filepath.Join(dst, rel), 0700)
+	}, processFile)
+}
+
+func processTree(src, dst string, processFile procFunc) error {
+	return walk(src, dst, func(path, rel string) error {
+		return os.MkdirAll(filepath.Join(dst, rel), 0700)
+	}, processFile)
 }
 
 func symlinkTree(src, dst string) error {

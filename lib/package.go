@@ -133,7 +133,16 @@ func (p *Package) GetImports() (importSet, error) {
 }
 
 func (p *Package) MockImports(importNames map[string]string, cfg *Config) error {
-	return MockImports(p.src, p.dst, importNames, cfg)
+	return processSingleDir(p.src, p.dst, func(path, rel string) error {
+		target := filepath.Join(p.dst, rel)
+
+		// Non-code we leave alone, code may need modification
+		if !strings.HasSuffix(path, ".go") {
+			return os.Symlink(path, target)
+		}
+
+		return mockFileImports(path, target, importNames, cfg)
+	})
 }
 
 func (p *Package) symlinkFile(path, rel string) error {
