@@ -13,44 +13,6 @@ import (
 	"strings"
 )
 
-func getNonGoFiles(path string) ([]string, []string, []string, error) {
-	d, err := os.Open(path)
-	if err != nil {
-		return nil, nil, nil, Cerr{"os.Open", err}
-	}
-	defer d.Close()
-
-	files, err := d.Readdir(-1)
-	if err != nil {
-		return nil, nil, nil, Cerr{"Readdirnames", err}
-	}
-
-	nonGoSources := []string{}
-	nonGoFiles := []string{}
-	subDirs := []string{}
-
-	for _, entry := range files {
-		name := entry.Name()
-		if strings.HasPrefix(name, ".") {
-			continue
-		}
-		if entry.IsDir() {
-			subDirs = append(subDirs, name)
-			continue
-		}
-		if entry.IsDir() || strings.HasSuffix(name, ".go") {
-			continue
-		}
-		if !strings.HasSuffix(name, ".s") && !strings.HasSuffix(name, ".c") {
-			nonGoFiles = append(nonGoFiles, name)
-			continue
-		}
-		nonGoSources = append(nonGoSources, name)
-	}
-
-	return nonGoSources, nonGoFiles, subDirs, nil
-}
-
 func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, error) {
 	srcFile := filepath.Join(p.src, base)
 	filename := filepath.Join(p.dst, base)
