@@ -39,7 +39,6 @@ type Context struct {
 
 	cfg *Config
 
-	cache *Cache
 	packages map[string]*Package
 }
 
@@ -80,10 +79,6 @@ func NewContext() (*Context, error) {
 		return nil, err
 	}
 
-	// Setup a cache for our build area
-
-	cache := NewCache(tmpDir)
-
 	// Build and return the context
 
 	return &Context{
@@ -99,7 +94,6 @@ func NewContext() (*Context, error) {
 		importRewrites: make(map[string]string),
 		doRewrite:      true,
 		cfg:            &Config{},
-		cache:          cache,
 		packages:       make(map[string]*Package),
 		// create excludes already including gomock, as we can't mock it.
 		excludes: map[string]bool{

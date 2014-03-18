@@ -12,10 +12,9 @@ import (
 type Cache struct {
 	enabled bool
 	root string
-	tmpDir string
 }
 
-func NewCache(tmpDir string) *Cache {
+func OpenCache() (*Cache, error) {
 	enabled := os.Getenv("WITHMOCK_DISABLE_CACHE") == ""
 
 	home := os.Getenv("HOME")
@@ -25,12 +24,17 @@ func NewCache(tmpDir string) *Cache {
 		if home == "" {
 			enabled = false
 		}
-		filepath.Join(home, ".withmock", "cache")
+		root = filepath.Join(home, ".withmock", "cache")
+	}
+
+	if enabled {
+		if err := os.MkdirAll(root, 0700); err != nil {
+			return nil, Cerr{"os.MkdirAll", err}
+		}
 	}
 
 	return &Cache{
 		enabled: enabled,
 		root: root,
-		tmpDir: tmpDir,
-	}
+	}, nil
 }

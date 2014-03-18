@@ -29,7 +29,7 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		return "", nil, nil
 	}
 
-	out, err := os.Create(filename)
+	out, err := p.cache.Create(filename)
 	if err != nil {
 		return "", nil, Cerr{"os.Create", err}
 	}

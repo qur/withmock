@@ -23,12 +23,18 @@ type Package struct {
 	goPath string
 	rw *rewriter
 	fset *token.FileSet
+	cache *Cache
 }
 
 func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
+	}
+
+	cache, err := OpenCache()
+	if err != nil {
+		return nil, Cerr{"OpenCache", err}
 	}
 
 	tmpPath := getTmpPath(tmpDir)
@@ -43,6 +49,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 		goPath: goPath,
 		rw: nil,
 		fset: token.NewFileSet(),
+		cache: cache,
 	}, nil
 }
 
@@ -50,6 +57,11 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Pac
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
+	}
+
+	cache, err := OpenCache()
+	if err != nil {
+		return nil, Cerr{"OpenCache", err}
 	}
 
 	tmpRoot := getTmpRoot(tmpDir)
@@ -64,6 +76,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Pac
 		goPath: goRoot,
 		rw: rw,
 		fset: token.NewFileSet(),
+		cache: cache,
 	}, nil
 }
 
