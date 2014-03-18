@@ -22,6 +22,7 @@ type Package struct {
 	tmpPath string
 	goPath string
 	rw *rewriter
+	fset *token.FileSet
 }
 
 func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
@@ -41,6 +42,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 		tmpPath: tmpPath,
 		goPath: goPath,
 		rw: nil,
+		fset: token.NewFileSet(),
 	}, nil
 }
 
@@ -61,6 +63,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Pac
 		tmpPath: tmpRoot,
 		goPath: goRoot,
 		rw: rw,
+		fset: token.NewFileSet(),
 	}, nil
 }
 
@@ -205,7 +208,7 @@ func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {
 		return nil, Cerr{"os.MkdirAll", err}
 	}
 
-	return p.makePkg(mock, cfg)
+	return p.mockPackage(mock, cfg)
 }
 
 func (p *Package) insideCommand(command string, args ...string) *exec.Cmd {
