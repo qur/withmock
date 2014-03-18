@@ -51,6 +51,43 @@ func getNonGoFiles(path string) ([]string, []string, []string, error) {
 	return nonGoSources, nonGoFiles, subDirs, nil
 }
 
+func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, error) {
+	srcFile := filepath.Join(p.src, base)
+	filename := filepath.Join(p.dst, base)
+
+	file, err := parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
+	if err != nil {
+		return "", nil, Cerr{"ParseFile", err}
+	}
+
+	// If only considering files for this OS/Arch, then reject files
+	// that aren't for this OS/Arch based on build constraint (also
+	// excludes files with an ignore build constraint).
+	if !goodOSArchConstraints(file) {
+		return "", nil, nil
+	}
+
+	out, err := os.Create(filename)
+	if err != nil {
+		return "", nil, Cerr{"os.Create", err}
+	}
+	defer out.Close()
+
+	imports, err := m.file(out, file, srcFile)
+	if err != nil {
+		return "", nil, Cerr{"m.file", err}
+	}
+
+	/*
+		// TODO: we want to gofmt, goimports can break things ...
+		if err := fixup(filename); err != nil {
+			return "", nil, Cerr{"fixup", err}
+		}
+	*/
+
+	return file.Name.Name, imports, nil
+}
+
 func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imports importSet) (string, []string, Interfaces, error) {
 	interfaces := make(Interfaces)
 
@@ -78,57 +115,32 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 	cfg.MatchOSArch = true
 
 	for _, base := range files {
-		srcFile := filepath.Join(p.src, base)
-		filename := filepath.Join(p.dst, base)
-
 		// If only considering files for this OS/Arch, then reject files
 		// that aren't for this OS/Arch based on filename.
 		if cfg.MatchOSArch && !goodOSArchFile(base, nil) {
 			continue
 		}
 
-		file, err := parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
+		name, i, err := p.mockFile(base, m)
 		if err != nil {
-			return "", nil, nil, Cerr{"ParseFile", err}
+			return "", nil, nil, Cerr{"p.mockFile", err}
 		}
 
-		// If only considering files for this OS/Arch, then reject files
-		// that aren't for this OS/Arch based on build constraint (also
-		// excludes files with an ignore build constraint).
-		if cfg.MatchOSArch && !goodOSArchConstraints(file) {
+		if name == "" {
 			continue
 		}
 
 		if pkg == "" {
-			pkg = file.Name.Name
-		} else if file.Name.Name != pkg {
-			return "", nil, nil, fmt.Errorf("Package name changed from %s to %s", pkg, file.Name.Name)
+			pkg = name
+		} else if name != pkg {
+			return "", nil, nil, fmt.Errorf("Package name changed from %s to %s", pkg, name)
 		}
 
 		processed++
 
-		out, err := os.Create(filename)
-		if err != nil {
-			return "", nil, nil, Cerr{"os.Create", err}
-		}
-		defer out.Close()
-
-		i, err := m.file(out, file, srcFile)
-		if err != nil {
-			return "", nil, nil, Cerr{"m.file", err}
-		}
-
 		for path := range i {
 			imports.Set(path, importNormal, "")
 		}
-
-		/*
-			// TODO: we want to gofmt, goimports can break things ...
-			err = fixup(filename)
-			if err != nil {
-				return err
-			}
-		*/
 	}
 
 	// If we skipped over all the files for this package, then ignore it
