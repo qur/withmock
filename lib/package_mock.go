@@ -137,7 +137,7 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 	return pkg, m.extFunctions, interfaces, nil
 }
 
-func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error) {
+func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (_ importSet, ret error) {
 	imports := make(importSet)
 
 	processDir := func(path, rel string) error {
@@ -202,8 +202,18 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 		input := filepath.Join(p.src, name)
 		output := filepath.Join(p.dst, name)
 
-		err := rw.Copy(input, output)
+		w, err := p.cache.Create(output)
 		if err != nil {
+			return nil, Cerr{"os.Create", err}
+		}
+		defer func() {
+			err := w.Close()
+			if ret == nil && err != nil {
+				ret = Cerr{"Close", err}
+			}
+		}()
+
+		if err := rw.Copy(input, w); err != nil {
 			return nil, Cerr{"rw.Copy", err}
 		}
 	}

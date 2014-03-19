@@ -98,18 +98,12 @@ func (r *rewriter) Change(w io.Writer) error {
 	return nil
 }
 
-func (rw *rewriter) Copy(src, dst string) error {
+func (rw *rewriter) Copy(src string, w io.Writer) error {
 	r, err := os.Open(src)
 	if err != nil {
 		return Cerr{"os.Open", err}
 	}
 	defer r.Close()
-
-	w, err := os.Create(dst)
-	if err != nil {
-		return Cerr{"os.Create", err}
-	}
-	defer w.Close()
 
 	err = rw.Change(w)
 	if err != nil {

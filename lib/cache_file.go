@@ -19,6 +19,7 @@ type CacheFile struct {
 	h hash.Hash
 	cache *Cache
 	path string
+	hash string
 }
 
 func (c *Cache) Create(path string) (*CacheFile, error) {
@@ -33,20 +34,31 @@ func (c *Cache) Create(path string) (*CacheFile, error) {
 		return nil, Cerr{"os.Create", err}
 	}
 
-	return &CacheFile{f, sha512.New(), c, path}, nil
+	return &CacheFile{f, sha512.New(), c, path, ""}, nil
 }
 
 func (f *CacheFile) Write(p []byte) (int, error) {
 	return io.MultiWriter(f.f, f.h).Write(p)
 }
 
+func (f *CacheFile) Hash() string {
+	return f.hash
+}
+
 func (f *CacheFile) Close() error {
+	// if hash has been set, then we are already closed
+	if f.hash != "" {
+		return nil
+	}
+
 	if err := f.f.Close(); err != nil {
 		return Cerr{"os.File.Close", err}
 	}
 
 	// TODO: should be adding size into the hash calculation ...
-	name := filepath.Join(f.cache.root, "files", hex.EncodeToString(f.h.Sum(nil)))
+	f.hash = hex.EncodeToString(f.h.Sum(nil))
+
+	name := filepath.Join(f.cache.root, "files", f.hash)
 
 	if err := os.Rename(f.f.Name(), name); err != nil {
 		return Cerr{"os.Rename", err}
