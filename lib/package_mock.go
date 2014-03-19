@@ -149,7 +149,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 			return nil
 		}
 
-		imports.Set(filepath.Join(p.name, rel), importNormal, "")
+		imports.Set(filepath.Join(p.name, rel), importNoInstall, "")
 		return filepath.SkipDir
 	}
 

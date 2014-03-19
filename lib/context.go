@@ -348,6 +348,7 @@ const (
 	importNormal importMode = iota
 	importMock
 	importReplace
+	importNoInstall
 )
 
 type importMode int
@@ -363,6 +364,10 @@ func (i importCfg) IsMock() bool {
 
 func (i importCfg) IsReplace() bool {
 	return i.mode == importReplace
+}
+
+func (i importCfg) ShouldInstall() bool {
+	return i.mode != importNoInstall
 }
 
 func (s importSet) Set(path string, mode importMode, path2 string) error {
@@ -453,6 +458,10 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 
 			cfg := c.cfg.Mock(name)
 
+			if !imports[name].ShouldInstall() {
+				pkg.DisableInstall()
+			}
+
 			if c.excludes[name] {
 				// this package has been specifically excluded from mocking, so
 				// we just link it, even if mocked is indicated.
@@ -487,6 +496,17 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			// Update imports from the package we just processed, but it can
 			// only add actual packages, not mocks
 			c.wantToProcess(false, pkgImports)
+
+			// we need to integrate pkgImports with imports.
+			//
+			// TODO: Really, this needs to be managed more carefully - but this
+			// should be enough to fix the problem we are having.
+			for p, i := range pkgImports {
+				_, set := imports[p]
+				if !set {
+					imports[p] = i
+				}
+			}
 		}
 	}
 

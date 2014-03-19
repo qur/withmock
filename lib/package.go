@@ -17,6 +17,7 @@ import (
 type Package struct {
 	name string
 	label string
+	install bool
 	src, dst string
 	tmpDir string
 	tmpPath string
@@ -42,6 +43,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 	return &Package{
 		name: pkgName,
 		label: label,
+		install: true,
 		src: codeSrc,
 		dst: filepath.Join(tmpPath, "src", label),
 		tmpDir: tmpDir,
@@ -69,6 +71,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Pac
 	return &Package{
 		name: pkgName,
 		label: label,
+		install: true,
 		src: codeSrc,
 		dst: filepath.Join(tmpRoot, "src", "pkg", label),
 		tmpDir: tmpDir,
@@ -201,6 +204,10 @@ func (p *Package) Link() (importSet, error) {
 	return p.getImports(false)
 }
 
+func (p *Package) DisableInstall() {
+	p.install = false
+}
+
 func (p *Package) Replace(with string) (importSet, error) {
 	src, err := LookupImportPath(with)
 	if err != nil {
@@ -258,6 +265,15 @@ func (p *Package) insideCommand(command string, args ...string) *exec.Cmd {
 }
 
 func (p *Package) needsInstall() (bool, error) {
+	if !p.install {
+		return false, nil
+	}
+
+	if getMark(p.label) == testMark {
+		// we don't install packages marked for test
+		return false, nil
+	}
+
 	d, err := os.Open(p.dst)
 	if err != nil {
 		return false, Cerr{"os.Open", err}
@@ -279,11 +295,6 @@ func (p *Package) needsInstall() (bool, error) {
 }
 
 func (p *Package) Install() error {
-	if getMark(p.label) == testMark {
-		// we don't install packages marked for test
-		return nil
-	}
-
 	needsInstall, err := p.needsInstall()
 	if err != nil {
 		return Cerr{"p.needsInstall", err}
