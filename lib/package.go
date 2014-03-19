@@ -167,21 +167,20 @@ func (p *Package) symlinkFile(path, rel string) error {
 	return os.Symlink(path, target)
 }
 
-func (p *Package) rewriteFile(path, rel string) (ret error) {
+func (p *Package) rewriteFile(path, rel string) error {
 	target := filepath.Join(p.dst, rel)
 
 	w, err := p.cache.Create(target)
 	if err != nil {
 		return Cerr{"os.Create", err}
 	}
-	defer func() {
-		err := w.Close()
-		if ret == nil && err != nil {
-			ret = Cerr{"Close", err}
-		}
-	}()
+	defer w.Close()
 
-	return p.rw.Copy(path, w)
+	if err := p.rw.Copy(path, w); err != nil {
+		return Cerr{"p.rw.Copy", err}
+	}
+
+	return w.Install()
 }
 
 func (p *Package) disableFile(path, rel string) error {

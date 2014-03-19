@@ -40,6 +40,10 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		return "", nil, Cerr{"m.file", err}
 	}
 
+	if err := out.Install(); err != nil {
+		return "", nil, Cerr{"out.Install", err}
+	}
+
 	/*
 		// TODO: we want to gofmt, goimports can break things ...
 		if err := fixup(filename); err != nil {
@@ -137,7 +141,7 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 	return pkg, m.extFunctions, interfaces, nil
 }
 
-func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (_ importSet, ret error) {
+func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error) {
 	imports := make(importSet)
 
 	processDir := func(path, rel string) error {
@@ -206,15 +210,14 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (_ importSet, ret
 		if err != nil {
 			return nil, Cerr{"os.Create", err}
 		}
-		defer func() {
-			err := w.Close()
-			if ret == nil && err != nil {
-				ret = Cerr{"Close", err}
-			}
-		}()
+		defer w.Close()
 
 		if err := rw.Copy(input, w); err != nil {
 			return nil, Cerr{"rw.Copy", err}
+		}
+
+		if err := w.Install(); err != nil {
+			return nil, Cerr{"w.Install", err}
 		}
 	}
 

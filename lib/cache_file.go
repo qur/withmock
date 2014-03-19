@@ -58,6 +58,14 @@ func (f *CacheFile) Close() error {
 	// TODO: should be adding size into the hash calculation ...
 	f.hash = hex.EncodeToString(f.h.Sum(nil))
 
+	return nil
+}
+
+func (f *CacheFile) Install() error {
+	if err := f.Close(); err != nil {
+		return Cerr{"f.Close", err}
+	}
+
 	name := filepath.Join(f.cache.root, "files", f.hash)
 
 	if err := os.Rename(f.f.Name(), name); err != nil {
