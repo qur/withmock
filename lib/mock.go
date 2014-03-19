@@ -444,7 +444,7 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 			continue
 		}
 		if entry.IsDir() {
-			imports.Set(filepath.Join(pkgName, name), importNormal, "")
+			imports.Set(filepath.Join(pkgName, name), importNoInstall, "")
 			continue
 		}
 		if entry.IsDir() || strings.HasSuffix(name, ".go") {

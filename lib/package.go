@@ -19,6 +19,8 @@ type Package interface {
 	Loc() codeLoc
 	HasNonGoCode() (bool, error)
 
+	DisableInstall()
+
 	GetImports() (importSet, error)
 	MockImports(map[string]string, *Config) error
 
@@ -30,6 +32,7 @@ type Package interface {
 type realPackage struct {
 	name string
 	label string
+	install bool
 	path string
 	src, dst string
 	tmpDir string
@@ -53,6 +56,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
 	return &realPackage{
 		name: pkgName,
 		label: label,
+		install: true,
 		path: path,
 		src: codeSrc,
 		dst: filepath.Join(tmpPath, "src", label),
@@ -80,6 +84,10 @@ func (p *realPackage) Loc() codeLoc {
 
 func (p *realPackage) HasNonGoCode() (bool, error) {
 	return hasNonGoCode(p.name)
+}
+
+func (p *realPackage) DisableInstall() {
+	p.install = false
 }
 
 func (p *realPackage) GetImports() (importSet, error) {
@@ -118,6 +126,15 @@ func (p *realPackage) insideCommand(command string, args ...string) *exec.Cmd {
 }
 
 func (p *realPackage) needsInstall() (bool, error) {
+	if !p.install {
+		return false, nil
+	}
+
+	if getMark(p.label) == testMark {
+		// we don't install packages marked for test
+		return false, nil
+	}
+
 	d, err := os.Open(p.dst)
 	if err != nil {
 		return false, Cerr{"os.Open", err}
@@ -139,11 +156,6 @@ func (p *realPackage) needsInstall() (bool, error) {
 }
 
 func (p *realPackage) Install() error {
-	if getMark(p.label) == testMark {
-		// we don't install packages marked for test
-		return nil
-	}
-
 	needsInstall, err := p.needsInstall()
 	if err != nil {
 		return Cerr{"p.needsInstall", err}

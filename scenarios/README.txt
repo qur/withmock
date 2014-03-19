@@ -146,3 +146,9 @@ stdlib_cross    - Currently we can mock stdlib packages, but you can't pass the
                   values from a mocked stdlib package to another package because
                   that package is using the real version (and the types are
                   actually different).
+
+other_c_code    - When a package contains a sub directory with a .go file in it
+                  we will try an install it.  However, if we only included the
+                  path because we saw it as a subdirectory then we shouldn't try
+                  to install it.  We should only install packages that are
+                  imported as part of the import chain from the test code.
