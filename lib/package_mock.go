@@ -29,19 +29,33 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		return "", nil, nil
 	}
 
-	out, err := p.cache.Create(filename)
+	f, err := p.cache.GetFile(srcFile)
 	if err != nil {
-		return "", nil, Cerr{"os.Create", err}
+		return "", nil, Cerr{"cache.GetFile", err}
 	}
-	defer out.Close()
+	defer f.Close()
 
-	imports, err := m.file(out, file, srcFile)
-	if err != nil {
-		return "", nil, Cerr{"m.file", err}
+	var name string
+	var imports map[string]bool
+
+	if f.Has(CacheData, "name", "imports") {
+		name = f.Get("name").(string)
+		imports = f.Get("imports").(map[string]bool)
+	} else {
+		i, err := m.file(f, file, srcFile)
+		if err != nil {
+			return "", nil, Cerr{"m.file", err}
+		}
+
+		f.Store("name", file.Name.Name)
+		f.Store("imports", i)
+
+		name = file.Name.Name
+		imports = i
 	}
 
-	if err := out.Install(); err != nil {
-		return "", nil, Cerr{"out.Install", err}
+	if err := f.Install(filename); err != nil {
+		return "", nil, Cerr{"f.Install", err}
 	}
 
 	/*
@@ -51,7 +65,7 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		}
 	*/
 
-	return file.Name.Name, imports, nil
+	return name, imports, nil
 }
 
 func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imports importSet) (string, []string, Interfaces, error) {
@@ -206,7 +220,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 		input := filepath.Join(p.src, name)
 		output := filepath.Join(p.dst, name)
 
-		w, err := p.cache.Create(output)
+		w, err := p.cache.GetFile(input)
 		if err != nil {
 			return nil, Cerr{"os.Create", err}
 		}
@@ -216,7 +230,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 			return nil, Cerr{"rw.Copy", err}
 		}
 
-		if err := w.Install(); err != nil {
+		if err := w.Install(output); err != nil {
 			return nil, Cerr{"w.Install", err}
 		}
 	}

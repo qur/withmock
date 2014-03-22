@@ -173,7 +173,7 @@ func (p *Package) symlinkFile(path, rel string) error {
 func (p *Package) rewriteFile(path, rel string) error {
 	target := filepath.Join(p.dst, rel)
 
-	w, err := p.cache.Create(target)
+	w, err := p.cache.GetFile(path)
 	if err != nil {
 		return Cerr{"os.Create", err}
 	}
@@ -183,7 +183,7 @@ func (p *Package) rewriteFile(path, rel string) error {
 		return Cerr{"p.rw.Copy", err}
 	}
 
-	return w.Install()
+	return w.Install(target)
 }
 
 func (p *Package) disableFile(path, rel string) error {
