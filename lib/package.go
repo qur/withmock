@@ -173,7 +173,7 @@ func (p *Package) symlinkFile(path, rel string) error {
 func (p *Package) rewriteFile(path, rel string) error {
 	target := filepath.Join(p.dst, rel)
 
-	w, err := p.cache.GetFile(path)
+	w, err := p.cache.GetFile(path, "rewriteFile")
 	if err != nil {
 		return Cerr{"os.Create", err}
 	}

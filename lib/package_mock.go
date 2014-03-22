@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"log"
 )
 
 func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, error) {
@@ -29,7 +30,7 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		return "", nil, nil
 	}
 
-	f, err := p.cache.GetFile(srcFile)
+	f, err := p.cache.GetFile(srcFile, "mockFile")
 	if err != nil {
 		return "", nil, Cerr{"cache.GetFile", err}
 	}
@@ -39,9 +40,11 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	var imports map[string]bool
 
 	if f.Has(CacheData, "name", "imports") {
+		log.Printf("cache hit: %s", srcFile)
 		name = f.Get("name").(string)
 		imports = f.Get("imports").(map[string]bool)
 	} else {
+		log.Printf("cache miss: %s", srcFile)
 		i, err := m.file(f, file, srcFile)
 		if err != nil {
 			return "", nil, Cerr{"m.file", err}
@@ -220,7 +223,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 		input := filepath.Join(p.src, name)
 		output := filepath.Join(p.dst, name)
 
-		w, err := p.cache.GetFile(input)
+		w, err := p.cache.GetFile(input, "mockPackage.nonGoSource")
 		if err != nil {
 			return nil, Cerr{"os.Create", err}
 		}
