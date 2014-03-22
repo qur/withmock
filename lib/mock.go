@@ -861,12 +861,26 @@ func getPackageName(impPath, srcPath string) (string, error) {
 	return name, nil
 }
 
-func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]bool, error) {
+type mockFileInfo struct {
+	ImportMap map[string]string
+	Types map[string]ast.Expr
+	Recorders    map[string]string
+	ExtFunctions []string
+}
+
+func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (*mockFileInfo, error) {
 	data, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	defer data.Close()
+
+	info := &mockFileInfo{
+		ImportMap: make(map[string]string),
+		Types: make(map[string]ast.Expr),
+		Recorders: make(map[string]string),
+		ExtFunctions: []string{},
+	}
 
 	// Make sure data is available to exprString/literal
 	m.data = data
@@ -891,7 +905,6 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 		}
 	}
 
-	imports := make(map[string]string)
 	inits := []string{}
 
 	fmt.Fprintf(out, "package %s\n\n", f.Name)
@@ -918,12 +931,12 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 					fmt.Fprintf(out, "import ")
 					if s.Name != nil {
 						fmt.Fprintf(out, "%s ", s.Name)
-						imports[s.Name.String()] = impPath
+						info.ImportMap[s.Name.String()] = impPath
 					} else {
 						name, err := getPackageName(impPath, m.srcPath)
 						if err == nil {
 							fmt.Fprintf(out, "%s ", name)
-							imports[name] = impPath
+							info.ImportMap[name] = impPath
 						} else if !buildTags {
 							// We only return an error if there are no build
 							// tags.  If there are build tags then this file
@@ -945,12 +958,12 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 					fmt.Fprintf(out, "\t")
 					if s.Name != nil {
 						fmt.Fprintf(out, "%s ", s.Name)
-						imports[s.Name.String()] = impPath
+						info.ImportMap[s.Name.String()] = impPath
 					} else {
 						name, err := getPackageName(impPath, m.srcPath)
 						if err == nil {
 							fmt.Fprintf(out, "%s ", name)
-							imports[name] = impPath
+							info.ImportMap[name] = impPath
 						} else if !buildTags {
 							// We only return an error if there are no build
 							// tags.  If there are build tags then this file
@@ -967,15 +980,17 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				if len(d.Specs) == 1 {
 					t := d.Specs[0].(*ast.TypeSpec)
 					fmt.Fprintf(out, "type %s %s\n\n", t.Name, m.exprString(t.Type))
-					m.types[t.Name.String()] = t.Type
-					m.ifInfo.addType(t, imports)
+					info.Types[t.Name.Name] = t.Type
+					//QQQ:m.types[t.Name.String()] = t.Type
+					//QQQ:m.ifInfo.addType(t, imports)
 				} else {
 					fmt.Fprintf(out, "type (\n")
 					for i := range d.Specs {
 						t := d.Specs[i].(*ast.TypeSpec)
 						fmt.Fprintf(out, "\t%s %s\n", t.Name, m.exprString(t.Type))
-						m.types[t.Name.String()] = t.Type
-						m.ifInfo.addType(t, imports)
+						info.Types[t.Name.Name] = t.Type
+						//QQQ:m.types[t.Name.String()] = t.Type
+						//QQQ:m.ifInfo.addType(t, imports)
 					}
 					fmt.Fprintf(out, ")\n\n")
 				}
@@ -1042,7 +1057,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				if s, ok := d.Recv.List[0].Type.(*ast.StarExpr); ok {
 					recorder = fmt.Sprintf("_%s_Rec", m.exprString(s.X))
 				}
-				m.recorders[t] = recorder
+				info.Recorders[t] = recorder
 			}
 			for _, param := range d.Type.Params.List {
 				p := field{
@@ -1091,7 +1106,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 			}
 			if d.Name.IsExported() {
 				if d.Body == nil {
-					m.extFunctions = append(m.extFunctions, d.Name.Name)
+					info.ExtFunctions = append(info.ExtFunctions, d.Name.Name)
 				}
 				fi.writeMock(out)
 				fi.writeRecorder(out, recorder)
@@ -1111,15 +1126,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 	fmt.Fprintf(out, "\tcallInits(%s)\n", strings.Join(inits, ", "))
 	fmt.Fprintf(out, "}\n")
 
-	i := map[string]bool{
-		"github.com/qur/gomock/interfaces": false,
-	}
-
-	for _, impPath := range imports {
-		i[impPath] = false
-	}
-
-	return i, nil
+	return info, nil
 }
 
 func copyData(a, b token.Pos, fset *token.FileSet, data io.ReadSeeker, out io.Writer) error {
@@ -1272,7 +1279,7 @@ func loadInterfaceInfo(impPath string) (*ifInfo, error) {
 					if d.Tok == token.TYPE {
 						for i := range d.Specs {
 							t := d.Specs[i].(*ast.TypeSpec)
-							ifInfo.addType(t, imports)
+							ifInfo.addType(t.Name.Name, t.Type, imports)
 						}
 					}
 				}

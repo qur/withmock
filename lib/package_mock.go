@@ -37,12 +37,12 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	defer f.Close()
 
 	var name string
-	var imports map[string]bool
+	var info *mockFileInfo
 
-	if f.Has(CacheData, "name", "imports") {
+	if f.Has(CacheData, "name", "info") {
 		log.Printf("cache hit: %s", srcFile)
 		name = f.Get("name").(string)
-		imports = f.Get("imports").(map[string]bool)
+		info = f.Get("info").(*mockFileInfo)
 	} else {
 		log.Printf("cache miss: %s", srcFile)
 		i, err := m.file(f, file, srcFile)
@@ -51,12 +51,29 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		}
 
 		f.Store("name", file.Name.Name)
-		f.Store("imports", i)
+		f.Store("info", i)
 
 		name = file.Name.Name
-		imports = i
+		info = i
 	}
 
+	// Update m using the information provided by m.file
+
+	for n, t := range info.Types {
+		m.types[n] = t
+		m.ifInfo.addType(n, t, info.ImportMap)
+		breakLoops(t)
+	}
+
+	for t, r := range info.Recorders {
+		m.recorders[t] = r
+	}
+
+	for _, name := range info.ExtFunctions {
+		m.extFunctions = append(m.extFunctions, name)
+	}
+
+	// Create the actual file in the src tree
 	if err := f.Install(filename); err != nil {
 		return "", nil, Cerr{"f.Install", err}
 	}
@@ -67,6 +84,16 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 			return "", nil, Cerr{"fixup", err}
 		}
 	*/
+
+	// Construct the imports map to return
+
+	imports := map[string]bool{
+		"github.com/qur/gomock/interfaces": false,
+	}
+
+	for _, impPath := range info.ImportMap {
+		imports[impPath] = false
+	}
 
 	return name, imports, nil
 }

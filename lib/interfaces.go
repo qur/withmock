@@ -80,8 +80,8 @@ func (ii *ifInfo) addImport(name, path string) {
 	ii.imports[name] = path
 }
 
-func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
-	i, ok := t.Type.(*ast.InterfaceType)
+func (ii *ifInfo) addType(tName string, t ast.Expr, imports map[string]string) {
+	i, ok := t.(*ast.InterfaceType)
 	if !ok {
 		// Only care about interfaces
 		return
@@ -97,7 +97,7 @@ func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
 				impPath, ok := imports[scope]
 				if !ok {
 					panic(fmt.Sprintf("Unkown package %s in interface %s",
-						scope, t.Name))
+						scope, tName))
 				}
 				ii.addImport(scope, impPath)
 			}
@@ -112,7 +112,7 @@ func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
 			impPath, ok := imports[p.String()]
 			if !ok {
 				panic(fmt.Sprintf("Unkown package %s in interface %s",
-					p, t.Name))
+					p, tName))
 			}
 			ii.addImport(p.String(), impPath)
 			id.addExternal(p.String(), impPath, v.Sel.String())
@@ -121,7 +121,7 @@ func (ii *ifInfo) addType(t *ast.TypeSpec, imports map[string]string) {
 		}
 	}
 
-	ii.types[t.Name.String()] = id
+	ii.types[tName] = id
 }
 
 type Interfaces map[string]*ifInfo

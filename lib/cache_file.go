@@ -6,22 +6,24 @@ package lib
 
 import (
 	"crypto/sha512"
+	"encoding/gob"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"go/ast"
 	"hash"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"encoding/json"
-	"encoding/gob"
-	"fmt"
-	"log"
 )
 
 const CacheData = "_DATA_"
 
 func init() {
 	gob.Register(map[string]bool{})
+	gob.Register(&mockFileInfo{})
+	registerAstTypes()
 }
 
 type cacheFileKey struct {
@@ -71,12 +73,19 @@ type CacheFile struct {
 }
 
 func (c *Cache) loadFile(key *cacheFileKey) (*CacheFile, error) {
+	dir := filepath.Join(c.root, "files")
+
+	tf, err := ioutil.TempFile(dir, "withmock-cache-")
+	if err != nil {
+		return nil, Cerr{"TempFile", err}
+	}
+
 	cf := &CacheFile{
 		key: key,
-		f: nil,
+		f: tf,
 		written: false,
 		changed: false,
-		h: nil,
+		h: sha512.New(),
 		cache: c,
 		hash: "",
 		data: nil,
@@ -105,12 +114,10 @@ func (c *Cache) GetFile(src, operation string) (*CacheFile, error) {
 
 	cf, err := c.loadFile(key)
 	if err == nil {
-		log.Printf("load cache: %s:%s", operation, src)
 		return cf, nil
 	}
 
 	if !os.IsNotExist(err) {
-		log.Printf("load failed: %s:%s", operation, src)
 		return nil, Cerr{"loadFile", err}
 	}
 
@@ -124,7 +131,7 @@ func (c *Cache) GetFile(src, operation string) (*CacheFile, error) {
 
 	f, err := ioutil.TempFile(dir, "withmock-cache-")
 	if err != nil {
-		return nil, Cerr{"os.Create", err}
+		return nil, Cerr{"TempFile", err}
 	}
 
 	return &CacheFile{
@@ -209,11 +216,9 @@ func (f *CacheFile) Install(path string) error {
 			return Cerr{"os.MkdirAll", err}
 		}
 
-		path := filepath.Join(f.cache.root, "metadata", f.key.Hash())
-
-		w, err := os.Create(path)
+		w, err := ioutil.TempFile(dir, "withmock-cache-")
 		if err != nil {
-			return Cerr{"os.Create", err}
+			return Cerr{"TempFile", err}
 		}
 		defer w.Close()
 
@@ -221,6 +226,13 @@ func (f *CacheFile) Install(path string) error {
 
 		if err := enc.Encode(f.data); err != nil {
 			return Cerr{"gob.Encode", err}
+		}
+
+		path := filepath.Join(f.cache.root, "metadata", f.key.Hash())
+
+		w.Close()
+		if err := os.Rename(w.Name(), path); err != nil {
+			return Cerr{"os.Rename", err}
 		}
 	}
 
@@ -257,4 +269,64 @@ func (f *CacheFile) Get(name string) interface{} {
 func (f *CacheFile) Lookup(name string) (interface{}, bool) {
 	value, found := f.data[name]
 	return value, found
+}
+
+func registerAstTypes() {
+	gob.Register(&ast.ArrayType{})
+	gob.Register(&ast.AssignStmt{})
+	gob.Register(&ast.BadDecl{})
+	gob.Register(&ast.BadExpr{})
+	gob.Register(&ast.BadStmt{})
+	gob.Register(&ast.BasicLit{})
+	gob.Register(&ast.BinaryExpr{})
+	gob.Register(&ast.BlockStmt{})
+	gob.Register(&ast.BranchStmt{})
+	gob.Register(&ast.CallExpr{})
+	gob.Register(&ast.CaseClause{})
+	gob.Register(&ast.ChanType{})
+	gob.Register(&ast.CommClause{})
+	gob.Register(&ast.Comment{})
+	gob.Register(&ast.CommentGroup{})
+	gob.Register(&ast.CompositeLit{})
+	gob.Register(&ast.DeclStmt{})
+	gob.Register(&ast.DeferStmt{})
+	gob.Register(&ast.Ellipsis{})
+	gob.Register(&ast.EmptyStmt{})
+	gob.Register(&ast.ExprStmt{})
+	gob.Register(&ast.Field{})
+	gob.Register(&ast.FieldList{})
+	gob.Register(&ast.File{})
+	gob.Register(&ast.ForStmt{})
+	gob.Register(&ast.FuncDecl{})
+	gob.Register(&ast.FuncLit{})
+	gob.Register(&ast.FuncType{})
+	gob.Register(&ast.GenDecl{})
+	gob.Register(&ast.GoStmt{})
+	gob.Register(&ast.Ident{})
+	gob.Register(&ast.IfStmt{})
+	gob.Register(&ast.ImportSpec{})
+	gob.Register(&ast.IncDecStmt{})
+	gob.Register(&ast.IndexExpr{})
+	gob.Register(&ast.InterfaceType{})
+	gob.Register(&ast.KeyValueExpr{})
+	gob.Register(&ast.LabeledStmt{})
+	gob.Register(&ast.MapType{})
+	gob.Register(&ast.Object{})
+	gob.Register(&ast.Package{})
+	gob.Register(&ast.ParenExpr{})
+	gob.Register(&ast.RangeStmt{})
+	gob.Register(&ast.ReturnStmt{})
+	gob.Register(&ast.Scope{})
+	gob.Register(&ast.SelectStmt{})
+	gob.Register(&ast.SelectorExpr{})
+	gob.Register(&ast.SendStmt{})
+	gob.Register(&ast.SliceExpr{})
+	gob.Register(&ast.StarExpr{})
+	gob.Register(&ast.StructType{})
+	gob.Register(&ast.SwitchStmt{})
+	gob.Register(&ast.TypeAssertExpr{})
+	gob.Register(&ast.TypeSpec{})
+	gob.Register(&ast.TypeSwitchStmt{})
+	gob.Register(&ast.UnaryExpr{})
+	gob.Register(&ast.ValueSpec{})
 }
