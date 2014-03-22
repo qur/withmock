@@ -204,25 +204,7 @@ func (c *Context) mockStdlib() error {
 	}
 
 	for pkgName, pkg := range pkgs {
-		imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)
-		if err != nil {
-			return Cerr{"GetOuput(go list .Deps)", err}
-		}
-
-		for _, name := range strings.Split(imports, "\n") {
-			name = strings.TrimSpace(name)
-
-			if name == "" || name == "github.com/qur/gomock/interfaces" {
-				continue
-			}
-			_, found := deps[name]
-			if !found {
-				return fmt.Errorf("missing dependency %s for %s", name, pkgName)
-			}
-			deps[pkgName][name] = true
-		}
-
-		if  pkgName == "runtime" || pkgName == "unsafe" || strings.HasPrefix(pkgName, "runtime/") {
+		if pkgName == "runtime" || pkgName == "unsafe" || strings.HasPrefix(pkgName, "runtime/") {
 			// We need special handling for the unsafe and runtime packages.
 			// All packages (apart from unsafe and runtime) get an automatic
 			// dependancy on runtime, which itself depends on unsafe.  This
@@ -238,11 +220,43 @@ func (c *Context) mockStdlib() error {
 			if err := pkg.DisableAllMocks();  err != nil {
 				return Cerr{"pkg.Link", err}
 			}
-		} else {
-			cfg := c.cfg.Mock(pkgName)
-			if _, err := pkg.Gen(false, cfg); err != nil {
-				return Cerr{"pkg.Gen", err}
+
+			imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)
+			if err != nil {
+				return Cerr{"GetOuput(go list .Deps)", err}
 			}
+
+			for _, name := range strings.Split(imports, "\n") {
+				name = strings.TrimSpace(name)
+
+				if name == "" || name == "github.com/qur/gomock/interfaces" {
+					continue
+				}
+				_, found := deps[name]
+				if !found {
+					return fmt.Errorf("missing dependency %s for %s", name, pkgName)
+				}
+				deps[pkgName][name] = true
+			}
+
+			continue
+		}
+
+		cfg := c.cfg.Mock(pkgName)
+		imports, err := pkg.Gen(false, cfg)
+		if err != nil {
+			return Cerr{"pkg.Gen", err}
+		}
+
+		for name, imp := range imports {
+			if !imp.ShouldInstall() || name == "github.com/qur/gomock/interfaces" || name == "C" {
+				continue
+			}
+			_, found := deps[name]
+			if !found {
+				return fmt.Errorf("missing dependency %s for %s", name, pkgName)
+			}
+			deps[pkgName][name] = true
 		}
 	}
 
