@@ -40,11 +40,9 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	var info *mockFileInfo
 
 	if f.Has(CacheData, "name", "info") {
-		log.Printf("cache hit: %s", srcFile)
 		name = f.Get("name").(string)
 		info = f.Get("info").(*mockFileInfo)
 	} else {
-		log.Printf("cache miss: %s", srcFile)
 		i, err := m.file(f, file, srcFile)
 		if err != nil {
 			return "", nil, Cerr{"m.file", err}
