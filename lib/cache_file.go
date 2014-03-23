@@ -16,7 +16,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"log"
 )
 
 const CacheData = "_DATA_"
@@ -64,17 +63,13 @@ func (k *CacheFileKey) Hash() string {
 func (k *CacheFileKey) calcHash() {
 	h := sha512.New()
 
-	w := io.MultiWriter(h, os.Stdout)
-
-	enc := json.NewEncoder(w)
+	enc := json.NewEncoder(h)
 
 	if err := enc.Encode(k); err != nil {
 		panic("Failed to JSON encode cacheFileKey instance: " + err.Error())
 	}
 
 	k.hash = hex.EncodeToString(h.Sum(nil))
-
-	log.Printf("key(%v): %s", k.Files, k.hash)
 }
 
 type CacheFile struct {
@@ -127,8 +122,6 @@ func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
 	if err := dec.Decode(&cf.data); err != nil {
 		return nil, Cerr{"gob.Decode", err}
 	}
-
-	log.Printf("load metadata: %v", cf.data)
 
 	cf.written = cf.HasData()
 	cf.hash = cf.data[CacheData].(string)
@@ -265,8 +258,6 @@ func (f *CacheFile) Install(path string) error {
 		return Cerr{"f.Close", err}
 	}
 
-	log.Printf("cache install 1: %s", path)
-
 	if f.written {
 		// Get the hash from data - as we could be installing either a new file,
 		// or one entirely loaded from the cache ...
@@ -282,8 +273,6 @@ func (f *CacheFile) Install(path string) error {
 		}
 
 		name := filepath.Join(f.cache.root, "files", hash.(string))
-
-		log.Printf("cache install 2: %s -> %s", hash, path)
 
 		if err := os.Link(name, path); err != nil {
 			if err := os.Symlink(name, path); err != nil {
@@ -310,8 +299,6 @@ func (f *CacheFile) Install(path string) error {
 		if err := enc.Encode(f.data); err != nil {
 			return Cerr{"gob.Encode", err}
 		}
-
-		log.Printf("store metadata: %v", f.data)
 
 		path := filepath.Join(f.cache.root, "metadata", f.key.Hash())
 

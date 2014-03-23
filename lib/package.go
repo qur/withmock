@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"log"
 )
 
 type Package struct {
@@ -315,8 +314,6 @@ func (p *Package) Install() error {
 		return Cerr{"p.needsInstall", err}
 	}
 
-	log.Printf("install %s: %v", p.label, needsInstall)
-
 	if !needsInstall {
 		return nil
 	}
@@ -332,7 +329,6 @@ func (p *Package) Install() error {
 		err := f.WriteFunc(func(dest string) error {
 			cmd := p.insideCommand("go", "build", "-o", dest, p.label)
 			out, err := cmd.CombinedOutput()
-			log.Printf("go build %s: %s", p.label, out)
 			if err != nil {
 				return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
 					p.label, err, out)
