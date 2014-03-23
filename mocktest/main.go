@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/qur/withmock/lib"
+	"log"
 )
 
 var (
@@ -58,6 +59,10 @@ func main() {
 }
 
 func doit() error {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
+	log.Printf("START: overall")
+
 	// Before we get to work, parse the command line
 
 	flag.Usage = usage
@@ -137,6 +142,7 @@ func doit() error {
 	// Now we add the packages that we want to test to the context, this will
 	// install the imports used by those packages (mocking them as approprite).
 
+	log.Printf("START: AddPackage")
 	for _, pkg := range pkgs {
 		name, err := ctxt.AddPackage(pkg)
 		if err != nil {
@@ -144,17 +150,21 @@ func doit() error {
 		}
 		args = append(args, name)
 	}
+	log.Printf("END: AddPackage")
 
 	// Add extra packages if configured
 
+	log.Printf("START: LinkPkg")
 	if *pkgFile != "" {
 		if err := ctxt.LinkPackagesFromFile(*pkgFile); err != nil {
 			return lib.Cerr{"LinkPackagesFromFile", err}
 		}
 	}
+	log.Printf("END: LinkPkg")
 
 	// Add in the gocov library, so that we can run with gocov if we want.
 
+	log.Printf("START: gocov")
 	if *gocov {
 		if *compile {
 			return fmt.Errorf("gocov doesn't provide a compiliation only mode.")
@@ -164,12 +174,17 @@ func doit() error {
 		}
 		command = "gocov"
 	}
+	log.Printf("END: gocov")
 
 	// Finally we can run the command inside the context
 
+	log.Printf("START: Run")
 	if err := ctxt.Run(command, args...); err != nil {
 		return lib.Cerr{"Run", err}
 	}
+	log.Printf("END: Run")
+
+	log.Printf("END: overall")
 
 	return nil
 }

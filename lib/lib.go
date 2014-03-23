@@ -15,6 +15,30 @@ import (
 	"strings"
 )
 
+var (
+	goOs, goArch string
+)
+
+func GetOsArch() string {
+	if goOs != "" && goArch != "" {
+		return goOs + "_" + goArch
+	}
+
+	var err error
+
+	goOs, err = GetOutput("go", "env", "GOOS")
+	if err != nil {
+		panic("Failed to get GOOS from go env: " + err.Error())
+	}
+
+	goArch, err = GetOutput("go", "env", "GOARCH")
+	if err != nil {
+		panic("Failed to get GOARCH from go env: " + err.Error())
+	}
+
+	return goOs + "_" + goArch
+}
+
 func LookupImportPath(impPath string) (string, error) {
 	if strings.HasPrefix(impPath, "_/") {
 		// special case if impPath is outside of GOPATH

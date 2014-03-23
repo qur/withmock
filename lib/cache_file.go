@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"log"
 )
 
 const CacheData = "_DATA_"
@@ -26,22 +27,33 @@ func init() {
 	registerAstTypes()
 }
 
-type cacheFileKey struct {
+type cacheFileDetails struct {
 	Src string `json:"src"`
+}
+
+type CacheFileKey struct {
 	Op string `json:"op"`
+	Files []cacheFileDetails `json:"files"`
 	hash string
 }
 
-func (c *Cache) newCacheFileKey(src, op string) *cacheFileKey {
+func (c *Cache) NewCacheFileKey(op string, srcs ...string) *CacheFileKey {
 	// TODO: need to include file size, mode, hash etc in key ...
 
-	return &cacheFileKey{
-		Src: src,
+	files := make([]cacheFileDetails, len(srcs))
+	for i, src := range srcs {
+		files[i] = cacheFileDetails{
+			Src: src,
+		}
+	}
+
+	return &CacheFileKey{
 		Op: op,
+		Files: files,
 	}
 }
 
-func (k *cacheFileKey) Hash() string {
+func (k *CacheFileKey) Hash() string {
 	if k.hash == "" {
 		k.calcHash()
 	}
@@ -49,21 +61,26 @@ func (k *cacheFileKey) Hash() string {
 	return k.hash
 }
 
-func (k *cacheFileKey) calcHash() {
+func (k *CacheFileKey) calcHash() {
 	h := sha512.New()
 
-	enc := json.NewEncoder(h)
+	w := io.MultiWriter(h, os.Stdout)
+
+	enc := json.NewEncoder(w)
 
 	if err := enc.Encode(k); err != nil {
 		panic("Failed to JSON encode cacheFileKey instance: " + err.Error())
 	}
 
 	k.hash = hex.EncodeToString(h.Sum(nil))
+
+	log.Printf("key(%v): %s", k.Files, k.hash)
 }
 
 type CacheFile struct {
-	key *cacheFileKey
+	key *CacheFileKey
 	f *os.File
+	tmpName string
 	written bool
 	changed bool
 	h hash.Hash
@@ -72,8 +89,12 @@ type CacheFile struct {
 	data map[string]interface{}
 }
 
-func (c *Cache) loadFile(key *cacheFileKey) (*CacheFile, error) {
+func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
 	dir := filepath.Join(c.root, "files")
+
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, Cerr{"os.MkdirAll", err}
+	}
 
 	tf, err := ioutil.TempFile(dir, "withmock-cache-")
 	if err != nil {
@@ -83,6 +104,7 @@ func (c *Cache) loadFile(key *cacheFileKey) (*CacheFile, error) {
 	cf := &CacheFile{
 		key: key,
 		f: tf,
+		tmpName: tf.Name(),
 		written: false,
 		changed: false,
 		h: sha512.New(),
@@ -106,12 +128,15 @@ func (c *Cache) loadFile(key *cacheFileKey) (*CacheFile, error) {
 		return nil, Cerr{"gob.Decode", err}
 	}
 
+	log.Printf("load metadata: %v", cf.data)
+
+	cf.written = cf.HasData()
+	cf.hash = cf.data[CacheData].(string)
+
 	return cf, nil
 }
 
-func (c *Cache) GetFile(src, operation string) (*CacheFile, error) {
-	key := c.newCacheFileKey(src, operation)
-
+func (c *Cache) GetFile(key *CacheFileKey) (*CacheFile, error) {
 	cf, err := c.loadFile(key)
 	if err == nil {
 		return cf, nil
@@ -137,6 +162,7 @@ func (c *Cache) GetFile(src, operation string) (*CacheFile, error) {
 	return &CacheFile{
 		key: key,
 		f: f,
+		tmpName: f.Name(),
 		written: false,
 		changed: false,
 		h: sha512.New(),
@@ -149,6 +175,49 @@ func (c *Cache) GetFile(src, operation string) (*CacheFile, error) {
 func (f *CacheFile) Write(p []byte) (int, error) {
 	f.written = true
 	return io.MultiWriter(f.f, f.h).Write(p)
+}
+
+func (f *CacheFile) WriteFunc(w func(string) error) error {
+	f.written = true
+
+	// Get rid of f.f - w is going to make the file directly
+
+	if err := f.f.Close(); err != nil {
+		return Cerr{"os.File.Close", err}
+	}
+	f.f = nil
+
+	if err := os.Remove(f.tmpName); err != nil {
+		return Cerr{"os.Remove", err}
+	}
+
+	// Call w to write the file content
+
+	if err := w(f.tmpName); err != nil {
+		return Cerr{"w", err}
+	}
+
+	// And now we need to read it into the hash
+
+	i, err := os.Open(f.tmpName)
+	if os.IsNotExist(err) {
+		// w didn't actually create a file - so reset the written flag, and we
+		// are done.
+		f.written = false
+		return nil
+	}
+	if err != nil {
+		return Cerr{"os.Open", err}
+	}
+	defer i.Close()
+
+	if _, err := io.Copy(f.h, i); err != nil {
+		return Cerr{"io.Copy", err}
+	}
+
+	// done
+
+	return nil
 }
 
 func (f *CacheFile) Hash() string {
@@ -167,8 +236,10 @@ func (f *CacheFile) Close() error {
 
 	f.changed = true
 
-	if err := f.f.Close(); err != nil {
-		return Cerr{"os.File.Close", err}
+	if f.f != nil {
+		if err := f.f.Close(); err != nil {
+			return Cerr{"os.File.Close", err}
+		}
 	}
 
 	// TODO: should be adding size into the hash calculation ...
@@ -176,7 +247,7 @@ func (f *CacheFile) Close() error {
 
 	name := filepath.Join(f.cache.root, "files", f.hash)
 
-	if err := os.Rename(f.f.Name(), name); err != nil {
+	if err := os.Rename(f.tmpName, name); err != nil {
 		return Cerr{"os.Rename", err}
 	}
 
@@ -194,18 +265,30 @@ func (f *CacheFile) Install(path string) error {
 		return Cerr{"f.Close", err}
 	}
 
-	// Get the hash from data - as we could be installing either a new file, or
-	// one entirely loaded from the cache ...
-	hash, found := f.data[CacheData]
-	if !found {
-		return fmt.Errorf("Failed to get hash")
-	}
+	log.Printf("cache install 1: %s", path)
 
-	name := filepath.Join(f.cache.root, "files", hash.(string))
+	if f.written {
+		// Get the hash from data - as we could be installing either a new file,
+		// or one entirely loaded from the cache ...
+		hash, found := f.data[CacheData]
+		if !found {
+			return fmt.Errorf("Failed to get hash")
+		}
 
-	if err := os.Link(name, path); err != nil {
-		if err := os.Symlink(name, path); err != nil {
-			return Cerr{"os.Symlink", err}
+		dir := filepath.Dir(path)
+
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return Cerr{"os.MkdirAll", err}
+		}
+
+		name := filepath.Join(f.cache.root, "files", hash.(string))
+
+		log.Printf("cache install 2: %s -> %s", hash, path)
+
+		if err := os.Link(name, path); err != nil {
+			if err := os.Symlink(name, path); err != nil {
+				return Cerr{"os.Symlink", err}
+			}
 		}
 	}
 
@@ -227,6 +310,8 @@ func (f *CacheFile) Install(path string) error {
 		if err := enc.Encode(f.data); err != nil {
 			return Cerr{"gob.Encode", err}
 		}
+
+		log.Printf("store metadata: %v", f.data)
 
 		path := filepath.Join(f.cache.root, "metadata", f.key.Hash())
 

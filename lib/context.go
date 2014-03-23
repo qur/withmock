@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"log"
 )
 
 type Context struct {
@@ -203,6 +204,8 @@ func (c *Context) mockStdlib() error {
 		deps[pkgName] = make(map[string]bool)
 	}
 
+	log.Printf("START: stdlib mock")
+
 	for pkgName, pkg := range pkgs {
 		if pkgName == "runtime" || pkgName == "unsafe" || strings.HasPrefix(pkgName, "runtime/") {
 			// We need special handling for the unsafe and runtime packages.
@@ -215,6 +218,7 @@ func (c *Context) mockStdlib() error {
 			continue
 		}
 
+		log.Printf("START: gen")
 		if pkgName == "testing" || strings.HasPrefix(pkgName, "testing/") {
 			// We don't want to mock testing - that just doesn't make sense ...
 			if err := pkg.DisableAllMocks();  err != nil {
@@ -258,7 +262,11 @@ func (c *Context) mockStdlib() error {
 			}
 			deps[pkgName][name] = true
 		}
+
+		log.Printf("END: gen")
 	}
+
+	log.Printf("END: stdlib mock")
 
 	// Now that we have done all the other packages we can do the runtime and
 	// unsafe packages.
@@ -307,6 +315,8 @@ func (c *Context) mockStdlib() error {
 		}
 	}
 
+	log.Printf("START: stdlib install")
+
 	// Install the packages in reverse depedency order
 	last := len(deps)
 	for len(deps) > 0 {
@@ -343,6 +353,8 @@ func (c *Context) mockStdlib() error {
 
 		last = len(deps)
 	}
+
+	log.Printf("END: stdlib install")
 
 	return nil
 }
@@ -651,21 +663,27 @@ func (c *Context) addRequiredPackages() error {
 func (c *Context) Run(command string, args ...string) error {
 	// Make sure required packages are installed
 
+	log.Printf("START: addReqPkg")
 	if err := c.addRequiredPackages(); err != nil {
 		return Cerr{"c.addRequiredPackages", err}
 	}
+	log.Printf("END: addReqPkg")
 
 	// Create a mocked version of the stdlib
 
+	log.Printf("START: mock stdlib")
 	if err := c.mockStdlib(); err != nil {
 		return Cerr{"c.mockStdlib", err}
 	}
+	log.Printf("END: mock stdlib")
 
 	// Install the packages inside the context
 
+	log.Printf("START: install pkgs")
 	if err := c.installPackages(); err != nil {
 		return Cerr{"c.installPackages", err}
 	}
+	log.Printf("END: install pkgs")
 
 	// Create a Command object
 

@@ -30,7 +30,8 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		return "", nil, nil
 	}
 
-	f, err := p.cache.GetFile(srcFile, "mockFile")
+	key := p.cache.NewCacheFileKey("mockFile", srcFile)
+	f, err := p.cache.GetFile(key)
 	if err != nil {
 		return "", nil, Cerr{"cache.GetFile", err}
 	}
@@ -122,6 +123,7 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 
 	cfg.MatchOSArch = true
 
+	log.Printf("START: mockFile loop")
 	for _, base := range files {
 		// If only considering files for this OS/Arch, then reject files
 		// that aren't for this OS/Arch based on filename.
@@ -150,6 +152,7 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 			imports.Set(path, importNormal, "")
 		}
 	}
+	log.Printf("END: mockFile loop")
 
 	// If we skipped over all the files for this package, then ignore it
 	// entirely.
@@ -159,6 +162,7 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 
 	filename := filepath.Join(p.dst, pkg+"_mock.go")
 
+	log.Printf("START: m.pkg")
 	out, err := os.Create(filename)
 	if err != nil {
 		return "", nil, nil, Cerr{"os.Create", err}
@@ -176,6 +180,7 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 	if err != nil {
 		return "", nil, nil, Cerr{"fixup", err}
 	}
+	log.Printf("END: m.pkg")
 
 	m.ifInfo.filename = filepath.Join(p.dst, pkg+"_ifmocks.go")
 	interfaces[pkg] = m.ifInfo
@@ -205,6 +210,9 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 		if strings.HasSuffix(name, "_test.go") {
 			return nil
 		}
+
+		p.files = append(p.files, path)
+
 		if strings.HasSuffix(name, ".go") {
 			goFiles = append(goFiles, name)
 			return nil
@@ -217,23 +225,30 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 		return nil
 	}
 
+	log.Printf("START: mockPackage.walk")
 	if err := walk(p.src, p.dst, processDir, processFile); err != nil {
 		return nil, Cerr{"walk", err}
 	}
+	log.Printf("END: mockPackage.walk")
 
+	log.Printf("START: mockFiles")
 	pkg, externalFunctions, interfaces, err := p.mockFiles(goFiles, byDefault, cfg, imports)
 	if err != nil {
 		return nil, Cerr{"mockFiles", err}
 	}
+	log.Printf("END: mockFiles")
 
+	log.Printf("START: genInterfaces")
 	if err := genInterfaces(interfaces); err != nil {
 		return nil, Cerr{"genInterfaces", err}
 	}
+	log.Printf("END: genInterfaces")
 
 	if cfg.IgnoreNonGoFiles {
 		return imports, nil
 	}
 
+	log.Printf("START: mockPackage.rewrite")
 	// Load up a rewriter with the rewrites for the external functions
 	rw := NewRewriter(nil)
 	for _, fname := range externalFunctions {
@@ -248,7 +263,8 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 		input := filepath.Join(p.src, name)
 		output := filepath.Join(p.dst, name)
 
-		w, err := p.cache.GetFile(input, "mockPackage.nonGoSource")
+		key := p.cache.NewCacheFileKey("mockPackage.nonGoSource", input)
+		w, err := p.cache.GetFile(key)
 		if err != nil {
 			return nil, Cerr{"os.Create", err}
 		}
@@ -273,6 +289,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 			return nil, Cerr{"os.Symlink", err}
 		}
 	}
+	log.Printf("END: mockPackage.rewrite")
 
 	return imports, nil
 }

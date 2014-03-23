@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"log"
 )
 
 type Package struct {
@@ -19,12 +20,14 @@ type Package struct {
 	label string
 	install bool
 	src, dst string
+	pkgDst string
 	tmpDir string
 	tmpPath string
 	goPath string
 	rw *rewriter
 	fset *token.FileSet
 	cache *Cache
+	files []string
 }
 
 func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
@@ -46,6 +49,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 		install: true,
 		src: codeSrc,
 		dst: filepath.Join(tmpPath, "src", label),
+		pkgDst: filepath.Join(tmpPath, "pkg", GetOsArch(), label + ".a"),
 		tmpDir: tmpDir,
 		tmpPath: tmpPath,
 		goPath: goPath,
@@ -75,6 +79,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Pac
 		install: true,
 		src: codeSrc,
 		dst: filepath.Join(tmpRoot, "src", "pkg", label),
+		pkgDst: filepath.Join(tmpRoot, "pkg", GetOsArch(), label + ".a"),
 		tmpDir: tmpDir,
 		tmpPath: tmpPath,
 		goPath: goRoot,
@@ -156,6 +161,8 @@ func (p *Package) MockImports(importNames map[string]string, cfg *Config) error 
 	return processSingleDir(p.src, p.dst, func(path, rel string) error {
 		target := filepath.Join(p.dst, rel)
 
+		p.files = append(p.files, path)
+
 		// Non-code we leave alone, code may need modification
 		if !strings.HasSuffix(path, ".go") {
 			return os.Symlink(path, target)
@@ -168,13 +175,18 @@ func (p *Package) MockImports(importNames map[string]string, cfg *Config) error 
 func (p *Package) symlinkFile(path, rel string) error {
 	target := filepath.Join(p.dst, rel)
 
+	p.files = append(p.files, path)
+
 	return os.Symlink(path, target)
 }
 
 func (p *Package) rewriteFile(path, rel string) error {
 	target := filepath.Join(p.dst, rel)
 
-	w, err := p.cache.GetFile(path, "rewriteFile")
+	p.files = append(p.files, path)
+
+	key := p.cache.NewCacheFileKey("rewriteFile", path)
+	w, err := p.cache.GetFile(key)
 	if err != nil {
 		return Cerr{"os.Create", err}
 	}
@@ -189,6 +201,8 @@ func (p *Package) rewriteFile(path, rel string) error {
 
 func (p *Package) disableFile(path, rel string) error {
 	target := filepath.Join(p.dst, rel)
+
+	p.files = append(p.files, path)
 
 	if strings.HasSuffix(path, ".go") {
 		return addMockDisables(path, target)
@@ -301,15 +315,38 @@ func (p *Package) Install() error {
 		return Cerr{"p.needsInstall", err}
 	}
 
+	log.Printf("install %s: %v", p.label, needsInstall)
+
 	if !needsInstall {
 		return nil
 	}
 
-	cmd := p.insideCommand("go", "install", p.label)
-	out, err := cmd.CombinedOutput()
+	key := p.cache.NewCacheFileKey("install", p.files...)
+	f, err := p.cache.GetFile(key)
 	if err != nil {
-		return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
-			p.label, err, out)
+		return Cerr{"cache.GetFile", err}
 	}
+	defer f.Close()
+
+	if !f.HasData() {
+		err := f.WriteFunc(func(dest string) error {
+			cmd := p.insideCommand("go", "build", "-o", dest, p.label)
+			out, err := cmd.CombinedOutput()
+			log.Printf("go build %s: %s", p.label, out)
+			if err != nil {
+				return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
+					p.label, err, out)
+			}
+			return nil
+		})
+		if err != nil {
+			return Cerr{"WriteFunc", err}
+		}
+	}
+
+	if err := f.Install(p.pkgDst); err != nil {
+		return Cerr{"f.Install", err}
+	}
+
 	return nil
 }
