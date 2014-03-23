@@ -316,11 +316,10 @@ func (c *Context) mockStdlib() error {
 				continue
 			}
 
-			cmd := c.insideCommand("go", "install", name)
-			out, err := cmd.CombinedOutput()
-			if err != nil {
-				return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
-					name, err, out)
+			pkg := pkgs[name]
+
+			if err := pkg.Install(); err != nil {
+				return Cerr{"pkg.Install", err}
 			}
 
 			inst = append(inst, name)

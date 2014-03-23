@@ -66,6 +66,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Pac
 		return nil, Cerr{"OpenCache", err}
 	}
 
+	tmpPath := getTmpPath(tmpDir)
 	tmpRoot := getTmpRoot(tmpDir)
 
 	return &Package{
@@ -75,7 +76,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Pac
 		src: codeSrc,
 		dst: filepath.Join(tmpRoot, "src", "pkg", label),
 		tmpDir: tmpDir,
-		tmpPath: tmpRoot,
+		tmpPath: tmpPath,
 		goPath: goRoot,
 		rw: rw,
 		fset: token.NewFileSet(),
