@@ -222,7 +222,7 @@ func (c *Context) mockStdlib() error {
 	log.Printf("START: stdlib mock")
 
 	for pkgName, pkg := range pkgs {
-		if pkgName == "runtime" || pkgName == "unsafe" || strings.HasPrefix(pkgName, "runtime/") || pkgName == "github.com/qur/gomock/interfaces" {
+		if pkgName == "runtime" || pkgName == "unsafe" || pkgName == "github.com/qur/gomock/interfaces" {
 			// We need special handling for the unsafe and runtime packages.
 			// All packages (apart from unsafe and runtime) get an automatic
 			// dependancy on runtime, which itself depends on unsafe.  This
@@ -235,6 +235,30 @@ func (c *Context) mockStdlib() error {
 
 		deps[pkgName]["runtime"] = true
 		deps[pkgName]["unsafe"] = true
+
+		if strings.HasPrefix(pkgName, "runtime/") {
+			// For runtime sub packages, we just want the deps.
+
+			imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)
+			if err != nil {
+				return Cerr{"GetOuput(go list .Deps)", err}
+			}
+
+			for _, name := range strings.Split(imports, "\n") {
+				name = strings.TrimSpace(name)
+
+				if name == "" {
+					continue
+				}
+				_, found := deps[name]
+				if !found {
+					return fmt.Errorf("missing dependency %s for %s", name, pkgName)
+				}
+				deps[pkgName][name] = true
+			}
+
+			continue
+		}
 
 		log.Printf("START: gen")
 		if pkgName == "testing" || strings.HasPrefix(pkgName, "testing/") {
