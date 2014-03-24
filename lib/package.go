@@ -258,6 +258,36 @@ func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {
 	return p.mockPackage(mock, cfg)
 }
 
+func (p *Package) Deps() ([]string, error) {
+	deps := []string{}
+
+	err := processSingleDir(p.src, p.dst, func(path, _ string) error {
+		p.files = append(p.files, path)
+
+		if strings.HasSuffix(path, "_test.go") || !strings.HasSuffix(path, ".go") {
+			// Don't try and parse imports from non-go or test files.
+			return nil
+		}
+
+		f, err := parser.ParseFile(p.fset, path, nil, parser.ImportsOnly)
+		if err != nil {
+			return Cerr{"ParseFile("+path+")", err}
+		}
+
+		for _, imp := range f.Imports {
+			impPath := strings.Trim(imp.Path.Value, "\"")
+			deps = append(deps, impPath)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, Cerr{"processSingleDir", err}
+	}
+
+	return deps, nil
+}
+
 func (p *Package) insideCommand(command string, args ...string) *exec.Cmd {
 	env := os.Environ()
 
@@ -332,7 +362,7 @@ func (p *Package) Install() error {
 		err := f.WriteFunc(func(dest string) error {
 			cmd := p.insideCommand("go", "build", "-v", "-o", dest, p.label)
 			out, err := cmd.CombinedOutput()
-			log.Printf("go build %s: %s", p.label, out)
+			log.Printf("go build %s:\n%s", p.label, out)
 			if err != nil {
 				return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
 					p.label, err, out)

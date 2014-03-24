@@ -257,6 +257,14 @@ func (c *Context) mockStdlib() error {
 				deps[pkgName][name] = true
 			}
 
+			d, err := pkg.Deps()
+			if err != nil {
+				return Cerr{"pkg.Deps", err}
+			}
+
+			log.Printf("deps(%s): %s", pkgName, deps[pkgName])
+			log.Printf("deps2(%s): %s", pkgName, d)
+
 			continue
 		}
 
