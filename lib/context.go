@@ -159,7 +159,7 @@ func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
 
 func (c *Context) installPackages() error {
 	for _, pkg := range c.packages {
-		if c.stdlibImports[pkg.Label()] {
+		if c.stdlibImports[pkg.Label()] || pkg.Name() == "github.com/qur/gomock/interfaces" {
 			// stdlib imports don't need installing
 			continue
 		}
@@ -204,10 +204,25 @@ func (c *Context) mockStdlib() error {
 		deps[pkgName] = make(map[string]bool)
 	}
 
+	p, err := c.getPkg("github.com/qur/gomock/interfaces", "github.com/qur/gomock/interfaces")
+	if err != nil {
+		return Cerr{"c.getPkg", err}
+	}
+
+	pkgs["github.com/qur/gomock/interfaces"] = p
+	deps["github.com/qur/gomock/interfaces"] = map[string]bool{
+		"runtime": true,
+		"unsafe": true,
+	}
+
+	if _, err := p.Link(); err != nil {
+		return Cerr{"p.Link", err}
+	}
+
 	log.Printf("START: stdlib mock")
 
 	for pkgName, pkg := range pkgs {
-		if pkgName == "runtime" || pkgName == "unsafe" || strings.HasPrefix(pkgName, "runtime/") {
+		if pkgName == "runtime" || pkgName == "unsafe" || strings.HasPrefix(pkgName, "runtime/") || pkgName == "github.com/qur/gomock/interfaces" {
 			// We need special handling for the unsafe and runtime packages.
 			// All packages (apart from unsafe and runtime) get an automatic
 			// dependancy on runtime, which itself depends on unsafe.  This
@@ -217,6 +232,9 @@ func (c *Context) mockStdlib() error {
 			// rename them when we setup our copy of runtime.
 			continue
 		}
+
+		deps[pkgName]["runtime"] = true
+		deps[pkgName]["unsafe"] = true
 
 		log.Printf("START: gen")
 		if pkgName == "testing" || strings.HasPrefix(pkgName, "testing/") {
@@ -233,7 +251,7 @@ func (c *Context) mockStdlib() error {
 			for _, name := range strings.Split(imports, "\n") {
 				name = strings.TrimSpace(name)
 
-				if name == "" || name == "github.com/qur/gomock/interfaces" {
+				if name == "" {
 					continue
 				}
 				_, found := deps[name]
@@ -246,14 +264,18 @@ func (c *Context) mockStdlib() error {
 			continue
 		}
 
+		log.Printf("DO GEN: %s", pkgName)
+
 		cfg := c.cfg.Mock(pkgName)
 		imports, err := pkg.Gen(false, cfg)
 		if err != nil {
 			return Cerr{"pkg.Gen", err}
 		}
 
+		log.Printf("imports(%s): %s", pkgName, imports)
+
 		for name, imp := range imports {
-			if !imp.ShouldInstall() || name == "github.com/qur/gomock/interfaces" || name == "C" {
+			if !imp.ShouldInstall() || name == "C" {
 				continue
 			}
 			_, found := deps[name]
@@ -262,6 +284,8 @@ func (c *Context) mockStdlib() error {
 			}
 			deps[pkgName][name] = true
 		}
+
+		log.Printf("deps(%s): %s", pkgName, deps[pkgName])
 
 		log.Printf("END: gen")
 	}
@@ -328,9 +352,11 @@ func (c *Context) mockStdlib() error {
 
 			pkg := pkgs[name]
 
+			log.Printf("START: pkg install")
 			if err := pkg.Install(); err != nil {
 				return Cerr{"pkg.Install", err}
 			}
+			log.Printf("END: pkg install")
 
 			inst = append(inst, name)
 		}
@@ -370,7 +396,7 @@ func (c *Context) Chdir(pkg string) error {
 }
 
 const (
-	importNormal importMode = iota
+	importNormal importMode = 1 << iota
 	importMock
 	importReplace
 	importNoInstall
@@ -383,12 +409,29 @@ type importCfg struct {
 }
 type importSet map[string]importCfg
 
+func (m importMode) String() string {
+	s := ""
+	if m & importNormal != 0 {
+		s += "N"
+	}
+	if m & importMock != 0 {
+		s += "M"
+	}
+	if m & importReplace != 0 {
+		s += "R"
+	}
+	if m & importNoInstall != 0 {
+		s += "I"
+	}
+	return s
+}
+
 func (i importCfg) IsMock() bool {
-	return i.mode == importMock
+	return i.mode & importMock != 0
 }
 
 func (i importCfg) IsReplace() bool {
-	return i.mode == importReplace
+	return i.mode & importReplace != 0
 }
 
 func (i importCfg) ShouldInstall() bool {
@@ -396,16 +439,24 @@ func (i importCfg) ShouldInstall() bool {
 }
 
 func (s importSet) Set(path string, mode importMode, path2 string) error {
-	i := s[path]
+	i, found := s[path]
 
-	if mode != importNormal {
-		if i.mode != importNormal && i.mode != mode {
-			return fmt.Errorf("Cannot change mode from %s to %s", i.mode, mode)
+	if found {
+/*
+		if i.mode != mode {
+			return fmt.Errorf("%s: Cannot change mode from %s to %s", path, i.mode, mode)
+		}
+*/
+
+		if i.path != path2 {
+			return fmt.Errorf("%s: Cannot change path from %s to %s", path, i.path, path2)
 		}
 
-		i.mode = mode
-		i.path = path2
+//		return nil
 	}
+
+	i.mode |= mode
+	i.path = path2
 
 	s[path] = i
 	return nil
@@ -471,8 +522,9 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				mock = true
 			}
 
-			if c.stdlibImports[name] {
-				// Ignore stdlib packages, we deal with them separately.
+			if c.stdlibImports[name] || name == "github.com/qur/gomock/interfaces" {
+				// Ignore stdlib packages, we deal with them separately.  We
+				// also deal with the interfaces pacakge at that point too.
 				continue
 			}
 
@@ -650,7 +702,7 @@ func (c *Context) addRequiredPackage(name string) error {
 
 func (c *Context) addRequiredPackages() error {
 	for _, name := range []string{
-		"github.com/qur/gomock/interfaces",
+		//"github.com/qur/gomock/interfaces",
 	} {
 		if err := c.addRequiredPackage(name); err != nil {
 			return Cerr{"c.addRequiredPackage", err}

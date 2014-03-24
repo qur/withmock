@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"log"
 )
 
 func isLocalExpr(expr string) bool {
@@ -955,20 +956,24 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (*mockFileIn
 					if impPath == "github.com/qur/gomock/interfaces" {
 						continue
 					}
+					log.Printf("QQQ: %s: %s", m.srcPath, impPath)
 					fmt.Fprintf(out, "\t")
 					if s.Name != nil {
 						fmt.Fprintf(out, "%s ", s.Name)
 						info.ImportMap[s.Name.String()] = impPath
+						log.Printf("RRR1: %s = %s", s.Name.String(), impPath)
 					} else {
 						name, err := getPackageName(impPath, m.srcPath)
 						if err == nil {
 							fmt.Fprintf(out, "%s ", name)
 							info.ImportMap[name] = impPath
+							log.Printf("RRR2: %s = %s", name, impPath)
 						} else if !buildTags {
 							// We only return an error if there are no build
 							// tags.  If there are build tags then this file
 							// might not actually be compiled - so the package
 							// being missing may not be a problem ...
+							log.Printf("ZZZ")
 							return nil, err
 						}
 					}

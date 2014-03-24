@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"log"
 )
 
 type Package struct {
@@ -248,6 +249,8 @@ func (p *Package) DisableAllMocks() error {
 }
 
 func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {
+	log.Printf("PKG GEN: %s", p.name)
+
 	if err := os.MkdirAll(p.dst, 0700); err != nil {
 		return nil, Cerr{"os.MkdirAll", err}
 	}
@@ -327,8 +330,9 @@ func (p *Package) Install() error {
 
 	if !f.HasData() {
 		err := f.WriteFunc(func(dest string) error {
-			cmd := p.insideCommand("go", "build", "-o", dest, p.label)
+			cmd := p.insideCommand("go", "build", "-v", "-o", dest, p.label)
 			out, err := cmd.CombinedOutput()
+			log.Printf("go build %s: %s", p.label, out)
 			if err != nil {
 				return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
 					p.label, err, out)

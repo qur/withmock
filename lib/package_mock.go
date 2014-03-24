@@ -149,7 +149,9 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 		processed++
 
 		for path := range i {
+			log.Printf("SET: %s = %s", path, importNormal)
 			imports.Set(path, importNormal, "")
+			log.Printf("GET: %s = %s", path, imports[path].mode)
 		}
 	}
 	log.Printf("END: mockFile loop")
