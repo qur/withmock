@@ -239,31 +239,16 @@ func (c *Context) mockStdlib() error {
 		if strings.HasPrefix(pkgName, "runtime/") {
 			// For runtime sub packages, we just want the deps.
 
-			imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)
-			if err != nil {
-				return Cerr{"GetOuput(go list .Deps)", err}
-			}
-
-			for _, name := range strings.Split(imports, "\n") {
-				name = strings.TrimSpace(name)
-
-				if name == "" {
-					continue
-				}
-				_, found := deps[name]
-				if !found {
-					return fmt.Errorf("missing dependency %s for %s", name, pkgName)
-				}
-				deps[pkgName][name] = true
-			}
-
-			d, err := pkg.Deps()
+			imports, err := pkg.Deps()
 			if err != nil {
 				return Cerr{"pkg.Deps", err}
 			}
 
+			for _, name := range imports {
+				deps[pkgName][name] = true
+			}
+
 			log.Printf("deps(%s): %s", pkgName, deps[pkgName])
-			log.Printf("deps2(%s): %s", pkgName, d)
 
 			continue
 		}

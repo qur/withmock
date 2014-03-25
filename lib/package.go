@@ -276,6 +276,9 @@ func (p *Package) Deps() ([]string, error) {
 
 		for _, imp := range f.Imports {
 			impPath := strings.Trim(imp.Path.Value, "\"")
+			if impPath == "C" {
+				continue
+			}
 			deps = append(deps, impPath)
 		}
 
