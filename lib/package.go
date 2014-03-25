@@ -60,15 +60,19 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 }
 
 func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Package, error) {
+	log.Printf("START: lookup import path")
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
 	}
+	log.Printf("END: lookup import path")
 
+	log.Printf("START: open cache")
 	cache, err := OpenCache()
 	if err != nil {
 		return nil, Cerr{"OpenCache", err}
 	}
+	log.Printf("END: open cache")
 
 	tmpPath := getTmpPath(tmpDir)
 	tmpRoot := getTmpRoot(tmpDir)

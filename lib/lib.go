@@ -39,28 +39,6 @@ func GetOsArch() string {
 	return goOs + "_" + goArch
 }
 
-func LookupImportPath(impPath string) (string, error) {
-	if strings.HasPrefix(impPath, "_/") {
-		// special case if impPath is outside of GOPATH
-		return impPath[1:], nil
-	}
-
-	path, err := GetOutput("go", "list", "-e", "-f", "{{.Dir}}", impPath)
-	if err != nil {
-		return "", err
-	}
-
-	if path == "" {
-		return "", fmt.Errorf("Unable to find package: %s", impPath)
-	}
-
-	path, err = filepath.Abs(path)
-	if err != nil {
-		return "", Cerr{"filepath.Abs", err}
-	}
-
-	return path, nil
-}
 func GetOutput(name string, args ...string) (string, error) {
 	return GetCmdOutput(exec.Command(name, args...))
 }

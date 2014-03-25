@@ -186,6 +186,8 @@ func (c *Context) mockStdlib() error {
 	// We want to intercept goroutine creation
 	runtimerw.Rewrite("runtime·newproc1(FuncVal ", "_real_newproc1(FuncVal ")
 
+	log.Printf("START: create pkgs")
+
 	for _, line := range strings.Split(list, "\n") {
 		pkgName := strings.TrimSpace(line)
 		label := markImport(pkgName, normalMark)
@@ -203,6 +205,8 @@ func (c *Context) mockStdlib() error {
 		pkgs[pkgName] = pkg
 		deps[pkgName] = make(map[string]bool)
 	}
+
+	log.Printf("END: create pkgs")
 
 	p, err := c.getPkg("github.com/qur/gomock/interfaces", "github.com/qur/gomock/interfaces")
 	if err != nil {
@@ -283,11 +287,13 @@ func (c *Context) mockStdlib() error {
 
 		log.Printf("DO GEN: %s", pkgName)
 
+		log.Printf("START: pkg.Gen")
 		cfg := c.cfg.Mock(pkgName)
 		imports, err := pkg.Gen(false, cfg)
 		if err != nil {
 			return Cerr{"pkg.Gen", err}
 		}
+		log.Printf("END: pkg.Gen")
 
 		log.Printf("imports(%s): %s", pkgName, imports)
 
