@@ -86,21 +86,8 @@ type CacheFile struct {
 }
 
 func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
-	dir := filepath.Join(c.root, "files")
-
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return nil, Cerr{"os.MkdirAll", err}
-	}
-
-	tf, err := ioutil.TempFile(dir, "withmock-cache-")
-	if err != nil {
-		return nil, Cerr{"TempFile", err}
-	}
-
 	cf := &CacheFile{
 		key: key,
-		f: tf,
-		tmpName: tf.Name(),
 		written: false,
 		changed: false,
 		h: sha512.New(),
@@ -139,23 +126,8 @@ func (c *Cache) GetFile(key *CacheFileKey) (*CacheFile, error) {
 		return nil, Cerr{"loadFile", err}
 	}
 
-	// TODO: we need to actually look for an existing entry in the cache
-
-	dir := filepath.Join(c.root, "files")
-
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return nil, Cerr{"os.MkdirAll", err}
-	}
-
-	f, err := ioutil.TempFile(dir, "withmock-cache-")
-	if err != nil {
-		return nil, Cerr{"TempFile", err}
-	}
-
 	return &CacheFile{
 		key: key,
-		f: f,
-		tmpName: f.Name(),
 		written: false,
 		changed: false,
 		h: sha512.New(),
@@ -165,7 +137,50 @@ func (c *Cache) GetFile(key *CacheFileKey) (*CacheFile, error) {
 	}, nil
 }
 
+func (f *CacheFile) open() error {
+	dir := filepath.Join(f.cache.root, "files")
+
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return Cerr{"os.MkdirAll", err}
+	}
+
+	w, err := ioutil.TempFile(dir, "withmock-data-")
+	if err != nil {
+		return Cerr{"TempFile", err}
+	}
+
+	f.f = w
+	f.tmpName = w.Name()
+
+	return nil
+}
+
+func (f *CacheFile) dump() error {
+	if f.f == nil {
+		return nil
+	}
+
+	if err := f.f.Close(); err != nil {
+		return Cerr{"os.File.Close", err}
+	}
+	f.f = nil
+
+	log.Printf("REMOVE: %s", f.tmpName)
+
+	if err := os.Remove(f.tmpName); err != nil {
+		return Cerr{"os.Remove", err}
+	}
+
+	return nil
+}
+
 func (f *CacheFile) Write(p []byte) (int, error) {
+	if f.f == nil {
+		if err := f.open(); err != nil {
+			return 0, Cerr{"cf.open", err}
+		}
+	}
+
 	f.written = true
 	return io.MultiWriter(f.f, f.h).Write(p)
 }
@@ -173,15 +188,16 @@ func (f *CacheFile) Write(p []byte) (int, error) {
 func (f *CacheFile) WriteFunc(w func(string) error) error {
 	f.written = true
 
+	// Currently creating a tempfile is the only way to get a filename ...
+
+	if err := f.open(); err != nil {
+		return Cerr{"cf.open", err}
+	}
+
 	// Get rid of f.f - w is going to make the file directly
 
-	if err := f.f.Close(); err != nil {
-		return Cerr{"os.File.Close", err}
-	}
-	f.f = nil
-
-	if err := os.Remove(f.tmpName); err != nil {
-		return Cerr{"os.Remove", err}
+	if err := f.dump(); err != nil {
+		return Cerr{"f.dump", err}
 	}
 
 	// Call w to write the file content
@@ -221,17 +237,8 @@ func (f *CacheFile) Hash() string {
 
 func (f *CacheFile) Close() error {
 	if !f.written {
-		if f.f != nil {
-			if err := f.f.Close(); err != nil {
-				return Cerr{"os.File.Close", err}
-			}
-			f.f = nil
-
-			log.Printf("REMOVE: %s", f.tmpName)
-
-			if err := os.Remove(f.tmpName); err != nil {
-				return Cerr{"os.Remove", err}
-			}
+		if err := f.dump(); err != nil {
+			return Cerr{"f.dump", err}
 		}
 
 		return nil
@@ -239,6 +246,10 @@ func (f *CacheFile) Close() error {
 
 	// if hash has been set, then we are already closed
 	if f.hash != "" {
+		if err := f.dump(); err != nil {
+			return Cerr{"f.dump", err}
+		}
+
 		return nil
 	}
 
@@ -304,7 +315,7 @@ func (f *CacheFile) Install(path string) error {
 			return Cerr{"os.MkdirAll", err}
 		}
 
-		w, err := ioutil.TempFile(dir, "withmock-cache-")
+		w, err := ioutil.TempFile(dir, "withmock-meta-")
 		if err != nil {
 			return Cerr{"TempFile", err}
 		}
