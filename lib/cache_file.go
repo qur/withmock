@@ -308,31 +308,41 @@ func (f *CacheFile) Install(path string) error {
 		}
 	}
 
-	if f.changed {
-		dir := filepath.Join(f.cache.root, "metadata")
+	if err := f.Save(); err != nil {
+		return Cerr{"f.Save", err}
+	}
 
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return Cerr{"os.MkdirAll", err}
-		}
+	return nil
+}
 
-		w, err := ioutil.TempFile(dir, "withmock-meta-")
-		if err != nil {
-			return Cerr{"TempFile", err}
-		}
-		defer w.Close()
+func (f *CacheFile) Save() error {
+	if !f.changed {
+		return nil
+	}
 
-		enc := gob.NewEncoder(w)
+	dir := filepath.Join(f.cache.root, "metadata")
 
-		if err := enc.Encode(f.data); err != nil {
-			return Cerr{"gob.Encode", err}
-		}
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return Cerr{"os.MkdirAll", err}
+	}
 
-		path := filepath.Join(f.cache.root, "metadata", f.key.Hash())
+	w, err := ioutil.TempFile(dir, "withmock-meta-")
+	if err != nil {
+		return Cerr{"TempFile", err}
+	}
+	defer w.Close()
 
-		w.Close()
-		if err := os.Rename(w.Name(), path); err != nil {
-			return Cerr{"os.Rename", err}
-		}
+	enc := gob.NewEncoder(w)
+
+	if err := enc.Encode(f.data); err != nil {
+		return Cerr{"gob.Encode", err}
+	}
+
+	path := filepath.Join(f.cache.root, "metadata", f.key.Hash())
+
+	w.Close()
+	if err := os.Rename(w.Name(), path); err != nil {
+		return Cerr{"os.Rename", err}
 	}
 
 	return nil

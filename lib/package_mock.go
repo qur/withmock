@@ -18,20 +18,6 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	srcFile := filepath.Join(p.src, base)
 	filename := filepath.Join(p.dst, base)
 
-	log.Printf("START: mockFile.ParseFile")
-	file, err := parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
-	if err != nil {
-		return "", nil, Cerr{"ParseFile", err}
-	}
-	log.Printf("END: mockFile.ParseFile")
-
-	// If only considering files for this OS/Arch, then reject files
-	// that aren't for this OS/Arch based on build constraint (also
-	// excludes files with an ignore build constraint).
-	if !goodOSArchConstraints(file) {
-		return "", nil, nil
-	}
-
 	key := p.cache.NewCacheFileKey("mockFile", srcFile)
 	f, err := p.cache.GetFile(key)
 	if err != nil {
@@ -39,13 +25,59 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	}
 	defer f.Close()
 
-	var name string
-	var info *mockFileInfo
+	var (
+		name string
+		info *mockFileInfo
+		ignore bool
+		file *ast.File
+	)
 
+	log.Printf("START: mockFile.getData")
+	if f.Has("ignore") {
+		ignore = f.Get("ignore").(bool)
+	} else {
+		var err error
+
+		log.Printf("START: mockFile.ParseFile")
+		file, err = parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
+		if err != nil {
+			return "", nil, Cerr{"ParseFile", err}
+		}
+		log.Printf("END: mockFile.ParseFile")
+
+		// If only considering files for this OS/Arch, then reject files
+		// that aren't for this OS/Arch based on build constraint (also
+		// excludes files with an ignore build constraint).
+		ignore = !goodOSArchConstraints(file)
+
+		f.Store("ignore", ignore)
+	}
+	log.Printf("END: mockFile.getData")
+
+	if ignore {
+		if err := f.Save(); err != nil {
+			return "", nil, Cerr{"f.Save", err}
+		}
+
+		return "", nil, nil
+	}
+
+	log.Printf("START: mockFile.getData")
 	if f.Has(CacheData, "name", "info") {
 		name = f.Get("name").(string)
 		info = f.Get("info").(*mockFileInfo)
 	} else {
+		if file == nil {
+			var err error
+
+			log.Printf("START: mockFile.ParseFile")
+			file, err = parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
+			if err != nil {
+				return "", nil, Cerr{"ParseFile", err}
+			}
+			log.Printf("END: mockFile.ParseFile")
+		}
+
 		i, err := m.file(f, file, srcFile)
 		if err != nil {
 			return "", nil, Cerr{"m.file", err}
@@ -57,6 +89,7 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		name = file.Name.Name
 		info = i
 	}
+	log.Printf("END: mockFile.getData")
 
 	// Update m using the information provided by m.file
 
