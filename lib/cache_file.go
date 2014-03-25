@@ -124,7 +124,6 @@ func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
 		return nil, Cerr{"gob.Decode", err}
 	}
 
-	cf.written = cf.HasData()
 	cf.hash = cf.data[CacheData].(string)
 
 	return cf, nil
@@ -222,6 +221,19 @@ func (f *CacheFile) Hash() string {
 
 func (f *CacheFile) Close() error {
 	if !f.written {
+		if f.f != nil {
+			if err := f.f.Close(); err != nil {
+				return Cerr{"os.File.Close", err}
+			}
+			f.f = nil
+
+			log.Printf("REMOVE: %s", f.tmpName)
+
+			if err := os.Remove(f.tmpName); err != nil {
+				return Cerr{"os.Remove", err}
+			}
+		}
+
 		return nil
 	}
 
@@ -236,6 +248,7 @@ func (f *CacheFile) Close() error {
 		if err := f.f.Close(); err != nil {
 			return Cerr{"os.File.Close", err}
 		}
+		f.f = nil
 	}
 
 	// TODO: should be adding size into the hash calculation ...
@@ -261,7 +274,7 @@ func (f *CacheFile) Install(path string) error {
 		return Cerr{"f.Close", err}
 	}
 
-	if f.written {
+	if f.written || f.HasData() {
 		// Get the hash from data - as we could be installing either a new file,
 		// or one entirely loaded from the cache ...
 		hash, found := f.data[CacheData]
