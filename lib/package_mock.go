@@ -18,10 +18,12 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	srcFile := filepath.Join(p.src, base)
 	filename := filepath.Join(p.dst, base)
 
+	log.Printf("START: mockFile.ParseFile")
 	file, err := parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
 	if err != nil {
 		return "", nil, Cerr{"ParseFile", err}
 	}
+	log.Printf("END: mockFile.ParseFile")
 
 	// If only considering files for this OS/Arch, then reject files
 	// that aren't for this OS/Arch based on build constraint (also
@@ -131,10 +133,12 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 			continue
 		}
 
+		log.Printf("START: p.mockFile")
 		name, i, err := p.mockFile(base, m)
 		if err != nil {
 			return "", nil, nil, Cerr{"p.mockFile", err}
 		}
+		log.Printf("END: p.mockFile")
 
 		if name == "" {
 			continue
@@ -165,29 +169,60 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 	filename := filepath.Join(p.dst, pkg+"_mock.go")
 
 	log.Printf("START: m.pkg")
-	out, err := os.Create(filename)
-	if err != nil {
-		return "", nil, nil, Cerr{"os.Create", err}
-	}
-	defer out.Close()
 
-	err = m.pkg(out, pkg)
+	key := p.cache.NewCacheFileKey("mockFiles.pkg", p.files...)
+	f, err := p.cache.GetFile(key)
 	if err != nil {
-		return "", nil, nil, Cerr{"m.pkg", err}
+		return "", nil, nil, Cerr{"cache.GetFile", err}
+	}
+	defer f.Close()
+
+	if !f.HasData() {
+		err := f.WriteFunc(func(filename string) error {
+			if err := p.doPkg(filename, pkg, m); err != nil {
+				return Cerr{"p.doPkg", err}
+			}
+			return nil
+		})
+		if err != nil {
+			return "", nil, nil, Cerr{"f.WriteFunc", err}
+		}
 	}
 
-	// TODO: currently we need to use goimports to add missing imports, we
-	// need to sort out our own imports, then we can switch to gofmt.
-	err = fixup(filename)
-	if err != nil {
-		return "", nil, nil, Cerr{"fixup", err}
+	if err := f.Install(filename); err != nil {
+		return "", nil, nil, Cerr{"f.Install", err}
 	}
+
 	log.Printf("END: m.pkg")
 
 	m.ifInfo.filename = filepath.Join(p.dst, pkg+"_ifmocks.go")
 	interfaces[pkg] = m.ifInfo
 
 	return pkg, m.extFunctions, interfaces, nil
+}
+
+func (p *Package) doPkg(filename, pkg string, m *mockGen) error {
+	out, err := os.Create(filename)
+	if err != nil {
+		return Cerr{"os.Create", err}
+	}
+	defer out.Close()
+
+	err = m.pkg(out, pkg)
+	if err != nil {
+		return Cerr{"m.pkg", err}
+	}
+
+	// TODO: currently we need to use goimports to add missing imports, we
+	// need to sort out our own imports, then we can switch to gofmt.
+	log.Printf("START: fixup")
+	err = fixup(filename)
+	if err != nil {
+		return Cerr{"fixup", err}
+	}
+	log.Printf("END: fixup")
+
+	return nil
 }
 
 func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error) {
