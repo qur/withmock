@@ -309,7 +309,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 	log.Printf("END: mockFiles")
 
 	log.Printf("START: genInterfaces")
-	if err := genInterfaces(interfaces); err != nil {
+	if err := p.genInterfaces(interfaces); err != nil {
 		return nil, Cerr{"genInterfaces", err}
 	}
 	log.Printf("END: genInterfaces")
@@ -362,4 +362,47 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 	log.Printf("END: mockPackage.rewrite")
 
 	return imports, nil
+}
+
+func (p *Package) genInterfaces(interfaces Interfaces) error {
+	for name, i := range interfaces {
+		if i.filename == "" {
+			// no filename means this package was only parsed for information,
+			// we don't need to write anything out
+			continue
+		}
+
+		key := p.cache.NewCacheFileKey("genInterface."+name, p.files...)
+		f, err := p.cache.GetFile(key)
+		if err != nil {
+			return Cerr{"cache.GetFile", err}
+		}
+		defer f.Close()
+
+		if !f.HasData() {
+			err = f.WriteFunc(func(filename string) error {
+				if err := interfaces.genInterface(name, filename); err != nil {
+					return Cerr{"genInterface", err}
+				}
+
+				// TODO: currently we need to use goimports to add missing
+				// imports, we need to sort out our own imports, then we can
+				// switch to gofmt.
+				if err := fixup(filename); err != nil {
+					return Cerr{"fixup", err}
+				}
+
+				return nil
+			})
+			if err != nil {
+				return Cerr{"f.WriteFunc", err}
+			}
+		}
+
+		if err := f.Install(i.filename); err != nil {
+			return Cerr{"f.Install", err}
+		}
+	}
+
+	return nil
 }

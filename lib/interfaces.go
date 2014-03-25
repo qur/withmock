@@ -185,10 +185,10 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 	return methods, nil
 }
 
-func (i Interfaces) genInterface(name string) error {
+func (i Interfaces) genInterface(name string, filename string) error {
 	info := i[name]
 
-	out, err := os.Create(info.filename)
+	out, err := os.Create(filename)
 	if err != nil {
 		return Cerr{"os.Create", err}
 	}
@@ -285,28 +285,6 @@ func (i Interfaces) genExtInterface(name string, extPkg string) error {
 			m.recv.expr = "*Mock" + tname
 			m.writeMock(out)
 			m.writeRecorder(out, "_mock_"+tname+"_rec")
-		}
-	}
-
-	return nil
-}
-
-func genInterfaces(interfaces Interfaces) error {
-	for name, i := range interfaces {
-		if i.filename == "" {
-			// no filename means this package was only parsed for information,
-			// we don't need to write anything out
-			continue
-		}
-
-		if err := interfaces.genInterface(name); err != nil {
-			return Cerr{"genInterface", err}
-		}
-
-		// TODO: currently we need to use goimports to add missing imports, we
-		// need to sort out our own imports, then we can switch to gofmt.
-		if err := fixup(i.filename); err != nil {
-			return Cerr{"fixup", err}
 		}
 	}
 
