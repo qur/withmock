@@ -173,10 +173,12 @@ func (c *Context) installPackages() error {
 }
 
 func (c *Context) mockStdlib() error {
+	log.Printf("START: get pkg list")
 	list, err := GetOutput("go", "list", "std")
 	if err != nil {
 		return Cerr{"GetOutput(\"go list std\")", err}
 	}
+	log.Printf("END: get pkg list")
 
 	pkgs := make(map[string]*Package)
 	deps := make(map[string]map[string]bool)
@@ -315,6 +317,8 @@ func (c *Context) mockStdlib() error {
 
 	log.Printf("END: stdlib mock")
 
+	log.Printf("START: runtime/unsafe")
+	
 	// Now that we have done all the other packages we can do the runtime and
 	// unsafe packages.
 	for _, pkgName := range []string{"unsafe", "runtime"} {
@@ -331,6 +335,8 @@ func (c *Context) mockStdlib() error {
 	if err := addMockController(loc.dst); err != nil {
 		return Cerr{"addMockController", err}
 	}
+
+	log.Printf("END: runtime/unsafe")
 
 	// Before we can install the packages we need to get the toolchain
 	toolSrc := filepath.Join(c.goRoot, "pkg", "tool")

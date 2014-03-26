@@ -189,6 +189,8 @@ func (p *Package) rewriteFile(path, rel string) error {
 
 	p.files = append(p.files, path)
 
+	// TODO: the rewrites need to be part of the key ...
+
 	key := p.cache.NewCacheFileKey("rewriteFile", path)
 	w, err := p.cache.GetFile(key)
 	if err != nil {
@@ -196,8 +198,10 @@ func (p *Package) rewriteFile(path, rel string) error {
 	}
 	defer w.Close()
 
-	if err := p.rw.Copy(path, w); err != nil {
-		return Cerr{"p.rw.Copy", err}
+	if !w.HasData() {
+		if err := p.rw.Copy(path, w); err != nil {
+			return Cerr{"p.rw.Copy", err}
+		}
 	}
 
 	return w.Install(target)
