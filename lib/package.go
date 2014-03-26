@@ -194,7 +194,7 @@ func (p *Package) rewriteFile(path, rel string) error {
 	key := p.cache.NewCacheFileKey("rewriteFile", path)
 	w, err := p.cache.GetFile(key)
 	if err != nil {
-		return Cerr{"os.Create", err}
+		return Cerr{"cache.GetFile", err}
 	}
 	defer w.Close()
 
@@ -205,18 +205,6 @@ func (p *Package) rewriteFile(path, rel string) error {
 	}
 
 	return w.Install(target)
-}
-
-func (p *Package) disableFile(path, rel string) error {
-	target := filepath.Join(p.dst, rel)
-
-	p.files = append(p.files, path)
-
-	if strings.HasSuffix(path, ".go") {
-		return addMockDisables(path, target)
-	}
-
-	return os.Symlink(path, target)
 }
 
 func (p *Package) Link() (importSet, error) {
@@ -252,8 +240,40 @@ func (p *Package) Rewrite() (importSet, error) {
 	return p.getImports(false)
 }
 
-func (p *Package) DisableAllMocks() error {
-	return processTree(p.src, p.dst, p.disableFile)
+func (p *Package) DisableAllMocks() ([]string, error) {
+	var imports []string
+
+	disableFile:= func(path, rel string) error {
+		target := filepath.Join(p.dst, rel)
+
+		p.files = append(p.files, path)
+
+		if !strings.HasSuffix(path, ".go") {
+			return os.Symlink(path, target)
+		}
+
+		key := p.cache.NewCacheFileKey("disableFile", path)
+		w, err := p.cache.GetFile(key)
+		if err != nil {
+			return Cerr{"cache.GetFile", err}
+		}
+		defer w.Close()
+
+		if w.Has(CacheData, "imports") {
+			imports = w.Get("imports").([]string)
+		} else {
+			i, err := addMockDisables(path, w)
+			if err != nil {
+				return Cerr{"addMockDisables", err}
+			}
+			w.Store("imports", i)
+			imports = i
+		}
+
+		return w.Install(target)
+	}
+
+	return imports, processSingleDir(p.src, p.dst, disableFile)
 }
 
 func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {

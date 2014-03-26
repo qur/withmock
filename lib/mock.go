@@ -1149,23 +1149,17 @@ func copyData(a, b token.Pos, fset *token.FileSet, data io.ReadSeeker, out io.Wr
 	return nil
 }
 
-func addMockDisables(src, dst string) error {
+func addMockDisables(src string, out io.Writer) ([]string, error) {
 	fset := token.NewFileSet()
 
 	f, err := parser.ParseFile(fset, src, nil, 0)
 	if err != nil {
-		return Cerr{"ParseFile", err}
+		return nil, Cerr{"ParseFile", err}
 	}
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return Cerr{"os.Create", err}
-	}
-	defer out.Close()
 
 	data, err := os.Open(src)
 	if err != nil {
-		return Cerr{"os.Open", err}
+		return nil, Cerr{"os.Open", err}
 	}
 	defer data.Close()
 
@@ -1181,12 +1175,21 @@ func addMockDisables(src, dst string) error {
 	fmt.Fprintf(out, "\t__gmrt \"runtime\"\n")
 	fmt.Fprintf(out, ")\n\n")
 
+	imports := []string{}
+
 	for _, decl := range f.Decls {
+		if d, ok := decl.(*ast.GenDecl); ok && d.Tok == token.IMPORT {
+			for _, spec := range d.Specs {
+				s := spec.(*ast.ImportSpec)
+				impPath := strings.Trim(s.Path.Value, "\"")
+				imports = append(imports, impPath)
+			}
+		}
 		if f, ok := decl.(*ast.FuncDecl); ok {
 			t := f.Type
 
 			if err := copyData(t.Pos(), t.End(), fset, data, out); err != nil {
-				return Cerr{"copyData", err}
+				return nil, Cerr{"copyData", err}
 			}
 
 			fmt.Fprintf(out, " {\n")
@@ -1199,7 +1202,7 @@ func addMockDisables(src, dst string) error {
 			if f.Name.Name == "tRunner" {
 				for _, line := range f.Body.List[:len(f.Body.List)-1] {
 					if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
-						return Cerr{"copyData", err}
+						return nil, Cerr{"copyData", err}
 					}
 					fmt.Fprintf(out, "\n")
 				}
@@ -1210,7 +1213,7 @@ func addMockDisables(src, dst string) error {
 			} else {
 				for _, line := range f.Body.List {
 					if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
-						return Cerr{"copyData", err}
+						return nil, Cerr{"copyData", err}
 					}
 					fmt.Fprintf(out, "\n")
 				}
@@ -1222,11 +1225,11 @@ func addMockDisables(src, dst string) error {
 			end := int64(fset.Position(decl.End()).Offset)
 
 			if _, err := data.Seek(start, 0); err != nil {
-				return Cerr{"data.Seek", err}
+				return nil, Cerr{"data.Seek", err}
 			}
 
 			if _, err := io.CopyN(out, data, end - start); err != nil {
-				return Cerr{"io.CopyN", err}
+				return nil, Cerr{"io.CopyN", err}
 			}
 		}
 
@@ -1236,7 +1239,7 @@ func addMockDisables(src, dst string) error {
 	fmt.Fprintf(out, "\n// Make sure __gmif and __gmrt are used\n")
 	fmt.Fprintf(out, "var _ __gmrt.Error = nil\n")
 
-	return nil
+	return imports, nil
 }
 
 func loadInterfaceInfo(impPath string) (*ifInfo, error) {

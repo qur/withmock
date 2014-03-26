@@ -210,6 +210,8 @@ func (c *Context) mockStdlib() error {
 
 	log.Printf("END: create pkgs")
 
+	log.Printf("START: setup interfaces")
+
 	p, err := c.getPkg("github.com/qur/gomock/interfaces", "github.com/qur/gomock/interfaces")
 	if err != nil {
 		return Cerr{"c.getPkg", err}
@@ -224,6 +226,8 @@ func (c *Context) mockStdlib() error {
 	if _, err := p.Link(); err != nil {
 		return Cerr{"p.Link", err}
 	}
+
+	log.Printf("END: setup interfaces")
 
 	log.Printf("START: stdlib mock")
 
@@ -261,17 +265,14 @@ func (c *Context) mockStdlib() error {
 
 		log.Printf("START: gen")
 		if pkgName == "testing" || strings.HasPrefix(pkgName, "testing/") {
+			log.Printf("START: testing")
 			// We don't want to mock testing - that just doesn't make sense ...
-			if err := pkg.DisableAllMocks();  err != nil {
+			imports, err := pkg.DisableAllMocks()
+			if err != nil {
 				return Cerr{"pkg.Link", err}
 			}
 
-			imports, err := GetOutput("go", "list", "-f", "{{range .Deps}}{{println .}}{{end}}", pkgName)
-			if err != nil {
-				return Cerr{"GetOuput(go list .Deps)", err}
-			}
-
-			for _, name := range strings.Split(imports, "\n") {
+			for _, name := range imports {
 				name = strings.TrimSpace(name)
 
 				if name == "" {
@@ -283,6 +284,8 @@ func (c *Context) mockStdlib() error {
 				}
 				deps[pkgName][name] = true
 			}
+
+			log.Printf("END: testing")
 
 			continue
 		}
@@ -768,13 +771,16 @@ func (c *Context) Run(command string, args ...string) error {
 
 	// Create a Command object
 
+	log.Printf("START: Create cmd object")
 	cmd := c.insideCommand(command, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	log.Printf("END: Create cmd object")
 
 	// Wrap stdout and stderr with rewriters, to put the paths back to real
 	// code, not our symlinks.
 
+	log.Printf("START: setup rewriter")
 	if c.doRewrite {
 		stdout := NewRewriter(os.Stdout)
 		defer stdout.Close()
@@ -794,8 +800,13 @@ func (c *Context) Run(command string, args ...string) error {
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 	}
+	log.Printf("END: setup rewriter")
 
 	// Then run the given command
 
-	return cmd.Run()
+	log.Printf("START: cmd.Run")
+	ret := cmd.Run()
+	log.Printf("END: cmd.Run")
+
+	return ret
 }
