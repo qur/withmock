@@ -93,11 +93,13 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 
 	// Update m using the information provided by m.file
 
+	log.Printf("START: breakLoops")
 	for n, t := range info.Types {
 		m.types[n] = t
 		m.ifInfo.addType(n, t, info.ImportMap)
 		breakLoops(t)
 	}
+	log.Printf("END: breakLoops")
 
 	for t, r := range info.Recorders {
 		m.recorders[t] = r
@@ -296,7 +298,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 	}
 
 	log.Printf("START: mockPackage.walk")
-	if err := walk(p.src, p.dst, processDir, processFile); err != nil {
+	if err := walk(p.src, processDir, processFile); err != nil {
 		return nil, Cerr{"walk", err}
 	}
 	log.Printf("END: mockPackage.walk")

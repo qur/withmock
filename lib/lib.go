@@ -161,7 +161,7 @@ func exists(path string) bool {
 
 type procFunc func(path, rel string) error
 
-func walk(src, dst string, processDir procFunc, processFile procFunc) error {
+func walk(src string, processDir procFunc, processFile procFunc) error {
 	fn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -184,7 +184,7 @@ func walk(src, dst string, processDir procFunc, processFile procFunc) error {
 }
 
 func processSingleDir(src, dst string, processFile procFunc) error {
-	return walk(src, dst, func(path, rel string) error {
+	return walk(src, func(path, rel string) error {
 		// Ignore every directory except src (which we need to mirror)
 		if path != src {
 			return filepath.SkipDir
@@ -195,7 +195,7 @@ func processSingleDir(src, dst string, processFile procFunc) error {
 }
 
 func processTree(src, dst string, processFile procFunc) error {
-	return walk(src, dst, func(path, rel string) error {
+	return walk(src, func(path, rel string) error {
 		return os.MkdirAll(filepath.Join(dst, rel), 0700)
 	}, processFile)
 }
@@ -204,4 +204,35 @@ func symlinkTree(src, dst string) error {
 	return processTree(src, dst, func(path, rel string) error {
 		return os.Symlink(path, filepath.Join(dst, rel))
 	})
+}
+
+func getStdlibPackages() ([]string, error) {
+	pkgs := map[string]bool{}
+
+	src := filepath.Join(goRoot, "src", "pkg")
+
+	dir := func(path, rel string) error {
+		switch filepath.Base(path) {
+		case "testdata", "builtin":
+			return filepath.SkipDir
+		default:
+			return nil
+		}
+	}
+
+	file := func(path, rel string) error {
+		pkgs[filepath.Dir(rel)] = true
+		return nil
+	}
+
+	if err := walk(src, dir, file); err != nil {
+		return nil, Cerr{"walk", err}
+	}
+
+	pkglist := make([]string, 0, len(pkgs))
+	for name := range pkgs {
+		pkglist = append(pkglist, name)
+	}
+
+	return pkglist, nil
 }

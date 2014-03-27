@@ -174,9 +174,9 @@ func (c *Context) installPackages() error {
 
 func (c *Context) mockStdlib() error {
 	log.Printf("START: get pkg list")
-	list, err := GetOutput("go", "list", "std")
+	list, err := getStdlibPackages()
 	if err != nil {
-		return Cerr{"GetOutput(\"go list std\")", err}
+		return Cerr{"getStdlibPackages", err}
 	}
 	log.Printf("END: get pkg list")
 
@@ -190,7 +190,7 @@ func (c *Context) mockStdlib() error {
 
 	log.Printf("START: create pkgs")
 
-	for _, line := range strings.Split(list, "\n") {
+	for _, line := range list {
 		pkgName := strings.TrimSpace(line)
 		label := markImport(pkgName, normalMark)
 
@@ -675,10 +675,12 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 
 	cfg := c.cfg.Mock(pkgName)
 
+	log.Printf("START: MockInterfaces")
 	err = MockInterfaces(c.tmpPath, pkgName, cfg)
 	if err != nil {
 		return "", Cerr{"MockInterfaces", err}
 	}
+	log.Printf("END: MockInterfaces")
 
 	c.code = append(c.code, pkg.Loc())
 
