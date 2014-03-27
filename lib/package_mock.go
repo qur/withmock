@@ -18,12 +18,14 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	srcFile := filepath.Join(p.src, base)
 	filename := filepath.Join(p.dst, base)
 
+	log.Printf("START: get cachefile")
 	key := p.cache.NewCacheFileKey("mockFile", srcFile)
 	f, err := p.cache.GetFile(key)
 	if err != nil {
 		return "", nil, Cerr{"cache.GetFile", err}
 	}
 	defer f.Close()
+	log.Printf("END: get cachefile")
 
 	var (
 		name string
@@ -164,9 +166,11 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 	for _, base := range files {
 		// If only considering files for this OS/Arch, then reject files
 		// that aren't for this OS/Arch based on filename.
+		log.Printf("START: osarch")
 		if cfg.MatchOSArch && !goodOSArchFile(base, nil) {
 			continue
 		}
+		log.Printf("END: osarch")
 
 		log.Printf("START: p.mockFile")
 		name, i, err := p.mockFile(base, m)
@@ -187,11 +191,11 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 
 		processed++
 
+		log.Printf("START: set imports")
 		for path := range i {
-			log.Printf("SET: %s = %s", path, importNormal)
 			imports.Set(path, importNormal, "")
-			log.Printf("GET: %s = %s", path, imports[path].mode)
 		}
+		log.Printf("END: set imports")
 	}
 	log.Printf("END: mockFile loop")
 
