@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"log"
 )
 
 type Package struct {
@@ -60,19 +59,15 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 }
 
 func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Package, error) {
-	log.Printf("START: lookup import path")
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, Cerr{"LookupImportPath", err}
 	}
-	log.Printf("END: lookup import path")
 
-	log.Printf("START: open cache")
 	cache, err := OpenCache()
 	if err != nil {
 		return nil, Cerr{"OpenCache", err}
 	}
-	log.Printf("END: open cache")
 
 	tmpPath := getTmpPath(tmpDir)
 	tmpRoot := getTmpRoot(tmpDir)
@@ -277,8 +272,6 @@ func (p *Package) DisableAllMocks() ([]string, error) {
 }
 
 func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {
-	log.Printf("PKG GEN: %s", p.name)
-
 	if err := os.MkdirAll(p.dst, 0700); err != nil {
 		return nil, Cerr{"os.MkdirAll", err}
 	}
@@ -393,7 +386,6 @@ func (p *Package) Install() error {
 		err := f.WriteFunc(func(dest string) error {
 			cmd := p.insideCommand("go", "build", "-v", "-o", dest, p.label)
 			out, err := cmd.CombinedOutput()
-			log.Printf("go build %s:\n%s", p.label, out)
 			if err != nil {
 				return fmt.Errorf("Failed to install '%s': %s\noutput:\n%s",
 					p.label, err, out)

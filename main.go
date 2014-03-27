@@ -12,7 +12,6 @@ import (
 	"syscall"
 
 	"github.com/qur/withmock/lib"
-	"log"
 )
 
 var (
@@ -56,10 +55,6 @@ func main() {
 }
 
 func doit() error {
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-
-	log.Printf("START: overall")
-
 	// Before we get to work, parse the command line
 
 	flag.Usage = usage
@@ -112,32 +107,26 @@ func doit() error {
 		return err
 	}
 
-	log.Printf("START: AddPackage")
 	testPkg, err := ctxt.AddPackage(pkg)
 	if err != nil {
 		return err
 	}
-	log.Printf("END: AddPackage")
 
 	// Add extra packages if configured
 
-	log.Printf("START: LinkPkg")
 	if *pkgFile != "" {
 		if err := ctxt.LinkPackagesFromFile(*pkgFile); err != nil {
 			return err
 		}
 	}
-	log.Printf("END: LinkPkg")
 
 	// Add in the gocov library, so that we can run with gocov if we want.
 
-	log.Printf("START: gocov")
 	if flag.Arg(0) == "gocov" || *gocov {
 		if err := ctxt.LinkPackage("github.com/axw/gocov"); err != nil {
 			return err
 		}
 	}
-	log.Printf("END: gocov")
 
 	// Finally we can chdir into the test code, and run the command inside the
 	// context
@@ -146,13 +135,9 @@ func doit() error {
 		return err
 	}
 
-	log.Printf("START: Run")
 	if err := ctxt.Run(flag.Arg(0), flag.Args()[1:]...); err != nil {
 		return lib.Cerr{"Run", err}
 	}
-	log.Printf("END: Run")
-
-	log.Printf("END: overall")
 
 	return nil
 }

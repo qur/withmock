@@ -11,21 +11,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"log"
 )
 
 func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, error) {
 	srcFile := filepath.Join(p.src, base)
 	filename := filepath.Join(p.dst, base)
 
-	log.Printf("START: get cachefile")
 	key := p.cache.NewCacheFileKey("mockFile", srcFile)
 	f, err := p.cache.GetFile(key)
 	if err != nil {
 		return "", nil, Cerr{"cache.GetFile", err}
 	}
 	defer f.Close()
-	log.Printf("END: get cachefile")
 
 	var (
 		name string
@@ -34,18 +31,15 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		file *ast.File
 	)
 
-	log.Printf("START: mockFile.getData")
 	if f.Has("ignore") {
 		ignore = f.Get("ignore").(bool)
 	} else {
 		var err error
 
-		log.Printf("START: mockFile.ParseFile")
 		file, err = parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
 		if err != nil {
 			return "", nil, Cerr{"ParseFile", err}
 		}
-		log.Printf("END: mockFile.ParseFile")
 
 		// If only considering files for this OS/Arch, then reject files
 		// that aren't for this OS/Arch based on build constraint (also
@@ -54,7 +48,6 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 
 		f.Store("ignore", ignore)
 	}
-	log.Printf("END: mockFile.getData")
 
 	if ignore {
 		if err := f.Save(); err != nil {
@@ -64,7 +57,6 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		return "", nil, nil
 	}
 
-	log.Printf("START: mockFile.getData")
 	if f.Has(CacheData, "name", "info") {
 		name = f.Get("name").(string)
 		info = f.Get("info").(*mockFileInfo)
@@ -72,12 +64,10 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		if file == nil {
 			var err error
 
-			log.Printf("START: mockFile.ParseFile")
 			file, err = parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
 			if err != nil {
 				return "", nil, Cerr{"ParseFile", err}
 			}
-			log.Printf("END: mockFile.ParseFile")
 		}
 
 		i, err := m.file(f, file, srcFile)
@@ -91,17 +81,14 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		name = file.Name.Name
 		info = i
 	}
-	log.Printf("END: mockFile.getData")
 
 	// Update m using the information provided by m.file
 
-	log.Printf("START: breakLoops")
 	for n, t := range info.Types {
 		m.types[n] = t
 		m.ifInfo.addType(n, t, info.ImportMap)
 		breakLoops(t)
 	}
-	log.Printf("END: breakLoops")
 
 	for t, r := range info.Recorders {
 		m.recorders[t] = r
@@ -162,22 +149,17 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 
 	cfg.MatchOSArch = true
 
-	log.Printf("START: mockFile loop")
 	for _, base := range files {
 		// If only considering files for this OS/Arch, then reject files
 		// that aren't for this OS/Arch based on filename.
-		log.Printf("START: osarch")
 		if cfg.MatchOSArch && !goodOSArchFile(base, nil) {
 			continue
 		}
-		log.Printf("END: osarch")
 
-		log.Printf("START: p.mockFile")
 		name, i, err := p.mockFile(base, m)
 		if err != nil {
 			return "", nil, nil, Cerr{"p.mockFile", err}
 		}
-		log.Printf("END: p.mockFile")
 
 		if name == "" {
 			continue
@@ -191,13 +173,10 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 
 		processed++
 
-		log.Printf("START: set imports")
 		for path := range i {
 			imports.Set(path, importNormal, "")
 		}
-		log.Printf("END: set imports")
 	}
-	log.Printf("END: mockFile loop")
 
 	// If we skipped over all the files for this package, then ignore it
 	// entirely.
@@ -206,8 +185,6 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 	}
 
 	filename := filepath.Join(p.dst, pkg+"_mock.go")
-
-	log.Printf("START: m.pkg")
 
 	key := p.cache.NewCacheFileKey("mockFiles.pkg", p.files...)
 	f, err := p.cache.GetFile(key)
@@ -232,8 +209,6 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 		return "", nil, nil, Cerr{"f.Install", err}
 	}
 
-	log.Printf("END: m.pkg")
-
 	m.ifInfo.filename = filepath.Join(p.dst, pkg+"_ifmocks.go")
 	interfaces[pkg] = m.ifInfo
 
@@ -254,12 +229,10 @@ func (p *Package) doPkg(filename, pkg string, m *mockGen) error {
 
 	// TODO: currently we need to use goimports to add missing imports, we
 	// need to sort out our own imports, then we can switch to gofmt.
-	log.Printf("START: fixup")
 	err = fixup(filename)
 	if err != nil {
 		return Cerr{"fixup", err}
 	}
-	log.Printf("END: fixup")
 
 	return nil
 }
@@ -301,30 +274,23 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 		return nil
 	}
 
-	log.Printf("START: mockPackage.walk")
 	if err := walk(p.src, processDir, processFile); err != nil {
 		return nil, Cerr{"walk", err}
 	}
-	log.Printf("END: mockPackage.walk")
 
-	log.Printf("START: mockFiles")
 	pkg, externalFunctions, interfaces, err := p.mockFiles(goFiles, byDefault, cfg, imports)
 	if err != nil {
 		return nil, Cerr{"mockFiles", err}
 	}
-	log.Printf("END: mockFiles")
 
-	log.Printf("START: genInterfaces")
 	if err := p.genInterfaces(interfaces); err != nil {
 		return nil, Cerr{"genInterfaces", err}
 	}
-	log.Printf("END: genInterfaces")
 
 	if cfg.IgnoreNonGoFiles {
 		return imports, nil
 	}
 
-	log.Printf("START: mockPackage.rewrite")
 	// Load up a rewriter with the rewrites for the external functions
 	rw := NewRewriter(nil)
 	for _, fname := range externalFunctions {
@@ -365,7 +331,6 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 			return nil, Cerr{"os.Symlink", err}
 		}
 	}
-	log.Printf("END: mockPackage.rewrite")
 
 	return imports, nil
 }

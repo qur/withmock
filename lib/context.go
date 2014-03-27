@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"log"
 )
 
 type Context struct {
@@ -173,12 +172,10 @@ func (c *Context) installPackages() error {
 }
 
 func (c *Context) mockStdlib() error {
-	log.Printf("START: get pkg list")
 	list, err := getStdlibPackages()
 	if err != nil {
 		return Cerr{"getStdlibPackages", err}
 	}
-	log.Printf("END: get pkg list")
 
 	pkgs := make(map[string]*Package)
 	deps := make(map[string]map[string]bool)
@@ -187,8 +184,6 @@ func (c *Context) mockStdlib() error {
 
 	// We want to intercept goroutine creation
 	runtimerw.Rewrite("runtime·newproc1(FuncVal ", "_real_newproc1(FuncVal ")
-
-	log.Printf("START: create pkgs")
 
 	for _, line := range list {
 		pkgName := strings.TrimSpace(line)
@@ -208,10 +203,6 @@ func (c *Context) mockStdlib() error {
 		deps[pkgName] = make(map[string]bool)
 	}
 
-	log.Printf("END: create pkgs")
-
-	log.Printf("START: setup interfaces")
-
 	p, err := c.getPkg("github.com/qur/gomock/interfaces", "github.com/qur/gomock/interfaces")
 	if err != nil {
 		return Cerr{"c.getPkg", err}
@@ -226,10 +217,6 @@ func (c *Context) mockStdlib() error {
 	if _, err := p.Link(); err != nil {
 		return Cerr{"p.Link", err}
 	}
-
-	log.Printf("END: setup interfaces")
-
-	log.Printf("START: stdlib mock")
 
 	for pkgName, pkg := range pkgs {
 		if pkgName == "runtime" || pkgName == "unsafe" || pkgName == "github.com/qur/gomock/interfaces" {
@@ -258,14 +245,10 @@ func (c *Context) mockStdlib() error {
 				deps[pkgName][name] = true
 			}
 
-			log.Printf("deps(%s): %s", pkgName, deps[pkgName])
-
 			continue
 		}
 
-		log.Printf("START: gen")
 		if pkgName == "testing" || strings.HasPrefix(pkgName, "testing/") {
-			log.Printf("START: testing")
 			// We don't want to mock testing - that just doesn't make sense ...
 			imports, err := pkg.DisableAllMocks()
 			if err != nil {
@@ -285,22 +268,14 @@ func (c *Context) mockStdlib() error {
 				deps[pkgName][name] = true
 			}
 
-			log.Printf("END: testing")
-
 			continue
 		}
 
-		log.Printf("DO GEN: %s", pkgName)
-
-		log.Printf("START: pkg.Gen")
 		cfg := c.cfg.Mock(pkgName)
 		imports, err := pkg.Gen(false, cfg)
 		if err != nil {
 			return Cerr{"pkg.Gen", err}
 		}
-		log.Printf("END: pkg.Gen")
-
-		log.Printf("imports(%s): %s", pkgName, imports)
 
 		for name, imp := range imports {
 			if !imp.ShouldInstall() || name == "C" {
@@ -312,16 +287,8 @@ func (c *Context) mockStdlib() error {
 			}
 			deps[pkgName][name] = true
 		}
-
-		log.Printf("deps(%s): %s", pkgName, deps[pkgName])
-
-		log.Printf("END: gen")
 	}
 
-	log.Printf("END: stdlib mock")
-
-	log.Printf("START: runtime/unsafe")
-	
 	// Now that we have done all the other packages we can do the runtime and
 	// unsafe packages.
 	for _, pkgName := range []string{"unsafe", "runtime"} {
@@ -338,8 +305,6 @@ func (c *Context) mockStdlib() error {
 	if err := addMockController(loc.dst); err != nil {
 		return Cerr{"addMockController", err}
 	}
-
-	log.Printf("END: runtime/unsafe")
 
 	// Before we can install the packages we need to get the toolchain
 	toolSrc := filepath.Join(c.goRoot, "pkg", "tool")
@@ -371,8 +336,6 @@ func (c *Context) mockStdlib() error {
 		}
 	}
 
-	log.Printf("START: stdlib install")
-
 	// Install the packages in reverse depedency order
 	last := len(deps)
 	for len(deps) > 0 {
@@ -384,11 +347,9 @@ func (c *Context) mockStdlib() error {
 
 			pkg := pkgs[name]
 
-			log.Printf("START: pkg install")
 			if err := pkg.Install(); err != nil {
 				return Cerr{"pkg.Install", err}
 			}
-			log.Printf("END: pkg install")
 
 			inst = append(inst, name)
 		}
@@ -411,8 +372,6 @@ func (c *Context) mockStdlib() error {
 
 		last = len(deps)
 	}
-
-	log.Printf("END: stdlib install")
 
 	return nil
 }
@@ -675,12 +634,10 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 
 	cfg := c.cfg.Mock(pkgName)
 
-	log.Printf("START: MockInterfaces")
 	err = MockInterfaces(c.tmpPath, pkgName, cfg)
 	if err != nil {
 		return "", Cerr{"MockInterfaces", err}
 	}
-	log.Printf("END: MockInterfaces")
 
 	c.code = append(c.code, pkg.Loc())
 
@@ -749,40 +706,31 @@ func (c *Context) addRequiredPackages() error {
 func (c *Context) Run(command string, args ...string) error {
 	// Make sure required packages are installed
 
-	log.Printf("START: addReqPkg")
 	if err := c.addRequiredPackages(); err != nil {
 		return Cerr{"c.addRequiredPackages", err}
 	}
-	log.Printf("END: addReqPkg")
 
 	// Create a mocked version of the stdlib
 
-	log.Printf("START: mock stdlib")
 	if err := c.mockStdlib(); err != nil {
 		return Cerr{"c.mockStdlib", err}
 	}
-	log.Printf("END: mock stdlib")
 
 	// Install the packages inside the context
 
-	log.Printf("START: install pkgs")
 	if err := c.installPackages(); err != nil {
 		return Cerr{"c.installPackages", err}
 	}
-	log.Printf("END: install pkgs")
 
 	// Create a Command object
 
-	log.Printf("START: Create cmd object")
 	cmd := c.insideCommand(command, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	log.Printf("END: Create cmd object")
 
 	// Wrap stdout and stderr with rewriters, to put the paths back to real
 	// code, not our symlinks.
 
-	log.Printf("START: setup rewriter")
 	if c.doRewrite {
 		stdout := NewRewriter(os.Stdout)
 		defer stdout.Close()
@@ -802,13 +750,8 @@ func (c *Context) Run(command string, args ...string) error {
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 	}
-	log.Printf("END: setup rewriter")
 
 	// Then run the given command
 
-	log.Printf("START: cmd.Run")
-	ret := cmd.Run()
-	log.Printf("END: cmd.Run")
-
-	return ret
+	return cmd.Run()
 }

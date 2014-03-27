@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"os"
-	"log"
 )
 
 var (
@@ -32,14 +31,12 @@ func init() {
 
 func find(impPath string) string {
 	path := filepath.Join(goRoot, "src", "pkg", impPath)
-	log.Printf("stat: %s", path)
 	if _, err := os.Stat(path); err == nil {
 		return path
 	}
 
 	for _, prefix := range filepath.SplitList(goPath) {
 		path := filepath.Join(prefix, "src", impPath)
-		log.Printf("stat: %s", path)
 		if _, err := os.Stat(path); err == nil {
 			return path
 		}

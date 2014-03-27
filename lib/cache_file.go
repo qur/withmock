@@ -16,7 +16,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"log"
 )
 
 const CacheData = "_DATA_"
@@ -165,8 +164,6 @@ func (f *CacheFile) dump() error {
 	}
 	f.f = nil
 
-	log.Printf("REMOVE: %s", f.tmpName)
-
 	if err := os.Remove(f.tmpName); err != nil {
 		return Cerr{"os.Remove", err}
 	}
@@ -202,11 +199,9 @@ func (f *CacheFile) WriteFunc(w func(string) error) error {
 
 	// Call w to write the file content
 
-	log.Printf("START: WriteFunc.w")
 	if err := w(f.tmpName); err != nil {
 		return Cerr{"w", err}
 	}
-	log.Printf("END: WriteFunc.w")
 
 	// And now we need to read it into the hash
 
