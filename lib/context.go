@@ -31,6 +31,8 @@ type Context struct {
 	processed      map[string]bool
 	importRewrites map[string]string
 
+	marked map[string]string
+
 	doRewrite bool
 
 	code []codeLoc
@@ -90,6 +92,7 @@ func NewContext() (*Context, error) {
 		removeTmp:      true,
 		processed:      make(map[string]bool),
 		importRewrites: make(map[string]string),
+		marked:         make(map[string]string),
 		doRewrite:      true,
 		cfg:            &Config{},
 		cache:          cache,
@@ -234,13 +237,13 @@ func (c *Context) wantToProcess(mockAllowed bool, imports importSet) map[string]
 	}
 
 	// remove nop rewites from the names map, and add real ones to
-	// c.importRewrites so they get added to the output rewrite rules.
+	// c.marked so that we can lookup the original mark
 	for orig, marked := range names {
 		if orig == marked {
 			delete(names, orig)
 			continue
 		}
-		c.importRewrites[marked] = orig
+		c.marked[marked] = orig
 	}
 
 	return names
@@ -273,7 +276,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			name := label
 			mock := imports[name].IsMock()
 
-			if n, found := c.importRewrites[label]; found {
+			if n, found := c.marked[label]; found {
 				name = n
 				mock = true
 			}
