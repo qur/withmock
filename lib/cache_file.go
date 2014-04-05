@@ -8,7 +8,6 @@ import (
 	"crypto/sha512"
 	"encoding/gob"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"go/ast"
 	"hash"
@@ -24,52 +23,6 @@ func init() {
 	gob.Register(map[string]bool{})
 	gob.Register(&mockFileInfo{})
 	registerAstTypes()
-}
-
-type cacheFileDetails struct {
-	Src string `json:"src"`
-}
-
-type CacheFileKey struct {
-	Op string `json:"op"`
-	Files []cacheFileDetails `json:"files"`
-	hash string
-}
-
-func (c *Cache) NewCacheFileKey(op string, srcs ...string) *CacheFileKey {
-	// TODO: need to include file size, mode, hash etc in key ...
-
-	files := make([]cacheFileDetails, len(srcs))
-	for i, src := range srcs {
-		files[i] = cacheFileDetails{
-			Src: src,
-		}
-	}
-
-	return &CacheFileKey{
-		Op: op,
-		Files: files,
-	}
-}
-
-func (k *CacheFileKey) Hash() string {
-	if k.hash == "" {
-		k.calcHash()
-	}
-
-	return k.hash
-}
-
-func (k *CacheFileKey) calcHash() {
-	h := sha512.New()
-
-	enc := json.NewEncoder(h)
-
-	if err := enc.Encode(k); err != nil {
-		panic("Failed to JSON encode cacheFileKey instance: " + err.Error())
-	}
-
-	k.hash = hex.EncodeToString(h.Sum(nil))
 }
 
 type CacheFile struct {

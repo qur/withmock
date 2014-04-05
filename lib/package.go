@@ -186,7 +186,11 @@ func (p *Package) rewriteFile(path, rel string) error {
 
 	// TODO: the rewrites need to be part of the key ...
 
-	key := p.cache.NewCacheFileKey("rewriteFile", path)
+	key, err := p.cache.NewCacheFileKey("rewriteFile", path)
+	if err != nil {
+		return Cerr{"cache.NewCacheFileKey", err}
+	}
+
 	w, err := p.cache.GetFile(key)
 	if err != nil {
 		return Cerr{"cache.GetFile", err}
@@ -247,7 +251,11 @@ func (p *Package) DisableAllMocks() ([]string, error) {
 			return os.Symlink(path, target)
 		}
 
-		key := p.cache.NewCacheFileKey("disableFile", path)
+		key, err := p.cache.NewCacheFileKey("disableFile", path)
+		if err != nil {
+			return Cerr{"cache.NewCacheFileKey", err}
+		}
+
 		w, err := p.cache.GetFile(key)
 		if err != nil {
 			return Cerr{"cache.GetFile", err}
@@ -375,7 +383,11 @@ func (p *Package) Install() error {
 		return nil
 	}
 
-	key := p.cache.NewCacheFileKey("install", p.files...)
+	key, err := p.cache.NewCacheFileKey("install", p.files...)
+	if err != nil {
+		return Cerr{"cache.NewCacheFileKey", err}
+	}
+
 	f, err := p.cache.GetFile(key)
 	if err != nil {
 		return Cerr{"cache.GetFile", err}

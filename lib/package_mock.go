@@ -17,7 +17,11 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	srcFile := filepath.Join(p.src, base)
 	filename := filepath.Join(p.dst, base)
 
-	key := p.cache.NewCacheFileKey("mockFile", srcFile)
+	key, err := p.cache.NewCacheFileKey("mockFile", srcFile)
+	if err != nil {
+		return "", nil, Cerr{"cache.NewCacheFileKey", err}
+	}
+
 	f, err := p.cache.GetFile(key)
 	if err != nil {
 		return "", nil, Cerr{"cache.GetFile", err}
@@ -186,7 +190,11 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 
 	filename := filepath.Join(p.dst, pkg+"_mock.go")
 
-	key := p.cache.NewCacheFileKey("mockFiles.pkg", p.files...)
+	key, err := p.cache.NewCacheFileKey("mockFiles.pkg", p.files...)
+	if err != nil {
+		return "", nil, nil, Cerr{"cache.NewCacheFileKey", err}
+	}
+
 	f, err := p.cache.GetFile(key)
 	if err != nil {
 		return "", nil, nil, Cerr{"cache.GetFile", err}
@@ -305,7 +313,11 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 		input := filepath.Join(p.src, name)
 		output := filepath.Join(p.dst, name)
 
-		key := p.cache.NewCacheFileKey("mockPackage.nonGoSource", input)
+		key, err := p.cache.NewCacheFileKey("mockPackage.nonGoSource", input)
+		if err != nil {
+			return nil, Cerr{"cache.NewCacheFileKey", err}
+		}
+
 		w, err := p.cache.GetFile(key)
 		if err != nil {
 			return nil, Cerr{"os.Create", err}
@@ -343,7 +355,11 @@ func (p *Package) genInterfaces(interfaces Interfaces) error {
 			continue
 		}
 
-		key := p.cache.NewCacheFileKey("genInterface."+name, p.files...)
+		key, err := p.cache.NewCacheFileKey("genInterface."+name, p.files...)
+		if err != nil {
+			return Cerr{"cache.NewCacheFileKey", err}
+		}
+
 		f, err := p.cache.GetFile(key)
 		if err != nil {
 			return Cerr{"cache.GetFile", err}
