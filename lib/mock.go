@@ -14,7 +14,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"encoding/gob"
+
+	"github.com/qur/withmock/utils"
 )
+
+func init() {
+	gob.Register(&mockFileInfo{})
+}
 
 func isLocalExpr(expr string) bool {
 	switch expr {
@@ -1134,11 +1141,11 @@ func copyData(a, b token.Pos, fset *token.FileSet, data io.ReadSeeker, out io.Wr
 	end := int64(fset.Position(b).Offset)
 
 	if _, err := data.Seek(start, 0); err != nil {
-		return Cerr{"data.Seek", err}
+		return utils.Err{"data.Seek", err}
 	}
 
 	if _, err := io.CopyN(out, data, end - start); err != nil {
-		return Cerr{"io.CopyN", err}
+		return utils.Err{"io.CopyN", err}
 	}
 
 	return nil
@@ -1149,12 +1156,12 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 
 	f, err := parser.ParseFile(fset, src, nil, 0)
 	if err != nil {
-		return nil, Cerr{"ParseFile", err}
+		return nil, utils.Err{"ParseFile", err}
 	}
 
 	data, err := os.Open(src)
 	if err != nil {
-		return nil, Cerr{"os.Open", err}
+		return nil, utils.Err{"os.Open", err}
 	}
 	defer data.Close()
 
@@ -1184,7 +1191,7 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 			t := f.Type
 
 			if err := copyData(t.Pos(), t.End(), fset, data, out); err != nil {
-				return nil, Cerr{"copyData", err}
+				return nil, utils.Err{"copyData", err}
 			}
 
 			fmt.Fprintf(out, " {\n")
@@ -1197,7 +1204,7 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 			if f.Name.Name == "tRunner" {
 				for _, line := range f.Body.List[:len(f.Body.List)-1] {
 					if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
-						return nil, Cerr{"copyData", err}
+						return nil, utils.Err{"copyData", err}
 					}
 					fmt.Fprintf(out, "\n")
 				}
@@ -1208,7 +1215,7 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 			} else {
 				for _, line := range f.Body.List {
 					if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
-						return nil, Cerr{"copyData", err}
+						return nil, utils.Err{"copyData", err}
 					}
 					fmt.Fprintf(out, "\n")
 				}
@@ -1220,11 +1227,11 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 			end := int64(fset.Position(decl.End()).Offset)
 
 			if _, err := data.Seek(start, 0); err != nil {
-				return nil, Cerr{"data.Seek", err}
+				return nil, utils.Err{"data.Seek", err}
 			}
 
 			if _, err := io.CopyN(out, data, end - start); err != nil {
-				return nil, Cerr{"io.CopyN", err}
+				return nil, utils.Err{"io.CopyN", err}
 			}
 		}
 

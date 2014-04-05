@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package lib
+package cache
 
 import (
 	"encoding/gob"
@@ -14,13 +14,14 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/qur/withmock/utils"
 )
 
-const CacheData = "_DATA_"
+const Data = "_DATA_"
 
 func init() {
 	gob.Register(map[string]bool{})
-	gob.Register(&mockFileInfo{})
 	registerAstTypes()
 }
 
@@ -59,10 +60,10 @@ func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
 	dec := gob.NewDecoder(f)
 
 	if err := dec.Decode(&cf.data); err != nil {
-		return nil, Cerr{"gob.Decode", err}
+		return nil, utils.Err{"gob.Decode", err}
 	}
 
-	cf.hash = cf.data[CacheData].(string)
+	cf.hash = cf.data[Data].(string)
 
 	return cf, nil
 }
@@ -74,7 +75,7 @@ func (c *Cache) GetFile(key *CacheFileKey) (*CacheFile, error) {
 	}
 
 	if !os.IsNotExist(err) {
-		return nil, Cerr{"loadFile", err}
+		return nil, utils.Err{"loadFile", err}
 	}
 
 	return &CacheFile{
@@ -92,12 +93,12 @@ func (f *CacheFile) open() error {
 	dir := filepath.Join(f.cache.root, "files")
 
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return Cerr{"os.MkdirAll", err}
+		return utils.Err{"os.MkdirAll", err}
 	}
 
 	w, err := ioutil.TempFile(dir, "withmock-data-")
 	if err != nil {
-		return Cerr{"TempFile", err}
+		return utils.Err{"TempFile", err}
 	}
 
 	f.f = w
@@ -112,12 +113,12 @@ func (f *CacheFile) dump() error {
 	}
 
 	if err := f.f.Close(); err != nil {
-		return Cerr{"os.File.Close", err}
+		return utils.Err{"os.File.Close", err}
 	}
 	f.f = nil
 
 	if err := os.Remove(f.tmpName); err != nil {
-		return Cerr{"os.Remove", err}
+		return utils.Err{"os.Remove", err}
 	}
 
 	return nil
@@ -126,7 +127,7 @@ func (f *CacheFile) dump() error {
 func (f *CacheFile) Write(p []byte) (int, error) {
 	if f.f == nil {
 		if err := f.open(); err != nil {
-			return 0, Cerr{"cf.open", err}
+			return 0, utils.Err{"cf.open", err}
 		}
 	}
 
@@ -140,19 +141,19 @@ func (f *CacheFile) WriteFunc(w func(string) error) error {
 	// Currently creating a tempfile is the only way to get a filename ...
 
 	if err := f.open(); err != nil {
-		return Cerr{"cf.open", err}
+		return utils.Err{"cf.open", err}
 	}
 
 	// Get rid of f.f - w is going to make the file directly
 
 	if err := f.dump(); err != nil {
-		return Cerr{"f.dump", err}
+		return utils.Err{"f.dump", err}
 	}
 
 	// Call w to write the file content
 
 	if err := w(f.tmpName); err != nil {
-		return Cerr{"w", err}
+		return utils.Err{"w", err}
 	}
 
 	// And now we need to read it into the hash
@@ -165,12 +166,12 @@ func (f *CacheFile) WriteFunc(w func(string) error) error {
 		return nil
 	}
 	if err != nil {
-		return Cerr{"os.Open", err}
+		return utils.Err{"os.Open", err}
 	}
 	defer i.Close()
 
 	if _, err := io.Copy(f.h, i); err != nil {
-		return Cerr{"io.Copy", err}
+		return utils.Err{"io.Copy", err}
 	}
 
 	// done
@@ -185,7 +186,7 @@ func (f *CacheFile) Hash() string {
 func (f *CacheFile) Close() error {
 	if !f.written {
 		if err := f.dump(); err != nil {
-			return Cerr{"f.dump", err}
+			return utils.Err{"f.dump", err}
 		}
 
 		return nil
@@ -194,7 +195,7 @@ func (f *CacheFile) Close() error {
 	// if hash has been set, then we are already closed
 	if f.hash != "" {
 		if err := f.dump(); err != nil {
-			return Cerr{"f.dump", err}
+			return utils.Err{"f.dump", err}
 		}
 
 		return nil
@@ -204,7 +205,7 @@ func (f *CacheFile) Close() error {
 
 	if f.f != nil {
 		if err := f.f.Close(); err != nil {
-			return Cerr{"os.File.Close", err}
+			return utils.Err{"os.File.Close", err}
 		}
 		f.f = nil
 	}
@@ -214,27 +215,27 @@ func (f *CacheFile) Close() error {
 	name := filepath.Join(f.cache.root, "files", f.hash)
 
 	if err := os.Rename(f.tmpName, name); err != nil {
-		return Cerr{"os.Rename", err}
+		return utils.Err{"os.Rename", err}
 	}
 
 	if err := os.Chmod(name, 0400); err != nil {
-		return Cerr{"os.Chmod", err}
+		return utils.Err{"os.Chmod", err}
 	}
 
-	f.data[CacheData] = f.hash
+	f.data[Data] = f.hash
 
 	return nil
 }
 
 func (f *CacheFile) Install(path string) error {
 	if err := f.Close(); err != nil {
-		return Cerr{"f.Close", err}
+		return utils.Err{"f.Close", err}
 	}
 
 	if f.written || f.HasData() {
 		// Get the hash from data - as we could be installing either a new file,
 		// or one entirely loaded from the cache ...
-		hash, found := f.data[CacheData]
+		hash, found := f.data[Data]
 		if !found {
 			return fmt.Errorf("Failed to get hash")
 		}
@@ -242,20 +243,20 @@ func (f *CacheFile) Install(path string) error {
 		dir := filepath.Dir(path)
 
 		if err := os.MkdirAll(dir, 0700); err != nil {
-			return Cerr{"os.MkdirAll", err}
+			return utils.Err{"os.MkdirAll", err}
 		}
 
 		name := filepath.Join(f.cache.root, "files", hash.(string))
 
 		if err := os.Link(name, path); err != nil {
 			if err := os.Symlink(name, path); err != nil {
-				return Cerr{"os.Symlink", err}
+				return utils.Err{"os.Symlink", err}
 			}
 		}
 	}
 
 	if err := f.Save(); err != nil {
-		return Cerr{"f.Save", err}
+		return utils.Err{"f.Save", err}
 	}
 
 	return nil
@@ -269,33 +270,33 @@ func (f *CacheFile) Save() error {
 	dir := filepath.Join(f.cache.root, "metadata")
 
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return Cerr{"os.MkdirAll", err}
+		return utils.Err{"os.MkdirAll", err}
 	}
 
 	w, err := ioutil.TempFile(dir, "withmock-meta-")
 	if err != nil {
-		return Cerr{"TempFile", err}
+		return utils.Err{"TempFile", err}
 	}
 	defer w.Close()
 
 	enc := gob.NewEncoder(w)
 
 	if err := enc.Encode(f.data); err != nil {
-		return Cerr{"gob.Encode", err}
+		return utils.Err{"gob.Encode", err}
 	}
 
 	path := filepath.Join(f.cache.root, "metadata", f.key.Hash())
 
 	w.Close()
 	if err := os.Rename(w.Name(), path); err != nil {
-		return Cerr{"os.Rename", err}
+		return utils.Err{"os.Rename", err}
 	}
 
 	return nil
 }
 
 func (f *CacheFile) HasData() bool {
-	return f.Has(CacheData)
+	return f.Has(Data)
 }
 
 func (f *CacheFile) Has(name ...string) bool {

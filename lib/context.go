@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/qur/withmock/utils"
 )
 
 type Context struct {
@@ -164,7 +166,7 @@ func (c *Context) installPackages() error {
 		}
 
 		if err := pkg.Install(); err != nil {
-			return Cerr{"pkg.Install", err}
+			return utils.Err{"pkg.Install", err}
 		}
 	}
 
@@ -174,7 +176,7 @@ func (c *Context) installPackages() error {
 func (c *Context) mockStdlib() error {
 	list, err := getStdlibPackages()
 	if err != nil {
-		return Cerr{"getStdlibPackages", err}
+		return utils.Err{"getStdlibPackages", err}
 	}
 
 	pkgs := make(map[string]*Package)
@@ -196,7 +198,7 @@ func (c *Context) mockStdlib() error {
 
 		pkg, err := NewStdlibPackage(pkgName, label, c.tmpDir, c.goRoot, runtimerw)
 		if err != nil {
-			return Cerr{"NewPackage", err}
+			return utils.Err{"NewPackage", err}
 		}
 
 		pkgs[pkgName] = pkg
@@ -205,7 +207,7 @@ func (c *Context) mockStdlib() error {
 
 	p, err := c.getPkg("github.com/qur/gomock/interfaces", "github.com/qur/gomock/interfaces")
 	if err != nil {
-		return Cerr{"c.getPkg", err}
+		return utils.Err{"c.getPkg", err}
 	}
 
 	pkgs["github.com/qur/gomock/interfaces"] = p
@@ -215,7 +217,7 @@ func (c *Context) mockStdlib() error {
 	}
 
 	if _, err := p.Link(); err != nil {
-		return Cerr{"p.Link", err}
+		return utils.Err{"p.Link", err}
 	}
 
 	for pkgName, pkg := range pkgs {
@@ -238,7 +240,7 @@ func (c *Context) mockStdlib() error {
 
 			imports, err := pkg.Deps()
 			if err != nil {
-				return Cerr{"pkg.Deps", err}
+				return utils.Err{"pkg.Deps", err}
 			}
 
 			for _, name := range imports {
@@ -252,7 +254,7 @@ func (c *Context) mockStdlib() error {
 			// We don't want to mock testing - that just doesn't make sense ...
 			imports, err := pkg.DisableAllMocks()
 			if err != nil {
-				return Cerr{"pkg.Link", err}
+				return utils.Err{"pkg.Link", err}
 			}
 
 			for _, name := range imports {
@@ -274,7 +276,7 @@ func (c *Context) mockStdlib() error {
 		cfg := c.cfg.Mock(pkgName)
 		imports, err := pkg.Gen(false, cfg)
 		if err != nil {
-			return Cerr{"pkg.Gen", err}
+			return utils.Err{"pkg.Gen", err}
 		}
 
 		for name, imp := range imports {
@@ -296,14 +298,14 @@ func (c *Context) mockStdlib() error {
 
 		_, err = pkg.Rewrite()
 		if err != nil {
-			return Cerr{"pkg.Rewrite", err}
+			return utils.Err{"pkg.Rewrite", err}
 		}
 	}
 
 	// Add some code to enable/disable mocking to the runtime package
 	loc := pkgs["runtime"].Loc()
 	if err := addMockController(loc.dst); err != nil {
-		return Cerr{"addMockController", err}
+		return utils.Err{"addMockController", err}
 	}
 
 	// Before we can install the packages we need to get the toolchain
@@ -328,11 +330,11 @@ func (c *Context) mockStdlib() error {
 		dstDir := filepath.Dir(dst)
 
 		if err := os.MkdirAll(dstDir, 0700); err != nil {
-			return Cerr{"os.MkDirAll", err}
+			return utils.Err{"os.MkDirAll", err}
 		}
 
 		if err := os.Symlink(src, dst); err != nil {
-			return Cerr{"os.Symlink", err}
+			return utils.Err{"os.Symlink", err}
 		}
 	}
 
@@ -348,7 +350,7 @@ func (c *Context) mockStdlib() error {
 			pkg := pkgs[name]
 
 			if err := pkg.Install(); err != nil {
-				return Cerr{"pkg.Install", err}
+				return utils.Err{"pkg.Install", err}
 			}
 
 			inst = append(inst, name)
@@ -521,7 +523,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 
 			pkg, err := c.getPkg(name, label)
 			if err != nil {
-				return nil, Cerr{"context.getPkg", err}
+				return nil, utils.Err{"context.getPkg", err}
 			}
 
 			cfg := c.cfg.Mock(name)
@@ -534,7 +536,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				// this package has been specifically excluded from mocking, so
 				// we just link it, even if mocked is indicated.
 				if _, err := pkg.Link(); err != nil {
-					return nil, Cerr{"pkg.Link", err}
+					return nil, utils.Err{"pkg.Link", err}
 				}
 				continue
 			}
@@ -545,7 +547,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				srcPath := imports[name].path
 				pkgImports, err := pkg.Replace(srcPath)
 				if err != nil {
-					return nil, Cerr{"pkg.Replace", err}
+					return nil, utils.Err{"pkg.Replace", err}
 				}
 
 				// Update imports from the package we just processed, but it
@@ -558,7 +560,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			// Process the package and get it's imports
 			pkgImports, err := pkg.Gen(mock, cfg)
 			if err != nil {
-				return nil, Cerr{"pkg.Gen", err}
+				return nil, utils.Err{"pkg.Gen", err}
 			}
 
 			// Update imports from the package we just processed, but it can
@@ -589,7 +591,7 @@ func (c *Context) getPkg(pkgName, label string) (*Package, error) {
 
 	pkg, err := NewPackage(pkgName, label, c.tmpDir, c.goPath)
 	if err != nil {
-		return nil, Cerr{"NewPackage", err}
+		return nil, utils.Err{"NewPackage", err}
 	}
 
 	c.packages[label] = pkg
@@ -600,7 +602,7 @@ func (c *Context) getPkg(pkgName, label string) (*Package, error) {
 func (c *Context) LinkPackage(pkgName string) error {
 	pkg, err := c.getPkg(pkgName, markImport(pkgName, normalMark))
 	if err != nil {
-		return Cerr{"c.getPkg", err}
+		return utils.Err{"c.getPkg", err}
 	}
 
 	_, err = pkg.Link()
@@ -610,17 +612,17 @@ func (c *Context) LinkPackage(pkgName string) error {
 func (c *Context) AddPackage(pkgName string) (string, error) {
 	pkg, err := c.getPkg(pkgName, markImport(pkgName, testMark))
 	if err != nil {
-		return "", Cerr{"context.getPkg", err}
+		return "", utils.Err{"context.getPkg", err}
 	}
 
 	imports, err := pkg.GetImports()
 	if err != nil {
-		return "", Cerr{"pkg.GetImports", err}
+		return "", utils.Err{"pkg.GetImports", err}
 	}
 
 	importNames, err := c.installImports(imports)
 	if err != nil {
-		return "", Cerr{"installImports", err}
+		return "", utils.Err{"installImports", err}
 	}
 
 	newName := pkg.Label()
@@ -629,14 +631,14 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 
 	err = pkg.MockImports(importNames, c.cfg)
 	if err != nil {
-		return "", Cerr{"MockImports", err}
+		return "", utils.Err{"MockImports", err}
 	}
 
 	cfg := c.cfg.Mock(pkgName)
 
 	err = MockInterfaces(c.tmpPath, pkgName, cfg)
 	if err != nil {
-		return "", Cerr{"MockInterfaces", err}
+		return "", utils.Err{"MockInterfaces", err}
 	}
 
 	c.code = append(c.code, pkg.Loc())
@@ -681,11 +683,11 @@ func (c *Context) addRequiredPackage(name string) error {
 
 	pkg, err := c.getPkg(name, label)
 	if err != nil {
-		return Cerr{"context.getPkg", err}
+		return utils.Err{"context.getPkg", err}
 	}
 
 	if _, err := pkg.Link(); err != nil {
-		return Cerr{"pkg.Link", err}
+		return utils.Err{"pkg.Link", err}
 	}
 
 	return nil
@@ -696,7 +698,7 @@ func (c *Context) addRequiredPackages() error {
 		//"github.com/qur/gomock/interfaces",
 	} {
 		if err := c.addRequiredPackage(name); err != nil {
-			return Cerr{"c.addRequiredPackage", err}
+			return utils.Err{"c.addRequiredPackage", err}
 		}
 	}
 
@@ -707,19 +709,19 @@ func (c *Context) Run(command string, args ...string) error {
 	// Make sure required packages are installed
 
 	if err := c.addRequiredPackages(); err != nil {
-		return Cerr{"c.addRequiredPackages", err}
+		return utils.Err{"c.addRequiredPackages", err}
 	}
 
 	// Create a mocked version of the stdlib
 
 	if err := c.mockStdlib(); err != nil {
-		return Cerr{"c.mockStdlib", err}
+		return utils.Err{"c.mockStdlib", err}
 	}
 
 	// Install the packages inside the context
 
 	if err := c.installPackages(); err != nil {
-		return Cerr{"c.installPackages", err}
+		return utils.Err{"c.installPackages", err}
 	}
 
 	// Create a Command object

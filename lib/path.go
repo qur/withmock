@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"os"
+
+	"github.com/qur/withmock/utils"
 )
 
 var (
@@ -58,7 +60,7 @@ func LookupImportPath(impPath string) (string, error) {
 
 	path, err := filepath.Abs(path)
 	if err != nil {
-		return "", Cerr{"filepath.Abs", err}
+		return "", utils.Err{"filepath.Abs", err}
 	}
 
 	return path, nil

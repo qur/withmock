@@ -12,6 +12,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/qur/withmock/cache"
+	"github.com/qur/withmock/utils"
 )
 
 type Package struct {
@@ -25,19 +28,19 @@ type Package struct {
 	goPath string
 	rw *rewriter
 	fset *token.FileSet
-	cache *Cache
+	cache *cache.Cache
 	files []string
 }
 
 func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
-		return nil, Cerr{"LookupImportPath", err}
+		return nil, utils.Err{"LookupImportPath", err}
 	}
 
-	cache, err := OpenCache()
+	cache, err := cache.OpenCache()
 	if err != nil {
-		return nil, Cerr{"OpenCache", err}
+		return nil, utils.Err{"OpenCache", err}
 	}
 
 	tmpPath := getTmpPath(tmpDir)
@@ -61,12 +64,12 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Package, error) {
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
-		return nil, Cerr{"LookupImportPath", err}
+		return nil, utils.Err{"LookupImportPath", err}
 	}
 
-	cache, err := OpenCache()
+	cache, err := cache.OpenCache()
 	if err != nil {
-		return nil, Cerr{"OpenCache", err}
+		return nil, utils.Err{"OpenCache", err}
 	}
 
 	tmpPath := getTmpPath(tmpDir)
@@ -188,18 +191,18 @@ func (p *Package) rewriteFile(path, rel string) error {
 
 	key, err := p.cache.NewCacheFileKey("rewriteFile", path)
 	if err != nil {
-		return Cerr{"cache.NewCacheFileKey", err}
+		return utils.Err{"cache.NewCacheFileKey", err}
 	}
 
 	w, err := p.cache.GetFile(key)
 	if err != nil {
-		return Cerr{"cache.GetFile", err}
+		return utils.Err{"cache.GetFile", err}
 	}
 	defer w.Close()
 
 	if !w.HasData() {
 		if err := p.rw.Copy(path, w); err != nil {
-			return Cerr{"p.rw.Copy", err}
+			return utils.Err{"p.rw.Copy", err}
 		}
 	}
 
@@ -208,7 +211,7 @@ func (p *Package) rewriteFile(path, rel string) error {
 
 func (p *Package) Link() (importSet, error) {
 	if err := processTree(p.src, p.dst, p.symlinkFile); err != nil {
-		return nil, Cerr{"processTree", err}
+		return nil, utils.Err{"processTree", err}
 	}
 
 	return p.getImports(false)
@@ -221,11 +224,11 @@ func (p *Package) DisableInstall() {
 func (p *Package) Replace(with string) (importSet, error) {
 	src, err := LookupImportPath(with)
 	if err != nil {
-		return nil, Cerr{"LookupImportPath", err}
+		return nil, utils.Err{"LookupImportPath", err}
 	}
 
 	if err := processTree(src, p.dst, p.symlinkFile); err != nil {
-		return nil, Cerr{"processTree", err}
+		return nil, utils.Err{"processTree", err}
 	}
 
 	return p.getImports(false)
@@ -233,7 +236,7 @@ func (p *Package) Replace(with string) (importSet, error) {
 
 func (p *Package) Rewrite() (importSet, error) {
 	if err := processTree(p.src, p.dst, p.rewriteFile); err != nil {
-		return nil, Cerr{"processTree", err}
+		return nil, utils.Err{"processTree", err}
 	}
 
 	return p.getImports(false)
@@ -253,21 +256,21 @@ func (p *Package) DisableAllMocks() ([]string, error) {
 
 		key, err := p.cache.NewCacheFileKey("disableFile", path)
 		if err != nil {
-			return Cerr{"cache.NewCacheFileKey", err}
+			return utils.Err{"cache.NewCacheFileKey", err}
 		}
 
 		w, err := p.cache.GetFile(key)
 		if err != nil {
-			return Cerr{"cache.GetFile", err}
+			return utils.Err{"cache.GetFile", err}
 		}
 		defer w.Close()
 
-		if w.Has(CacheData, "imports") {
+		if w.Has(cache.Data, "imports") {
 			imports = w.Get("imports").([]string)
 		} else {
 			i, err := addMockDisables(path, w)
 			if err != nil {
-				return Cerr{"addMockDisables", err}
+				return utils.Err{"addMockDisables", err}
 			}
 			w.Store("imports", i)
 			imports = i
@@ -281,7 +284,7 @@ func (p *Package) DisableAllMocks() ([]string, error) {
 
 func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {
 	if err := os.MkdirAll(p.dst, 0700); err != nil {
-		return nil, Cerr{"os.MkdirAll", err}
+		return nil, utils.Err{"os.MkdirAll", err}
 	}
 
 	return p.mockPackage(mock, cfg)
@@ -300,7 +303,7 @@ func (p *Package) Deps() ([]string, error) {
 
 		f, err := parser.ParseFile(p.fset, path, nil, parser.ImportsOnly)
 		if err != nil {
-			return Cerr{"ParseFile("+path+")", err}
+			return utils.Err{"ParseFile("+path+")", err}
 		}
 
 		for _, imp := range f.Imports {
@@ -314,7 +317,7 @@ func (p *Package) Deps() ([]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, Cerr{"processSingleDir", err}
+		return nil, utils.Err{"processSingleDir", err}
 	}
 
 	return deps, nil
@@ -355,13 +358,13 @@ func (p *Package) needsInstall() (bool, error) {
 
 	d, err := os.Open(p.dst)
 	if err != nil {
-		return false, Cerr{"os.Open", err}
+		return false, utils.Err{"os.Open", err}
 	}
 	defer d.Close()
 
 	files, err := d.Readdirnames(-1)
 	if err != nil {
-		return false, Cerr{"d.Readdirnames", err}
+		return false, utils.Err{"d.Readdirnames", err}
 	}
 
 	for _, name := range files {
@@ -376,7 +379,7 @@ func (p *Package) needsInstall() (bool, error) {
 func (p *Package) Install() error {
 	needsInstall, err := p.needsInstall()
 	if err != nil {
-		return Cerr{"p.needsInstall", err}
+		return utils.Err{"p.needsInstall", err}
 	}
 
 	if !needsInstall {
@@ -385,12 +388,12 @@ func (p *Package) Install() error {
 
 	key, err := p.cache.NewCacheFileKey("install", p.files...)
 	if err != nil {
-		return Cerr{"cache.NewCacheFileKey", err}
+		return utils.Err{"cache.NewCacheFileKey", err}
 	}
 
 	f, err := p.cache.GetFile(key)
 	if err != nil {
-		return Cerr{"cache.GetFile", err}
+		return utils.Err{"cache.GetFile", err}
 	}
 	defer f.Close()
 
@@ -405,12 +408,12 @@ func (p *Package) Install() error {
 			return nil
 		})
 		if err != nil {
-			return Cerr{"WriteFunc", err}
+			return utils.Err{"WriteFunc", err}
 		}
 	}
 
 	if err := f.Install(p.pkgDst); err != nil {
-		return Cerr{"f.Install", err}
+		return utils.Err{"f.Install", err}
 	}
 
 	return nil

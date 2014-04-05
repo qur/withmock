@@ -11,6 +11,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/qur/withmock/cache"
+	"github.com/qur/withmock/utils"
 )
 
 func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, error) {
@@ -19,12 +22,12 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 
 	key, err := p.cache.NewCacheFileKey("mockFile", srcFile)
 	if err != nil {
-		return "", nil, Cerr{"cache.NewCacheFileKey", err}
+		return "", nil, utils.Err{"cache.NewCacheFileKey", err}
 	}
 
 	f, err := p.cache.GetFile(key)
 	if err != nil {
-		return "", nil, Cerr{"cache.GetFile", err}
+		return "", nil, utils.Err{"cache.GetFile", err}
 	}
 	defer f.Close()
 
@@ -42,7 +45,7 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 
 		file, err = parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
 		if err != nil {
-			return "", nil, Cerr{"ParseFile", err}
+			return "", nil, utils.Err{"ParseFile", err}
 		}
 
 		// If only considering files for this OS/Arch, then reject files
@@ -55,13 +58,13 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 
 	if ignore {
 		if err := f.Save(); err != nil {
-			return "", nil, Cerr{"f.Save", err}
+			return "", nil, utils.Err{"f.Save", err}
 		}
 
 		return "", nil, nil
 	}
 
-	if f.Has(CacheData, "name", "info") {
+	if f.Has(cache.Data, "name", "info") {
 		name = f.Get("name").(string)
 		info = f.Get("info").(*mockFileInfo)
 	} else {
@@ -70,13 +73,13 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 
 			file, err = parser.ParseFile(p.fset, srcFile, nil, parser.ParseComments)
 			if err != nil {
-				return "", nil, Cerr{"ParseFile", err}
+				return "", nil, utils.Err{"ParseFile", err}
 			}
 		}
 
 		i, err := m.file(f, file, srcFile)
 		if err != nil {
-			return "", nil, Cerr{"m.file", err}
+			return "", nil, utils.Err{"m.file", err}
 		}
 
 		f.Store("name", file.Name.Name)
@@ -104,13 +107,13 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 
 	// Create the actual file in the src tree
 	if err := f.Install(filename); err != nil {
-		return "", nil, Cerr{"f.Install", err}
+		return "", nil, utils.Err{"f.Install", err}
 	}
 
 	/*
 		// TODO: we want to gofmt, goimports can break things ...
 		if err := fixup(filename); err != nil {
-			return "", nil, Cerr{"fixup", err}
+			return "", nil, utils.Err{"fixup", err}
 		}
 	*/
 
@@ -162,7 +165,7 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 
 		name, i, err := p.mockFile(base, m)
 		if err != nil {
-			return "", nil, nil, Cerr{"p.mockFile", err}
+			return "", nil, nil, utils.Err{"p.mockFile", err}
 		}
 
 		if name == "" {
@@ -192,29 +195,29 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 
 	key, err := p.cache.NewCacheFileKey("mockFiles.pkg", p.files...)
 	if err != nil {
-		return "", nil, nil, Cerr{"cache.NewCacheFileKey", err}
+		return "", nil, nil, utils.Err{"cache.NewCacheFileKey", err}
 	}
 
 	f, err := p.cache.GetFile(key)
 	if err != nil {
-		return "", nil, nil, Cerr{"cache.GetFile", err}
+		return "", nil, nil, utils.Err{"cache.GetFile", err}
 	}
 	defer f.Close()
 
 	if !f.HasData() {
 		err := f.WriteFunc(func(filename string) error {
 			if err := p.doPkg(filename, pkg, m); err != nil {
-				return Cerr{"p.doPkg", err}
+				return utils.Err{"p.doPkg", err}
 			}
 			return nil
 		})
 		if err != nil {
-			return "", nil, nil, Cerr{"f.WriteFunc", err}
+			return "", nil, nil, utils.Err{"f.WriteFunc", err}
 		}
 	}
 
 	if err := f.Install(filename); err != nil {
-		return "", nil, nil, Cerr{"f.Install", err}
+		return "", nil, nil, utils.Err{"f.Install", err}
 	}
 
 	m.ifInfo.filename = filepath.Join(p.dst, pkg+"_ifmocks.go")
@@ -226,20 +229,20 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 func (p *Package) doPkg(filename, pkg string, m *mockGen) error {
 	out, err := os.Create(filename)
 	if err != nil {
-		return Cerr{"os.Create", err}
+		return utils.Err{"os.Create", err}
 	}
 	defer out.Close()
 
 	err = m.pkg(out, pkg)
 	if err != nil {
-		return Cerr{"m.pkg", err}
+		return utils.Err{"m.pkg", err}
 	}
 
 	// TODO: currently we need to use goimports to add missing imports, we
 	// need to sort out our own imports, then we can switch to gofmt.
 	err = fixup(filename)
 	if err != nil {
-		return Cerr{"fixup", err}
+		return utils.Err{"fixup", err}
 	}
 
 	return nil
@@ -283,16 +286,16 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 	}
 
 	if err := walk(p.src, processDir, processFile); err != nil {
-		return nil, Cerr{"walk", err}
+		return nil, utils.Err{"walk", err}
 	}
 
 	pkg, externalFunctions, interfaces, err := p.mockFiles(goFiles, byDefault, cfg, imports)
 	if err != nil {
-		return nil, Cerr{"mockFiles", err}
+		return nil, utils.Err{"mockFiles", err}
 	}
 
 	if err := p.genInterfaces(interfaces); err != nil {
-		return nil, Cerr{"genInterfaces", err}
+		return nil, utils.Err{"genInterfaces", err}
 	}
 
 	if cfg.IgnoreNonGoFiles {
@@ -315,21 +318,21 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 
 		key, err := p.cache.NewCacheFileKey("mockPackage.nonGoSource", input)
 		if err != nil {
-			return nil, Cerr{"cache.NewCacheFileKey", err}
+			return nil, utils.Err{"cache.NewCacheFileKey", err}
 		}
 
 		w, err := p.cache.GetFile(key)
 		if err != nil {
-			return nil, Cerr{"os.Create", err}
+			return nil, utils.Err{"os.Create", err}
 		}
 		defer w.Close()
 
 		if err := rw.Copy(input, w); err != nil {
-			return nil, Cerr{"rw.Copy", err}
+			return nil, utils.Err{"rw.Copy", err}
 		}
 
 		if err := w.Install(output); err != nil {
-			return nil, Cerr{"w.Install", err}
+			return nil, utils.Err{"w.Install", err}
 		}
 	}
 
@@ -340,7 +343,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 
 		err := os.Symlink(input, output)
 		if err != nil {
-			return nil, Cerr{"os.Symlink", err}
+			return nil, utils.Err{"os.Symlink", err}
 		}
 	}
 
@@ -357,37 +360,37 @@ func (p *Package) genInterfaces(interfaces Interfaces) error {
 
 		key, err := p.cache.NewCacheFileKey("genInterface."+name, p.files...)
 		if err != nil {
-			return Cerr{"cache.NewCacheFileKey", err}
+			return utils.Err{"cache.NewCacheFileKey", err}
 		}
 
 		f, err := p.cache.GetFile(key)
 		if err != nil {
-			return Cerr{"cache.GetFile", err}
+			return utils.Err{"cache.GetFile", err}
 		}
 		defer f.Close()
 
 		if !f.HasData() {
 			err = f.WriteFunc(func(filename string) error {
 				if err := interfaces.genInterface(name, filename); err != nil {
-					return Cerr{"genInterface", err}
+					return utils.Err{"genInterface", err}
 				}
 
 				// TODO: currently we need to use goimports to add missing
 				// imports, we need to sort out our own imports, then we can
 				// switch to gofmt.
 				if err := fixup(filename); err != nil {
-					return Cerr{"fixup", err}
+					return utils.Err{"fixup", err}
 				}
 
 				return nil
 			})
 			if err != nil {
-				return Cerr{"f.WriteFunc", err}
+				return utils.Err{"f.WriteFunc", err}
 			}
 		}
 
 		if err := f.Install(i.filename); err != nil {
-			return Cerr{"f.Install", err}
+			return utils.Err{"f.Install", err}
 		}
 	}
 

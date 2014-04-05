@@ -3,6 +3,8 @@ package lib
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/qur/withmock/utils"
 )
 
 var mockControlC = `#include "runtime.h"
@@ -65,25 +67,25 @@ func addMockController(dst string) error {
 	cpath := filepath.Join(dst, "mock_control.c")
 	cf, err := os.Create(cpath)
 	if err != nil {
-		return Cerr{"os.Create(cpath)", err}
+		return utils.Err{"os.Create(cpath)", err}
 	}
 	defer cf.Close()
 
 	_, err = cf.WriteString(mockControlC)
 	if err != nil {
-		return Cerr{"cf.WriteString", err}
+		return utils.Err{"cf.WriteString", err}
 	}
 
 	gopath := filepath.Join(dst, "mock_control.go")
 	gf, err := os.Create(gopath)
 	if err != nil {
-		return Cerr{"os.Create(gopath)", err}
+		return utils.Err{"os.Create(gopath)", err}
 	}
 	defer gf.Close()
 
 	_, err = gf.WriteString(mockControlGo)
 	if err != nil {
-		return Cerr{"gf.WriteString", err}
+		return utils.Err{"gf.WriteString", err}
 	}
 
 	return nil

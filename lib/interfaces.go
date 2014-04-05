@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"go/ast"
 	"os"
+
+	"github.com/qur/withmock/utils"
 )
 
 type external struct {
@@ -159,7 +161,7 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 		}
 		m, err := i.getMethods(name, n)
 		if err != nil {
-			return nil, Cerr{"i.getMethods", err}
+			return nil, utils.Err{"i.getMethods", err}
 		}
 		methods = append(methods, m...)
 	}
@@ -168,14 +170,14 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 		if _, ok := i[e.name]; !ok {
 			info, err := loadInterfaceInfo(e.impPath)
 			if err != nil {
-				return nil, Cerr{"loadInterfaceInfo", err}
+				return nil, utils.Err{"loadInterfaceInfo", err}
 			}
 			i[e.name] = info
 		}
 
 		m, err := i.getMethods(e.name, e.selector)
 		if err != nil {
-			return nil, Cerr{"i.getMethods", err}
+			return nil, utils.Err{"i.getMethods", err}
 		}
 		for _, method := range m {
 			methods = append(methods, method.AddScope(e.name))
@@ -190,7 +192,7 @@ func (i Interfaces) genInterface(name string, filename string) error {
 
 	out, err := os.Create(filename)
 	if err != nil {
-		return Cerr{"os.Create", err}
+		return utils.Err{"os.Create", err}
 	}
 	defer out.Close()
 
@@ -220,7 +222,7 @@ func (i Interfaces) genInterface(name string, filename string) error {
 
 		methods, err := i.getMethods(name, tname)
 		if err != nil {
-			return Cerr{"getMethods", err}
+			return utils.Err{"getMethods", err}
 		}
 
 		for _, m := range methods {

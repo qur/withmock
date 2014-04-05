@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"io"
 	"os"
+
+	"github.com/qur/withmock/utils"
 )
 
 type rewriter struct {
@@ -101,19 +103,19 @@ func (r *rewriter) Change(w io.Writer) error {
 func (rw *rewriter) Copy(src string, w io.Writer) error {
 	r, err := os.Open(src)
 	if err != nil {
-		return Cerr{"os.Open", err}
+		return utils.Err{"os.Open", err}
 	}
 	defer r.Close()
 
 	err = rw.Change(w)
 	if err != nil {
-		return Cerr{"rw.Change", err}
+		return utils.Err{"rw.Change", err}
 	}
 	defer rw.Close()
 
 	_, err = io.Copy(rw, r)
 	if err != nil {
-		return Cerr{"io.Copy", err}
+		return utils.Err{"io.Copy", err}
 	}
 
 	return nil

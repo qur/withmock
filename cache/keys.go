@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package lib
+package cache
 
 import (
 	"encoding/hex"
@@ -11,6 +11,8 @@ import (
 	"time"
 	"io"
 	"log"
+
+	"github.com/qur/withmock/utils"
 )
 
 type cacheFileDetails struct {
@@ -26,12 +28,12 @@ func (c *Cache) getDetails(path string) (cacheFileDetails, error) {
 
 	st, err := os.Stat(path)
 	if err != nil {
-		return cacheFileDetails{}, Cerr{"os.Stat", err}
+		return cacheFileDetails{}, utils.Err{"os.Stat", err}
 	}
 
 	f, err := os.Open(path)
 	if err != nil {
-		return cacheFileDetails{}, Cerr{"os.Open", err}
+		return cacheFileDetails{}, utils.Err{"os.Open", err}
 	}
 	defer f.Close()
 
@@ -39,7 +41,7 @@ func (c *Cache) getDetails(path string) (cacheFileDetails, error) {
 
 	log.Printf("START: calcHash")
 	if _, err := io.Copy(h, f); err != nil {
-		return cacheFileDetails{}, Cerr{"io.Copy", err}
+		return cacheFileDetails{}, utils.Err{"io.Copy", err}
 	}
 	hash := hex.EncodeToString(h.Sum(nil))
 	log.Printf("END: calcHash")
@@ -68,7 +70,7 @@ func (c *Cache) NewCacheFileKey(op string, srcs ...string) (*CacheFileKey, error
 		files[i], err = c.getDetails(src)
 		log.Printf("END: getDetails")
 		if err != nil {
-			return nil, Cerr{"c.getDetails("+src+")", err}
+			return nil, utils.Err{"c.getDetails("+src+")", err}
 		}
 	}
 

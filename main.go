@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/qur/withmock/lib"
+	"github.com/qur/withmock/utils"
 	"log"
 )
 
@@ -46,7 +47,7 @@ func main() {
 		os.Exit(ws.ExitStatus())
 	}
 
-	if c, ok := err.(lib.Cerr); *debug && ok {
+	if c, ok := err.(utils.Err); *debug && ok {
 		fmt.Fprintf(os.Stderr, "ERROR(%s): %s\n", c.Context(), err)
 		os.Exit(1)
 	}
@@ -139,7 +140,7 @@ func doit() error {
 	}
 
 	if err := ctxt.Run(flag.Arg(0), flag.Args()[1:]...); err != nil {
-		return lib.Cerr{"Run", err}
+		return utils.Err{"Run", err}
 	}
 
 	return nil

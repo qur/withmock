@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/qur/withmock/lib"
+	"github.com/qur/withmock/utils"
 	"log"
 )
 
@@ -49,7 +50,7 @@ func main() {
 		os.Exit(ws.ExitStatus())
 	}
 
-	if c, ok := err.(lib.Cerr); *debug && ok {
+	if c, ok := err.(utils.Err); *debug && ok {
 		fmt.Fprintf(os.Stderr, "ERROR(%s): %s\n", c.Context(), err)
 		os.Exit(1)
 	}
@@ -78,7 +79,7 @@ func doit() error {
 	for _, arg := range args {
 		list, err := lib.GetOutput("go", "list", arg)
 		if err != nil {
-			return lib.Cerr{"go list", err}
+			return utils.Err{"go list", err}
 		}
 		for _, pkg := range strings.Split(list, "\n") {
 			pkg = strings.TrimSpace(pkg)
@@ -98,7 +99,7 @@ func doit() error {
 
 	ctxt, err := lib.NewContext()
 	if err != nil {
-		return lib.Cerr{"NewContext", err}
+		return utils.Err{"NewContext", err}
 	}
 	defer ctxt.Close()
 
@@ -114,7 +115,7 @@ func doit() error {
 
 	if *exclFile != "" {
 		if err := ctxt.ExcludePackagesFromFile(*exclFile); err != nil {
-			return lib.Cerr{"ExcludePackagesFromFile", err}
+			return utils.Err{"ExcludePackagesFromFile", err}
 		}
 	}
 
@@ -122,7 +123,7 @@ func doit() error {
 
 	if *cfgFile != "" {
 		if err := ctxt.LoadConfig(*cfgFile); err != nil {
-			return lib.Cerr{"LoadConfig", err}
+			return utils.Err{"LoadConfig", err}
 		}
 	}
 
@@ -143,7 +144,7 @@ func doit() error {
 	for _, pkg := range pkgs {
 		name, err := ctxt.AddPackage(pkg)
 		if err != nil {
-			return lib.Cerr{"AddPackage", err}
+			return utils.Err{"AddPackage", err}
 		}
 		args = append(args, name)
 	}
@@ -152,7 +153,7 @@ func doit() error {
 
 	if *pkgFile != "" {
 		if err := ctxt.LinkPackagesFromFile(*pkgFile); err != nil {
-			return lib.Cerr{"LinkPackagesFromFile", err}
+			return utils.Err{"LinkPackagesFromFile", err}
 		}
 	}
 
@@ -163,7 +164,7 @@ func doit() error {
 			return fmt.Errorf("gocov doesn't provide a compiliation only mode.")
 		}
 		if err := ctxt.LinkPackage("github.com/axw/gocov"); err != nil {
-			return lib.Cerr{"LinkPackage(gocov)", err}
+			return utils.Err{"LinkPackage(gocov)", err}
 		}
 		command = "gocov"
 	}
@@ -171,7 +172,7 @@ func doit() error {
 	// Finally we can run the command inside the context
 
 	if err := ctxt.Run(command, args...); err != nil {
-		return lib.Cerr{"Run", err}
+		return utils.Err{"Run", err}
 	}
 
 	return nil

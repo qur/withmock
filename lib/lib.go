@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/qur/withmock/utils"
 )
 
 var (
@@ -226,7 +228,7 @@ func getStdlibPackages() ([]string, error) {
 	}
 
 	if err := walk(src, dir, file); err != nil {
-		return nil, Cerr{"walk", err}
+		return nil, utils.Err{"walk", err}
 	}
 
 	pkglist := make([]string, 0, len(pkgs))
