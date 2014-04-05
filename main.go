@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/qur/withmock/lib"
+	"log"
 )
 
 var (
@@ -36,6 +37,8 @@ func usage() {
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
 	err := doit()
 
 	if exit, ok := err.(*exec.ExitError); ok {
