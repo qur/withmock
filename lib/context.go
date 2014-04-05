@@ -434,18 +434,8 @@ func (i importCfg) ShouldInstall() bool {
 func (s importSet) Set(path string, mode importMode, path2 string) error {
 	i, found := s[path]
 
-	if found {
-/*
-		if i.mode != mode {
-			return fmt.Errorf("%s: Cannot change mode from %s to %s", path, i.mode, mode)
-		}
-*/
-
-		if i.path != path2 {
-			return fmt.Errorf("%s: Cannot change path from %s to %s", path, i.path, path2)
-		}
-
-//		return nil
+	if found && path2 == "" {
+		path2 = i.path
 	}
 
 	i.mode |= mode

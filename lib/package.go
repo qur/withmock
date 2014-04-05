@@ -146,7 +146,7 @@ func (p *Package) getImports(tests bool) (importSet, error) {
 
 				err := imports.Set(path, mode, path2)
 				if err != nil {
-					return nil, err
+					return nil, utils.Err{"imports.Set", err}
 				}
 			}
 		}
