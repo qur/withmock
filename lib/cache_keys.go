@@ -5,11 +5,12 @@
 package lib
 
 import (
-	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"os"
 	"time"
+	"io"
+	"log"
 )
 
 type cacheFileDetails struct {
@@ -17,6 +18,7 @@ type cacheFileDetails struct {
 	Size int64 `json:"size"`
 	Mode os.FileMode `json:"mode"`
 	ModTime time.Time `json:"mod_time"`
+	Hash string `json:"hash"`
 }
 
 func (c *Cache) getDetails(path string) (cacheFileDetails, error) {
@@ -27,11 +29,27 @@ func (c *Cache) getDetails(path string) (cacheFileDetails, error) {
 		return cacheFileDetails{}, Cerr{"os.Stat", err}
 	}
 
+	f, err := os.Open(path)
+	if err != nil {
+		return cacheFileDetails{}, Cerr{"os.Open", err}
+	}
+	defer f.Close()
+
+	h := NewCacheHash()
+
+	log.Printf("START: calcHash")
+	if _, err := io.Copy(h, f); err != nil {
+		return cacheFileDetails{}, Cerr{"io.Copy", err}
+	}
+	hash := hex.EncodeToString(h.Sum(nil))
+	log.Printf("END: calcHash")
+
 	return cacheFileDetails{
 		Src: path,
 		Size: st.Size(),
 		Mode: st.Mode(),
 		ModTime: st.ModTime(),
+		Hash: hash,
 	}, nil
 }
 
@@ -46,7 +64,9 @@ func (c *Cache) NewCacheFileKey(op string, srcs ...string) (*CacheFileKey, error
 
 	files := make([]cacheFileDetails, len(srcs))
 	for i, src := range srcs {
+		log.Printf("START: getDetails")
 		files[i], err = c.getDetails(src)
+		log.Printf("END: getDetails")
 		if err != nil {
 			return nil, Cerr{"c.getDetails("+src+")", err}
 		}
@@ -67,7 +87,7 @@ func (k *CacheFileKey) Hash() string {
 }
 
 func (k *CacheFileKey) calcHash() {
-	h := sha512.New()
+	h := NewCacheHash()
 
 	enc := json.NewEncoder(h)
 

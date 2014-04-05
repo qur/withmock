@@ -5,7 +5,6 @@
 package lib
 
 import (
-	"crypto/sha512"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
@@ -42,7 +41,7 @@ func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
 		key: key,
 		written: false,
 		changed: false,
-		h: sha512.New(),
+		h: NewCacheHash(),
 		cache: c,
 		hash: "",
 		data: nil,
@@ -82,7 +81,7 @@ func (c *Cache) GetFile(key *CacheFileKey) (*CacheFile, error) {
 		key: key,
 		written: false,
 		changed: false,
-		h: sha512.New(),
+		h: NewCacheHash(),
 		cache: c,
 		hash: "",
 		data: make(map[string]interface{}),
@@ -210,7 +209,6 @@ func (f *CacheFile) Close() error {
 		f.f = nil
 	}
 
-	// TODO: should be adding size into the hash calculation ...
 	f.hash = hex.EncodeToString(f.h.Sum(nil))
 
 	name := filepath.Join(f.cache.root, "files", f.hash)
