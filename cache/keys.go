@@ -7,7 +7,6 @@ package cache
 import (
 	"encoding/hex"
 	"encoding/json"
-	"log"
 
 	"github.com/qur/withmock/utils"
 )
@@ -24,9 +23,7 @@ func (c *Cache) NewCacheFileKey(op string, srcs ...string) (*CacheFileKey, error
 
 	files := make([]string, len(srcs))
 	for i, src := range srcs {
-		log.Printf("START: lookupDetails")
 		files[i], err = c.lookupDetails(src)
-		log.Printf("END: lookupDetails")
 		if err != nil {
 			return nil, utils.Err{"c.getDetails("+src+")", err}
 		}

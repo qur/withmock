@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"log"
 	"os"
 	"time"
 
@@ -49,12 +48,10 @@ func hashFile(path string) (string, error) {
 
 	h := NewCacheHash()
 
-	log.Printf("START: calcHash")
 	if _, err := io.Copy(h, f); err != nil {
 		return "", utils.Err{"io.Copy", err}
 	}
 	hash := hex.EncodeToString(h.Sum(nil))
-	log.Printf("END: calcHash")
 
 	return hash, nil
 }
