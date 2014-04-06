@@ -15,15 +15,15 @@ import (
 type Cache struct {
 	enabled bool
 	root string
-	self cacheFileDetails
+	self string
 }
 
-var self cacheFileDetails
+var self string
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	log.Printf("START: getDetails(/proc/self/exe)")
-	hash, err := getDetails("/proc/self/exe")
+	hash, err := hashFile("/proc/self/exe")
 	log.Printf("END: getDetails(/proc/self/exe)")
 	if err != nil {
 		panic("Failed to generate key from binary: " + err.Error())

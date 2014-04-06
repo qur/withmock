@@ -13,7 +13,7 @@ import (
 )
 
 type CacheFileKey struct {
-	Self cacheFileDetails `json:"self"`
+	Self string `json:"self"`
 	Op string `json:"op"`
 	Files []string `json:"files"`
 	hash string
