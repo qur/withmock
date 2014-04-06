@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/qur/withmock/config"
 	"github.com/qur/withmock/utils"
 )
 
@@ -15,6 +16,7 @@ type Cache struct {
 	enabled bool
 	root string
 	self string
+	cfg *config.MockConfig
 }
 
 var self string
@@ -27,7 +29,7 @@ func init() {
 	self = hash
 }
 
-func OpenCache() (*Cache, error) {
+func OpenCache(cfg *config.MockConfig) (*Cache, error) {
 	enabled := os.Getenv("WITHMOCK_DISABLE_CACHE") == ""
 
 	home := os.Getenv("HOME")
@@ -50,5 +52,6 @@ func OpenCache() (*Cache, error) {
 		enabled: enabled,
 		root: root,
 		self: self,
+		cfg: cfg,
 	}, nil
 }

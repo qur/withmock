@@ -9,12 +9,14 @@ import (
 	"encoding/json"
 
 	"github.com/qur/withmock/utils"
+	"github.com/qur/withmock/config"
 )
 
 type CacheFileKey struct {
 	Self string `json:"self"`
 	Op string `json:"op"`
 	Files []string `json:"files"`
+	Config *config.MockConfig `json:"config"`
 	hash string
 }
 
@@ -33,6 +35,7 @@ func (c *Cache) NewCacheFileKey(op string, srcs ...string) (*CacheFileKey, error
 		Self: c.self,
 		Op: op,
 		Files: files,
+		Config: c.cfg,
 	}, nil
 }
 

@@ -12,9 +12,9 @@ import (
 )
 
 type MockConfig struct {
-	MOCK      string `yaml:"MOCK"`
-	EXPECT    string `yaml:"EXPECT"`
-	ObjEXPECT string `yaml:"obj.EXPECT"`
+	MOCK      string `yaml:"MOCK" json:"MOCK"`
+	EXPECT    string `yaml:"EXPECT" json:"EXPECT"`
+	ObjEXPECT string `yaml:"obj.EXPECT" json:"obj.EXPECT"`
 }
 
 type Config struct {

@@ -40,7 +40,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string, cfg *config.Config) (*Pac
 		return nil, utils.Err{"LookupImportPath", err}
 	}
 
-	cache, err := cache.OpenCache()
+	cache, err := cache.OpenCache(cfg.Mock(pkgName))
 	if err != nil {
 		return nil, utils.Err{"OpenCache", err}
 	}
@@ -70,7 +70,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, cfg *config.Config,
 		return nil, utils.Err{"LookupImportPath", err}
 	}
 
-	cache, err := cache.OpenCache()
+	cache, err := cache.OpenCache(cfg.Mock(pkgName))
 	if err != nil {
 		return nil, utils.Err{"OpenCache", err}
 	}
