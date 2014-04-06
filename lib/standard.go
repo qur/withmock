@@ -12,6 +12,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/qur/withmock/config"
 )
 
 type rewrite struct {
@@ -19,7 +21,7 @@ type rewrite struct {
 	content string
 }
 
-func mockFileImports(src, dst string, change map[string]string, cfg *Config) error {
+func mockFileImports(src, dst string, change map[string]string, cfg *config.Config) error {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, src, nil,
 		parser.ImportsOnly|parser.ParseComments)

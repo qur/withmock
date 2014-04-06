@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/qur/withmock/cache"
+	"github.com/qur/withmock/config"
 	"github.com/qur/withmock/utils"
 )
 
@@ -130,7 +131,7 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	return name, imports, nil
 }
 
-func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imports importSet) (string, []string, Interfaces, error) {
+func (p *Package) mockFiles(files []string, byDefault bool, cfg *config.MockConfig, imports importSet) (string, []string, Interfaces, error) {
 	interfaces := make(Interfaces)
 
 	pkg := ""
@@ -242,7 +243,7 @@ func (p *Package) doPkg(filename, pkg string, m *mockGen) error {
 	return nil
 }
 
-func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error) {
+func (p *Package) mockPackage(byDefault bool, cfg *config.MockConfig) (importSet, error) {
 	imports := make(importSet)
 
 	processDir := func(path, rel string) error {

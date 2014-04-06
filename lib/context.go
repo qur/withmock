@@ -5,6 +5,7 @@
 package lib
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/qur/withmock/config"
 	"github.com/qur/withmock/utils"
 )
 
@@ -39,7 +41,7 @@ type Context struct {
 
 	code []codeLoc
 
-	cfg *Config
+	cfg *config.Config
 
 	packages map[string]*Package
 }
@@ -95,7 +97,7 @@ func NewContext() (*Context, error) {
 		processed:      make(map[string]bool),
 		importRewrites: make(map[string]string),
 		doRewrite:      true,
-		cfg:            &Config{},
+		cfg:            &config.Config{},
 		packages:       make(map[string]*Package),
 		// create excludes already including gomock, as we can't mock it.
 		excludes: map[string]bool{
@@ -131,7 +133,7 @@ func (c *Context) Close() error {
 }
 
 func (c *Context) LoadConfig(path string) (err error) {
-	c.cfg, err = ReadConfig(path)
+	c.cfg, err = config.Read(path)
 	return
 }
 
@@ -631,6 +633,30 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 	c.code = append(c.code, pkg.Loc())
 
 	return newName, nil
+}
+
+func readPackages(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	pkgs := []string{}
+
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := strings.TrimSpace(s.Text())
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+		pkgs = append(pkgs, line)
+	}
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+
+	return pkgs, nil
 }
 
 func (c *Context) LinkPackagesFromFile(path string) error {

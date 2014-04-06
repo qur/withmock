@@ -2,40 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package lib
+package config
 
 import (
-	"bufio"
 	"io/ioutil"
 	"os"
-	"strings"
 
 	"launchpad.net/goyaml"
 )
-
-func readPackages(path string) ([]string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	pkgs := []string{}
-
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		line := strings.TrimSpace(s.Text())
-		if len(line) == 0 || line[0] == '#' {
-			continue
-		}
-		pkgs = append(pkgs, line)
-	}
-	if err := s.Err(); err != nil {
-		return nil, err
-	}
-
-	return pkgs, nil
-}
 
 type MockConfig struct {
 	MOCK      string `yaml:"MOCK"`
@@ -88,7 +62,7 @@ func (c *Config) Mock(path string) *MockConfig {
 	return m
 }
 
-func ReadConfig(path string) (*Config, error) {
+func Read(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/qur/withmock/cache"
+	"github.com/qur/withmock/config"
 	"github.com/qur/withmock/utils"
 )
 
@@ -29,11 +30,11 @@ type Package struct {
 	rw *rewriter
 	fset *token.FileSet
 	cache *cache.Cache
-	cfg *Config
+	cfg *config.Config
 	files []string
 }
 
-func NewPackage(pkgName, label, tmpDir, goPath string, cfg *Config) (*Package, error) {
+func NewPackage(pkgName, label, tmpDir, goPath string, cfg *config.Config) (*Package, error) {
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, utils.Err{"LookupImportPath", err}
@@ -63,7 +64,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string, cfg *Config) (*Package, e
 	}, nil
 }
 
-func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, cfg *Config, rw *rewriter) (*Package, error) {
+func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, cfg *config.Config, rw *rewriter) (*Package, error) {
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, utils.Err{"LookupImportPath", err}

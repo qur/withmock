@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/qur/withmock/config"
 	"github.com/qur/withmock/lib"
 )
 
@@ -19,9 +20,9 @@ func main() {
 
 	impPath, dstPath := os.Args[1], os.Args[2]
 
-	cfg := &lib.Config{
-		Mocks: map[string]*lib.MockConfig{
-			"impPath": &lib.MockConfig{
+	cfg := &config.Config{
+		Mocks: map[string]*config.MockConfig{
+			"impPath": &config.MockConfig{
 				MOCK:   "MOCK",
 				EXPECT: "EXPECT",
 			},

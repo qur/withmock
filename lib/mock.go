@@ -16,6 +16,7 @@ import (
 	"strings"
 	"encoding/gob"
 
+	"github.com/qur/withmock/config"
 	"github.com/qur/withmock/utils"
 )
 
@@ -1259,7 +1260,7 @@ func loadInterfaceInfo(impPath string) (*ifInfo, error) {
 	return ifInfo, nil
 }
 
-func MockInterfaces(tmpPath, pkgName string, cfg *MockConfig) error {
+func MockInterfaces(tmpPath, pkgName string, cfg *config.MockConfig) error {
 	i := make(Interfaces)
 
 	dst := filepath.Join(tmpPath, "src", pkgName, "_mocks_")
