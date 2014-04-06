@@ -292,10 +292,6 @@ func (p *Package) mockPackage(byDefault bool, cfg *MockConfig) (importSet, error
 		return nil, utils.Err{"genInterfaces", err}
 	}
 
-	if cfg.IgnoreNonGoFiles {
-		return imports, nil
-	}
-
 	// Load up a rewriter with the rewrites for the external functions
 	rw := NewRewriter(nil)
 	for _, fname := range externalFunctions {

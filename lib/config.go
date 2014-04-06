@@ -38,10 +38,6 @@ func readPackages(path string) ([]string, error) {
 }
 
 type MockConfig struct {
-	// Local configuration
-	IgnoreNonGoFiles bool // Don't copy non-go files into the mocked package
-
-	// File based configuration
 	MOCK      string `yaml:"MOCK"`
 	EXPECT    string `yaml:"EXPECT"`
 	ObjEXPECT string `yaml:"obj.EXPECT"`
