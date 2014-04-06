@@ -9,11 +9,26 @@ import (
 	"path/filepath"
 
 	"github.com/qur/withmock/utils"
+	"log"
 )
 
 type Cache struct {
 	enabled bool
 	root string
+	self cacheFileDetails
+}
+
+var self cacheFileDetails
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.Printf("START: getDetails(/proc/self/exe)")
+	hash, err := getDetails("/proc/self/exe")
+	log.Printf("END: getDetails(/proc/self/exe)")
+	if err != nil {
+		panic("Failed to generate key from binary: " + err.Error())
+	}
+	self = hash
 }
 
 func OpenCache() (*Cache, error) {
@@ -38,5 +53,6 @@ func OpenCache() (*Cache, error) {
 	return &Cache{
 		enabled: enabled,
 		root: root,
+		self: self,
 	}, nil
 }

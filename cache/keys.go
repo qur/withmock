@@ -23,7 +23,7 @@ type cacheFileDetails struct {
 	Hash string `json:"hash"`
 }
 
-func (c *Cache) getDetails(path string) (cacheFileDetails, error) {
+func getDetails(path string) (cacheFileDetails, error) {
 	// TODO: need to include file size, mode, hash etc in key ...
 
 	st, err := os.Stat(path)
@@ -56,6 +56,7 @@ func (c *Cache) getDetails(path string) (cacheFileDetails, error) {
 }
 
 type CacheFileKey struct {
+	Self cacheFileDetails `json:"self"`
 	Op string `json:"op"`
 	Files []cacheFileDetails `json:"files"`
 	hash string
@@ -67,7 +68,7 @@ func (c *Cache) NewCacheFileKey(op string, srcs ...string) (*CacheFileKey, error
 	files := make([]cacheFileDetails, len(srcs))
 	for i, src := range srcs {
 		log.Printf("START: getDetails")
-		files[i], err = c.getDetails(src)
+		files[i], err = getDetails(src)
 		log.Printf("END: getDetails")
 		if err != nil {
 			return nil, utils.Err{"c.getDetails("+src+")", err}
@@ -75,6 +76,7 @@ func (c *Cache) NewCacheFileKey(op string, srcs ...string) (*CacheFileKey, error
 	}
 
 	return &CacheFileKey{
+		Self: c.self,
 		Op: op,
 		Files: files,
 	}, nil
