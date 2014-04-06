@@ -29,10 +29,11 @@ type Package struct {
 	rw *rewriter
 	fset *token.FileSet
 	cache *cache.Cache
+	cfg *Config
 	files []string
 }
 
-func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
+func NewPackage(pkgName, label, tmpDir, goPath string, cfg *Config) (*Package, error) {
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, utils.Err{"LookupImportPath", err}
@@ -58,10 +59,11 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (*Package, error) {
 		rw: nil,
 		fset: token.NewFileSet(),
 		cache: cache,
+		cfg: cfg,
 	}, nil
 }
 
-func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Package, error) {
+func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, cfg *Config, rw *rewriter) (*Package, error) {
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, utils.Err{"LookupImportPath", err}
@@ -88,6 +90,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, rw *rewriter) (*Pac
 		rw: rw,
 		fset: token.NewFileSet(),
 		cache: cache,
+		cfg: cfg,
 	}, nil
 }
 
@@ -159,7 +162,7 @@ func (p *Package) GetImports() (importSet, error) {
 	return p.getImports(true)
 }
 
-func (p *Package) MockImports(importNames map[string]string, cfg *Config) error {
+func (p *Package) MockImports(importNames map[string]string) error {
 	return processSingleDir(p.src, p.dst, func(path, rel string) error {
 		target := filepath.Join(p.dst, rel)
 
@@ -170,7 +173,7 @@ func (p *Package) MockImports(importNames map[string]string, cfg *Config) error 
 			return os.Symlink(path, target)
 		}
 
-		return mockFileImports(path, target, importNames, cfg)
+		return mockFileImports(path, target, importNames, p.cfg)
 	})
 }
 
@@ -282,12 +285,12 @@ func (p *Package) DisableAllMocks() ([]string, error) {
 	return imports, processSingleDir(p.src, p.dst, disableFile)
 }
 
-func (p *Package) Gen(mock bool, cfg *MockConfig) (importSet, error) {
+func (p *Package) Gen(mock bool) (importSet, error) {
 	if err := os.MkdirAll(p.dst, 0700); err != nil {
 		return nil, utils.Err{"os.MkdirAll", err}
 	}
 
-	return p.mockPackage(mock, cfg)
+	return p.mockPackage(mock, p.cfg.Mock(p.name))
 }
 
 func (p *Package) Deps() ([]string, error) {

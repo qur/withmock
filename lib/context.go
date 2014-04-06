@@ -196,7 +196,7 @@ func (c *Context) mockStdlib() error {
 			continue
 		}
 
-		pkg, err := NewStdlibPackage(pkgName, label, c.tmpDir, c.goRoot, runtimerw)
+		pkg, err := NewStdlibPackage(pkgName, label, c.tmpDir, c.goRoot, c.cfg, runtimerw)
 		if err != nil {
 			return utils.Err{"NewPackage", err}
 		}
@@ -273,8 +273,7 @@ func (c *Context) mockStdlib() error {
 			continue
 		}
 
-		cfg := c.cfg.Mock(pkgName)
-		imports, err := pkg.Gen(false, cfg)
+		imports, err := pkg.Gen(false)
 		if err != nil {
 			return utils.Err{"pkg.Gen", err}
 		}
@@ -516,8 +515,6 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				return nil, utils.Err{"context.getPkg", err}
 			}
 
-			cfg := c.cfg.Mock(name)
-
 			if !imports[name].ShouldInstall() {
 				pkg.DisableInstall()
 			}
@@ -548,7 +545,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			}
 
 			// Process the package and get it's imports
-			pkgImports, err := pkg.Gen(mock, cfg)
+			pkgImports, err := pkg.Gen(mock)
 			if err != nil {
 				return nil, utils.Err{"pkg.Gen", err}
 			}
@@ -579,7 +576,7 @@ func (c *Context) getPkg(pkgName, label string) (*Package, error) {
 		return pkg, nil
 	}
 
-	pkg, err := NewPackage(pkgName, label, c.tmpDir, c.goPath)
+	pkg, err := NewPackage(pkgName, label, c.tmpDir, c.goPath, c.cfg)
 	if err != nil {
 		return nil, utils.Err{"NewPackage", err}
 	}
@@ -619,7 +616,7 @@ func (c *Context) AddPackage(pkgName string) (string, error) {
 	c.importRewrites[newName] = pkgName
 	importNames[pkgName] = newName
 
-	err = pkg.MockImports(importNames, c.cfg)
+	err = pkg.MockImports(importNames)
 	if err != nil {
 		return "", utils.Err{"MockImports", err}
 	}

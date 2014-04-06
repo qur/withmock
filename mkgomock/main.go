@@ -19,18 +19,22 @@ func main() {
 
 	impPath, dstPath := os.Args[1], os.Args[2]
 
-	cfg := &lib.MockConfig{
-		MOCK:   "MOCK",
-		EXPECT: "EXPECT",
+	cfg := &lib.Config{
+		Mocks: map[string]*lib.MockConfig{
+			"impPath": &lib.MockConfig{
+				MOCK:   "MOCK",
+				EXPECT: "EXPECT",
+			},
+		},
 	}
 
-	pkg, err := lib.NewPackage(impPath, impPath, dstPath, os.Getenv("GOROOT"))
+	pkg, err := lib.NewPackage(impPath, impPath, dstPath, os.Getenv("GOROOT"), cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(1)
 	}
 
-	_, err = pkg.Gen(true, cfg)
+	_, err = pkg.Gen(true)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(1)
