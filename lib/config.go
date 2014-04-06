@@ -39,7 +39,6 @@ func readPackages(path string) ([]string, error) {
 
 type MockConfig struct {
 	// Local configuration
-	MockPrototypes   bool // Mock prototypes (i.e. functions without bodies)
 	IgnoreNonGoFiles bool // Don't copy non-go files into the mocked package
 
 	// File based configuration

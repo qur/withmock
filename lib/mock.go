@@ -129,40 +129,6 @@ func (fi *funcInfo) writeReal(out io.Writer) {
 	fmt.Fprintf(out, "\n")
 }
 
-func (fi *funcInfo) writeStub(out io.Writer) {
-	fmt.Fprintf(out, "func ")
-	if fi.IsMethod() {
-		fmt.Fprintf(out, "(%s %s) ", fi.recv.name, fi.recv.expr)
-	}
-	if ast.IsExported(fi.name) {
-		fmt.Fprintf(out, "_real_")
-	}
-	fmt.Fprintf(out, "%s(", fi.name)
-	for i, param := range fi.params {
-		if i > 0 {
-			fmt.Fprintf(out, ", ")
-		}
-		n := strings.Join(param.names, ", ")
-		fmt.Fprintf(out, "%s %s", n, param.expr)
-	}
-	fmt.Fprintf(out, ") ")
-	if len(fi.results) > 0 {
-		fmt.Fprintf(out, "(")
-		for i, result := range fi.results {
-			if i > 0 {
-				fmt.Fprintf(out, ", ")
-			}
-			n := strings.Join(result.names, ", ")
-			fmt.Fprintf(out, "%s %s", n, result.expr)
-		}
-		fmt.Fprintf(out, ") ")
-	}
-	fmt.Fprintf(out, "{\n")
-	fmt.Fprintf(out, "\tpanic(\"This is only a stub!\")\n")
-	fmt.Fprintf(out, "}\n")
-	fmt.Fprintf(out, "\n")
-}
-
 func (fi *funcInfo) countParams() int {
 	p := 0
 	for _, param := range fi.params {
@@ -398,7 +364,6 @@ type mockGen struct {
 	fset           *token.FileSet
 	srcPath        string
 	mockByDefault  bool
-	mockPrototypes bool
 	extFunctions   []string
 	types          map[string]ast.Expr
 	recorders      map[string]string
@@ -1102,8 +1067,6 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (*mockFileIn
 				fi.writeReal(out)
 				inits = append(inits, fi.name)
 				m.initCount++
-			} else if d.Body == nil && m.mockPrototypes {
-				fi.writeStub(out)
 			} else {
 				fi.writeReal(out)
 			}

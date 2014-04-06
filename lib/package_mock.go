@@ -139,7 +139,6 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 		fset:           p.fset,
 		srcPath:        p.src,
 		mockByDefault:  byDefault,
-		mockPrototypes: cfg.MockPrototypes,
 		types:          make(map[string]ast.Expr),
 		recorders:      make(map[string]string),
 		ifInfo:         newIfInfo(""),
