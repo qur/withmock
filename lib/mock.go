@@ -400,8 +400,6 @@ type mockGen struct {
 	mockByDefault  bool
 	mockPrototypes bool
 	extFunctions   []string
-	callInits      bool
-	matchOS        bool
 	types          map[string]ast.Expr
 	recorders      map[string]string
 	data           io.ReaderAt
@@ -1102,9 +1100,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (*mockFileIn
 			if fi.name == "init" && !fi.IsMethod() {
 				fi.name = fmt.Sprintf("_real_init_%d", m.initCount)
 				fi.writeReal(out)
-				if m.callInits {
-					inits = append(inits, fi.name)
-				}
+				inits = append(inits, fi.name)
 				m.initCount++
 			} else if d.Body == nil && m.mockPrototypes {
 				fi.writeStub(out)

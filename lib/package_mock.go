@@ -140,8 +140,6 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 		srcPath:        p.src,
 		mockByDefault:  byDefault,
 		mockPrototypes: cfg.MockPrototypes,
-		callInits:      !cfg.IgnoreInits,
-		matchOS:        cfg.MatchOSArch,
 		types:          make(map[string]ast.Expr),
 		recorders:      make(map[string]string),
 		ifInfo:         newIfInfo(""),
@@ -154,12 +152,9 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *MockConfig, imp
 
 	processed := 0
 
-	cfg.MatchOSArch = true
-
 	for _, base := range files {
-		// If only considering files for this OS/Arch, then reject files
-		// that aren't for this OS/Arch based on filename.
-		if cfg.MatchOSArch && !goodOSArchFile(base, nil) {
+		// Reject files that aren't for this OS/Arch based on filename.
+		if !goodOSArchFile(base, nil) {
 			continue
 		}
 
