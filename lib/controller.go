@@ -15,6 +15,18 @@ void
 	FLUSH(&ret);
 }
 
+static Lock mockmu;
+
+void
+·lockMock(void) {
+	runtime·lock(&mockmu);
+}
+
+void
+·unlockMock(void) {
+	runtime·unlock(&mockmu);
+}
+
 extern void ·copyMocking(uintptr, uintptr);
 extern G* _real_newproc1(FuncVal *fn, byte *argp, int32 narg, int32 nret, void *callerpc);
 
@@ -29,35 +41,56 @@ runtime·newproc1(FuncVal *fn, byte *argp, int32 narg, int32 nret, void *callerp
 var mockControlGo = `package runtime
 
 func getG() uintptr
+func lockMock()
+func unlockMock()
 
 // store disabled flags so that missing entries will be considered enabled.
 var mockDisabled = map[uintptr]bool{}
 
 func MockingDisabled() bool {
+	lockMock()
+	defer unlockMock()
+
 	return mockDisabled[getG()]
 }
 
 func copyMocking(src, dst uintptr) {
+	lockMock()
+	defer unlockMock()
+
 	if mockDisabled[src] {
 		mockDisabled[dst] = true
 	}
 }
 
 func RestoreMocking(val bool) {
+	lockMock()
+	defer unlockMock()
+
 	mockDisabled[getG()] = val
 }
 
 func EnableMocking() bool {
 	id := getG()
+
+	lockMock()
+	defer unlockMock()
+
 	old := mockDisabled[id]
 	delete(mockDisabled, id)
+
 	return old
 }
 
 func DisableMocking() bool {
 	id := getG()
+
+	lockMock()
+	defer unlockMock()
+
 	old := mockDisabled[id]
 	mockDisabled[id] = true
+
 	return old
 }
 
