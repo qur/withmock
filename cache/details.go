@@ -135,12 +135,18 @@ func (c *Cache) lookupDetails(path string) (string, error) {
 
 	dHash := hex.EncodeToString(h.Sum(nil))
 
-	hash, err := c.loadDetails(dHash)
-	if err == nil {
-		return hash, nil
+	if !c.ignore {
+		hash, err := c.loadDetails(dHash)
+		if err == nil {
+			return hash, nil
+		}
+
+		if !utils.IsNotExist(err) {
+			return "", utils.Err{"loadDetails", err}
+		}
 	}
 
-	hash, err = hashFile(path)
+	hash, err := hashFile(path)
 	if err != nil {
 		return "", utils.Err{"hashFile", err}
 	}

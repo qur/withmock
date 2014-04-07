@@ -14,6 +14,7 @@ import (
 
 type Cache struct {
 	enabled bool
+	ignore bool
 	root string
 	goRoot string
 	goVersion string
@@ -33,6 +34,7 @@ func init() {
 
 func OpenCache(goRoot, goVersion string, cfg *config.MockConfig) (*Cache, error) {
 	enabled := os.Getenv("WITHMOCK_DISABLE_CACHE") == ""
+	ignore := os.Getenv("WITHMOCK_IGNORE_CACHE") != ""
 
 	home := os.Getenv("HOME")
 
@@ -52,6 +54,7 @@ func OpenCache(goRoot, goVersion string, cfg *config.MockConfig) (*Cache, error)
 
 	return &Cache{
 		enabled: enabled,
+		ignore: ignore,
 		root: root,
 		goRoot: goRoot,
 		goVersion: goVersion,

@@ -4,6 +4,10 @@
 
 package utils
 
+import (
+	"os"
+)
+
 type Err struct {
 	Ctxt string
 	Err  error
@@ -19,4 +23,11 @@ func (c Err) Context() string {
 	} else {
 		return c.Ctxt
 	}
+}
+
+func IsNotExist(err error) bool {
+	if e, ok := err.(Err); ok {
+		return IsNotExist(e.Err)
+	}
+	return os.IsNotExist(err)
 }

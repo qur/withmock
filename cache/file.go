@@ -51,9 +51,8 @@ func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
 	path := filepath.Join(c.root, "metadata", key.Hash())
 
 	f, err := os.Open(path)
-
 	if err != nil {
-		return nil, err
+		return nil, utils.Err{"os.Open", err}
 	}
 	defer f.Close()
 
@@ -69,13 +68,15 @@ func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
 }
 
 func (c *Cache) GetFile(key *CacheFileKey) (*CacheFile, error) {
-	cf, err := c.loadFile(key)
-	if err == nil {
-		return cf, nil
-	}
+	if c.enabled && !c.ignore {
+		cf, err := c.loadFile(key)
+		if err == nil {
+			return cf, nil
+		}
 
-	if !os.IsNotExist(err) {
-		return nil, utils.Err{"loadFile", err}
+		if !utils.IsNotExist(err) {
+			return nil, utils.Err{"loadFile", err}
+		}
 	}
 
 	return &CacheFile{
@@ -90,6 +91,10 @@ func (c *Cache) GetFile(key *CacheFileKey) (*CacheFile, error) {
 }
 
 func (f *CacheFile) open() error {
+	if !f.cache.enabled {
+		panic("Not currently implemented")
+	}
+
 	dir := filepath.Join(f.cache.root, "files")
 
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -232,6 +237,10 @@ func (f *CacheFile) Install(path string) error {
 		return utils.Err{"f.Close", err}
 	}
 
+	if !f.cache.enabled {
+		return nil
+	}
+
 	if f.written || f.HasData() {
 		// Get the hash from data - as we could be installing either a new file,
 		// or one entirely loaded from the cache ...
@@ -263,7 +272,7 @@ func (f *CacheFile) Install(path string) error {
 }
 
 func (f *CacheFile) Save() error {
-	if !f.changed {
+	if !f.changed || !f.cache.enabled {
 		return nil
 	}
 
@@ -300,6 +309,10 @@ func (f *CacheFile) HasData() bool {
 }
 
 func (f *CacheFile) Has(name ...string) bool {
+	if !f.cache.enabled {
+		return false
+	}
+
 	for _, n := range name {
 		_, found := f.data[n]
 		if !found {
