@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	goRoot, goPath string
+	goRoot, goPath, goVersion string
 )
 
 func init() {
@@ -28,6 +28,11 @@ func init() {
 	goPath, err = GetOutput("go", "env", "GOPATH")
 	if err != nil {
 		panic("Unable to get GOPATH: " + err.Error())
+	}
+
+	goVersion, err = GetOutput("go", "version")
+	if err != nil {
+		panic("Unable to get Go Version: " + err.Error())
 	}
 }
 

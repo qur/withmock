@@ -14,6 +14,7 @@ import (
 
 type CacheFileKey struct {
 	GoRoot string `json:"goroot"`
+	GoVersion string `json:"goversion"`
 	Self string `json:"self"`
 	Op string `json:"op"`
 	Files []string `json:"files"`
@@ -34,6 +35,7 @@ func (c *Cache) NewCacheFileKey(op string, srcs ...string) (*CacheFileKey, error
 
 	return &CacheFileKey{
 		GoRoot: c.goRoot,
+		GoVersion: c.goVersion,
 		Self: c.self,
 		Op: op,
 		Files: files,
