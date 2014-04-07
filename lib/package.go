@@ -34,13 +34,13 @@ type Package struct {
 	files []string
 }
 
-func NewPackage(pkgName, label, tmpDir, goPath string, cfg *config.Config) (*Package, error) {
+func NewPackage(pkgName, label, tmpDir, goRoot string, cfg *config.Config) (*Package, error) {
 	codeSrc, err := LookupImportPath(pkgName)
 	if err != nil {
 		return nil, utils.Err{"LookupImportPath", err}
 	}
 
-	cache, err := cache.OpenCache(cfg.Mock(pkgName))
+	cache, err := cache.OpenCache(goRoot, cfg.Mock(pkgName))
 	if err != nil {
 		return nil, utils.Err{"OpenCache", err}
 	}
@@ -56,7 +56,7 @@ func NewPackage(pkgName, label, tmpDir, goPath string, cfg *config.Config) (*Pac
 		pkgDst: filepath.Join(tmpPath, "pkg", GetOsArch(), label + ".a"),
 		tmpDir: tmpDir,
 		tmpPath: tmpPath,
-		goPath: goPath,
+		goPath: goRoot,
 		rw: nil,
 		fset: token.NewFileSet(),
 		cache: cache,
@@ -70,7 +70,7 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, cfg *config.Config,
 		return nil, utils.Err{"LookupImportPath", err}
 	}
 
-	cache, err := cache.OpenCache(cfg.Mock(pkgName))
+	cache, err := cache.OpenCache(goRoot, cfg.Mock(pkgName))
 	if err != nil {
 		return nil, utils.Err{"OpenCache", err}
 	}
