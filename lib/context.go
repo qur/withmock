@@ -524,7 +524,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			if c.excludes[name] {
 				// this package has been specifically excluded from mocking, so
 				// we just link it, even if mocked is indicated.
-				if _, err := pkg.Link(); err != nil {
+				if _, err := pkg.DisableAllMocks(); err != nil {
 					return nil, utils.Err{"pkg.Link", err}
 				}
 				continue
