@@ -34,7 +34,23 @@ case ${pkg} in
         echo "not supported"
         exit 1
         ;;
+    runtime)
+        echo "not supported"
+        exit 1
+        ;;
+    runtime/*)
+        echo "not supported"
+        exit 1
+        ;;
+    unsafe)
+        echo "not supported"
+        exit 1
+        ;;
     testing)
+        echo "not supported"
+        exit 1
+        ;;
+    testing/*)
         echo "not supported"
         exit 1
         ;;

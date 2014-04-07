@@ -5,7 +5,7 @@ mydir="$(cd "${mydir}"; pwd)"
 
 exec 3>&1 1>setup.log 2>&1
 
-versions=(1.0.3 1.1.0 1.1.1 1.1.2 1.2.0)
+versions=(1.1.0 1.1.1 1.1.2 1.2.0 1.2.1)
 
 declare -A url
 url=(
@@ -17,6 +17,7 @@ url=(
     [1.1.1]="https://go.googlecode.com/files/go1.1.1.src.tar.gz"
     [1.1.2]="https://go.googlecode.com/files/go1.1.2.src.tar.gz"
     [1.2.0]="https://go.googlecode.com/files/go1.2.src.tar.gz"
+    [1.2.1]="https://go.googlecode.com/files/go1.2.1.src.tar.gz"
 )
 
 mkdir -p src

@@ -9,7 +9,19 @@ for pkg in $(go list std); do
         cmd/*)
             continue
             ;;
+        runtime)
+            continue
+            ;;
+        runtime/*)
+            continue
+            ;;
+        unsafe)
+            continue
+            ;;
         testing)
+            continue
+            ;;
+        testing/*)
             continue
             ;;
         *)
