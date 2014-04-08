@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/qur/withmock/utils"
 )
@@ -259,6 +260,12 @@ func (f *CacheFile) Install() error {
 		}
 
 		name := filepath.Join(f.cache.root, "files", hash.(string))
+
+		// Make sure the file looks like we just wrote it
+		now := time.Now()
+		if err := os.Chtimes(name, now, now); err != nil {
+			return utils.Err{"os.Chtimes", err}
+		}
 
 		if err := os.Link(name, f.dest); err != nil {
 			if err := os.Symlink(name, f.dest); err != nil {
