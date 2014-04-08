@@ -96,7 +96,15 @@ func (c *Cache) GetFile(key *CacheFileKey, dest string) (*CacheFile, error) {
 
 func (f *CacheFile) open() error {
 	if !f.cache.enabled {
-		panic("Not currently implemented")
+		w, err := os.Create(f.dest)
+		if err != nil {
+			return utils.Err{"os.Create", err}
+		}
+
+		f.f = w
+		f.tmpName = w.Name()
+
+		return nil
 	}
 
 	dir := filepath.Join(f.cache.root, "files")
