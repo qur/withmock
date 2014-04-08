@@ -26,7 +26,7 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 		return "", nil, utils.Err{"cache.NewCacheFileKey", err}
 	}
 
-	f, err := p.cache.GetFile(key)
+	f, err := p.cache.GetFile(key, filename)
 	if err != nil {
 		return "", nil, utils.Err{"cache.GetFile", err}
 	}
@@ -107,7 +107,7 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	}
 
 	// Create the actual file in the src tree
-	if err := f.Install(filename); err != nil {
+	if err := f.Install(); err != nil {
 		return "", nil, utils.Err{"f.Install", err}
 	}
 
@@ -193,7 +193,7 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *config.MockConf
 		return "", nil, nil, utils.Err{"cache.NewCacheFileKey", err}
 	}
 
-	f, err := p.cache.GetFile(key)
+	f, err := p.cache.GetFile(key, filename)
 	if err != nil {
 		return "", nil, nil, utils.Err{"cache.GetFile", err}
 	}
@@ -211,7 +211,7 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *config.MockConf
 		}
 	}
 
-	if err := f.Install(filename); err != nil {
+	if err := f.Install(); err != nil {
 		return "", nil, nil, utils.Err{"f.Install", err}
 	}
 
@@ -312,7 +312,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *config.MockConfig) (importSet
 			return nil, utils.Err{"cache.NewCacheFileKey", err}
 		}
 
-		w, err := p.cache.GetFile(key)
+		w, err := p.cache.GetFile(key, output)
 		if err != nil {
 			return nil, utils.Err{"os.Create", err}
 		}
@@ -322,7 +322,7 @@ func (p *Package) mockPackage(byDefault bool, cfg *config.MockConfig) (importSet
 			return nil, utils.Err{"rw.Copy", err}
 		}
 
-		if err := w.Install(output); err != nil {
+		if err := w.Install(); err != nil {
 			return nil, utils.Err{"w.Install", err}
 		}
 	}
@@ -354,7 +354,7 @@ func (p *Package) genInterfaces(interfaces Interfaces) error {
 			return utils.Err{"cache.NewCacheFileKey", err}
 		}
 
-		f, err := p.cache.GetFile(key)
+		f, err := p.cache.GetFile(key, i.filename)
 		if err != nil {
 			return utils.Err{"cache.GetFile", err}
 		}
@@ -380,7 +380,7 @@ func (p *Package) genInterfaces(interfaces Interfaces) error {
 			}
 		}
 
-		if err := f.Install(i.filename); err != nil {
+		if err := f.Install(); err != nil {
 			return utils.Err{"f.Install", err}
 		}
 	}

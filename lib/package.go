@@ -198,7 +198,7 @@ func (p *Package) rewriteFile(path, rel string) error {
 		return utils.Err{"cache.NewCacheFileKey", err}
 	}
 
-	w, err := p.cache.GetFile(key)
+	w, err := p.cache.GetFile(key, target)
 	if err != nil {
 		return utils.Err{"cache.GetFile", err}
 	}
@@ -210,7 +210,7 @@ func (p *Package) rewriteFile(path, rel string) error {
 		}
 	}
 
-	return w.Install(target)
+	return w.Install()
 }
 
 func (p *Package) Link() (importSet, error) {
@@ -263,7 +263,7 @@ func (p *Package) DisableAllMocks() ([]string, error) {
 			return utils.Err{"cache.NewCacheFileKey", err}
 		}
 
-		w, err := p.cache.GetFile(key)
+		w, err := p.cache.GetFile(key, target)
 		if err != nil {
 			return utils.Err{"cache.GetFile", err}
 		}
@@ -280,7 +280,7 @@ func (p *Package) DisableAllMocks() ([]string, error) {
 			imports = i
 		}
 
-		return w.Install(target)
+		return w.Install()
 	}
 
 	return imports, processSingleDir(p.src, p.dst, disableFile)
@@ -395,7 +395,7 @@ func (p *Package) Install() error {
 		return utils.Err{"cache.NewCacheFileKey", err}
 	}
 
-	f, err := p.cache.GetFile(key)
+	f, err := p.cache.GetFile(key, p.pkgDst)
 	if err != nil {
 		return utils.Err{"cache.GetFile", err}
 	}
@@ -416,7 +416,7 @@ func (p *Package) Install() error {
 		}
 	}
 
-	if err := f.Install(p.pkgDst); err != nil {
+	if err := f.Install(); err != nil {
 		return utils.Err{"f.Install", err}
 	}
 

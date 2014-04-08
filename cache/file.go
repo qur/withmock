@@ -27,6 +27,7 @@ func init() {
 
 type CacheFile struct {
 	key *CacheFileKey
+	dest string
 	f *os.File
 	tmpName string
 	written bool
@@ -37,9 +38,10 @@ type CacheFile struct {
 	data map[string]interface{}
 }
 
-func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
+func (c *Cache) loadFile(key *CacheFileKey, dest string) (*CacheFile, error) {
 	cf := &CacheFile{
 		key: key,
+		dest: dest,
 		written: false,
 		changed: false,
 		h: NewCacheHash(),
@@ -67,9 +69,9 @@ func (c *Cache) loadFile(key *CacheFileKey) (*CacheFile, error) {
 	return cf, nil
 }
 
-func (c *Cache) GetFile(key *CacheFileKey) (*CacheFile, error) {
+func (c *Cache) GetFile(key *CacheFileKey, dest string) (*CacheFile, error) {
 	if c.enabled && !c.ignore {
-		cf, err := c.loadFile(key)
+		cf, err := c.loadFile(key, dest)
 		if err == nil {
 			return cf, nil
 		}
@@ -81,6 +83,7 @@ func (c *Cache) GetFile(key *CacheFileKey) (*CacheFile, error) {
 
 	return &CacheFile{
 		key: key,
+		dest: dest,
 		written: false,
 		changed: false,
 		h: NewCacheHash(),
@@ -232,7 +235,7 @@ func (f *CacheFile) Close() error {
 	return nil
 }
 
-func (f *CacheFile) Install(path string) error {
+func (f *CacheFile) Install() error {
 	if err := f.Close(); err != nil {
 		return utils.Err{"f.Close", err}
 	}
@@ -249,7 +252,7 @@ func (f *CacheFile) Install(path string) error {
 			return fmt.Errorf("Failed to get hash")
 		}
 
-		dir := filepath.Dir(path)
+		dir := filepath.Dir(f.dest)
 
 		if err := os.MkdirAll(dir, 0700); err != nil {
 			return utils.Err{"os.MkdirAll", err}
@@ -257,8 +260,8 @@ func (f *CacheFile) Install(path string) error {
 
 		name := filepath.Join(f.cache.root, "files", hash.(string))
 
-		if err := os.Link(name, path); err != nil {
-			if err := os.Symlink(name, path); err != nil {
+		if err := os.Link(name, f.dest); err != nil {
+			if err := os.Symlink(name, f.dest); err != nil {
 				return utils.Err{"os.Symlink", err}
 			}
 		}
