@@ -33,10 +33,10 @@ func (p *Package) mockFile(base string, m *mockGen) (string, map[string]bool, er
 	defer f.Close()
 
 	var (
-		name string
-		info *mockFileInfo
+		name   string
+		info   *mockFileInfo
 		ignore bool
-		file *ast.File
+		file   *ast.File
 	)
 
 	if f.Has("ignore") {
@@ -137,15 +137,15 @@ func (p *Package) mockFiles(files []string, byDefault bool, cfg *config.MockConf
 	pkg := ""
 
 	m := &mockGen{
-		fset:           p.fset,
-		srcPath:        p.src,
-		mockByDefault:  byDefault,
-		types:          make(map[string]ast.Expr),
-		recorders:      make(map[string]string),
-		ifInfo:         newIfInfo(""),
-		MOCK:           cfg.MOCK,
-		EXPECT:         cfg.EXPECT,
-		ObjEXPECT:      cfg.ObjEXPECT,
+		fset:          p.fset,
+		srcPath:       p.src,
+		mockByDefault: byDefault,
+		types:         make(map[string]ast.Expr),
+		recorders:     make(map[string]string),
+		ifInfo:        newIfInfo(""),
+		MOCK:          cfg.MOCK,
+		EXPECT:        cfg.EXPECT,
+		ObjEXPECT:     cfg.ObjEXPECT,
 	}
 
 	m.ifInfo.EXPECT = m.EXPECT
@@ -296,9 +296,9 @@ func (p *Package) mockPackage(byDefault bool, cfg *config.MockConfig) (importSet
 	// Load up a rewriter with the rewrites for the external functions
 	rw := NewRewriter(nil)
 	for _, fname := range externalFunctions {
-		rw.Rewrite("·" + fname + "(", "·_real_" + fname + "(")
+		rw.Rewrite("·"+fname+"(", "·_real_"+fname+"(")
 		if p.rw != nil {
-			p.rw.Rewrite(pkg + "·" + fname + "(", pkg + "·_real_" + fname + "(")
+			p.rw.Rewrite(pkg+"·"+fname+"(", pkg+"·_real_"+fname+"(")
 		}
 	}
 

@@ -5,6 +5,7 @@
 package lib
 
 import (
+	"encoding/gob"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -14,7 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"encoding/gob"
 
 	"github.com/qur/withmock/config"
 	"github.com/qur/withmock/utils"
@@ -54,7 +54,7 @@ func scopeFields(fields []field, scope string) []field {
 	for i, f := range fields {
 		newFields[i] = field{
 			names: f.names,
-			expr: scopeName(f.expr, scope),
+			expr:  scopeName(f.expr, scope),
 		}
 	}
 	return newFields
@@ -79,16 +79,16 @@ type funcInfo struct {
 
 func (fi *funcInfo) AddScope(scope string) *funcInfo {
 	return &funcInfo{
-		name: fi.name,
-		varidic: fi.varidic,
+		name:         fi.name,
+		varidic:      fi.varidic,
 		realDisabled: fi.realDisabled,
-		recv: struct{name, expr string}{
+		recv: struct{ name, expr string }{
 			fi.recv.name,
 			scopeName(fi.recv.expr, scope),
 		},
-		params: scopeFields(fi.params, scope),
+		params:  scopeFields(fi.params, scope),
 		results: scopeFields(fi.results, scope),
-		body: fi.body,
+		body:    fi.body,
 	}
 }
 
@@ -363,18 +363,18 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 }
 
 type mockGen struct {
-	fset           *token.FileSet
-	srcPath        string
-	mockByDefault  bool
-	extFunctions   []string
-	types          map[string]ast.Expr
-	recorders      map[string]string
-	data           io.ReaderAt
-	ifInfo         *ifInfo
-	scopes         map[string]bool
-	MOCK           string
-	EXPECT         string
-	ObjEXPECT      string
+	fset          *token.FileSet
+	srcPath       string
+	mockByDefault bool
+	extFunctions  []string
+	types         map[string]ast.Expr
+	recorders     map[string]string
+	data          io.ReaderAt
+	ifInfo        *ifInfo
+	scopes        map[string]bool
+	MOCK          string
+	EXPECT        string
+	ObjEXPECT     string
 }
 
 func (m *mockGen) literal(name string) (string, bool) {
@@ -833,8 +833,8 @@ func getPackageName(impPath, srcPath string) (string, error) {
 }
 
 type mockFileInfo struct {
-	ImportMap map[string]string
-	Types map[string]ast.Expr
+	ImportMap    map[string]string
+	Types        map[string]ast.Expr
 	Recorders    map[string]string
 	ExtFunctions []string
 }
@@ -847,9 +847,9 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (*mockFileIn
 	defer data.Close()
 
 	info := &mockFileInfo{
-		ImportMap: make(map[string]string),
-		Types: make(map[string]ast.Expr),
-		Recorders: make(map[string]string),
+		ImportMap:    make(map[string]string),
+		Types:        make(map[string]ast.Expr),
+		Recorders:    make(map[string]string),
 		ExtFunctions: []string{},
 	}
 
@@ -1103,7 +1103,7 @@ func copyData(a, b token.Pos, fset *token.FileSet, data io.ReadSeeker, out io.Wr
 		return utils.Err{"data.Seek", err}
 	}
 
-	if _, err := io.CopyN(out, data, end - start); err != nil {
+	if _, err := io.CopyN(out, data, end-start); err != nil {
 		return utils.Err{"io.CopyN", err}
 	}
 
@@ -1189,7 +1189,7 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 				return nil, utils.Err{"data.Seek", err}
 			}
 
-			if _, err := io.CopyN(out, data, end - start); err != nil {
+			if _, err := io.CopyN(out, data, end-start); err != nil {
 				return nil, utils.Err{"io.CopyN", err}
 			}
 		}

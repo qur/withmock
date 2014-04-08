@@ -5,14 +5,14 @@
 package lib
 
 import (
-	"go/build"
 	"go/ast"
-	"strings"
+	"go/build"
 	"log"
+	"strings"
 )
 
 var (
-	goos = build.Default.GOOS
+	goos   = build.Default.GOOS
 	goarch = build.Default.GOARCH
 )
 

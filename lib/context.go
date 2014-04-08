@@ -101,7 +101,7 @@ func NewContext() (*Context, error) {
 		packages:       make(map[string]*Package),
 		// create excludes already including gomock, as we can't mock it.
 		excludes: map[string]bool{
-			"github.com/qur/gomock/gomock": true,
+			"github.com/qur/gomock/gomock":     true,
 			"github.com/qur/gomock/interfaces": true,
 		},
 	}, nil
@@ -151,9 +151,9 @@ func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
 	}
 
 	// Setup the environment variables that we want
-	env = append(env, "GOPATH=" + c.tmpPath)
-	env = append(env, "GOROOT=" + c.tmpRoot)
-	env = append(env, "ORIG_GOPATH=" + c.origPath)
+	env = append(env, "GOPATH="+c.tmpPath)
+	env = append(env, "GOROOT="+c.tmpRoot)
+	env = append(env, "ORIG_GOPATH="+c.origPath)
 
 	cmd := exec.Command(command, args...)
 	cmd.Env = env
@@ -215,7 +215,7 @@ func (c *Context) mockStdlib() error {
 	pkgs["github.com/qur/gomock/interfaces"] = p
 	deps["github.com/qur/gomock/interfaces"] = map[string]bool{
 		"runtime": true,
-		"unsafe": true,
+		"unsafe":  true,
 	}
 
 	if _, err := p.Link(); err != nil {
@@ -405,27 +405,27 @@ type importSet map[string]importCfg
 
 func (m importMode) String() string {
 	s := ""
-	if m & importNormal != 0 {
+	if m&importNormal != 0 {
 		s += "N"
 	}
-	if m & importMock != 0 {
+	if m&importMock != 0 {
 		s += "M"
 	}
-	if m & importReplace != 0 {
+	if m&importReplace != 0 {
 		s += "R"
 	}
-	if m & importNoInstall != 0 {
+	if m&importNoInstall != 0 {
 		s += "I"
 	}
 	return s
 }
 
 func (i importCfg) IsMock() bool {
-	return i.mode & importMock != 0
+	return i.mode&importMock != 0
 }
 
 func (i importCfg) IsReplace() bool {
-	return i.mode & importReplace != 0
+	return i.mode&importReplace != 0
 }
 
 func (i importCfg) ShouldInstall() bool {
@@ -708,7 +708,7 @@ func (c *Context) addRequiredPackage(name string) error {
 
 func (c *Context) addRequiredPackages() error {
 	for _, name := range []string{
-		//"github.com/qur/gomock/interfaces",
+	//"github.com/qur/gomock/interfaces",
 	} {
 		if err := c.addRequiredPackage(name); err != nil {
 			return utils.Err{"c.addRequiredPackage", err}

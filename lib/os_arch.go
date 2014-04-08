@@ -12,8 +12,8 @@
 package lib
 
 import (
-	"strings"
 	"go/build"
+	"strings"
 )
 
 // These lists needs to match the actual list in
@@ -31,9 +31,9 @@ var knownOS = map[string]bool{
 }
 
 var knownArch = map[string]bool{
-	"386": true,
+	"386":   true,
 	"amd64": true,
-	"arm": true,
+	"arm":   true,
 }
 
 // goodOSArchFile returns false if the name contains a $GOOS or $GOARCH
@@ -50,32 +50,32 @@ var knownArch = map[string]bool{
 func goodOSArchFile(name string, allTags map[string]bool) bool {
 	ctxt := build.Default
 
-    if dot := strings.Index(name, "."); dot != -1 {
-        name = name[:dot]
-    }
-    l := strings.Split(name, "_")
-    if n := len(l); n > 0 && l[n-1] == "test" {
-        l = l[:n-1]
-    }
-    n := len(l)
-    if n >= 2 && knownOS[l[n-2]] && knownArch[l[n-1]] {
-        if allTags != nil {
-            allTags[l[n-2]] = true
-            allTags[l[n-1]] = true
-        }
-        return l[n-2] == ctxt.GOOS && l[n-1] == ctxt.GOARCH
-    }
-    if n >= 1 && knownOS[l[n-1]] {
-        if allTags != nil {
-            allTags[l[n-1]] = true
-        }
-        return l[n-1] == ctxt.GOOS
-    }
-    if n >= 1 && knownArch[l[n-1]] {
-        if allTags != nil {
-            allTags[l[n-1]] = true
-        }
-        return l[n-1] == ctxt.GOARCH
-    }
-    return true
+	if dot := strings.Index(name, "."); dot != -1 {
+		name = name[:dot]
+	}
+	l := strings.Split(name, "_")
+	if n := len(l); n > 0 && l[n-1] == "test" {
+		l = l[:n-1]
+	}
+	n := len(l)
+	if n >= 2 && knownOS[l[n-2]] && knownArch[l[n-1]] {
+		if allTags != nil {
+			allTags[l[n-2]] = true
+			allTags[l[n-1]] = true
+		}
+		return l[n-2] == ctxt.GOOS && l[n-1] == ctxt.GOARCH
+	}
+	if n >= 1 && knownOS[l[n-1]] {
+		if allTags != nil {
+			allTags[l[n-1]] = true
+		}
+		return l[n-1] == ctxt.GOOS
+	}
+	if n >= 1 && knownArch[l[n-1]] {
+		if allTags != nil {
+			allTags[l[n-1]] = true
+		}
+		return l[n-1] == ctxt.GOARCH
+	}
+	return true
 }

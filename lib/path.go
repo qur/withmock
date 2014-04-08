@@ -6,9 +6,9 @@ package lib
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
-	"os"
 
 	"github.com/qur/withmock/utils"
 )

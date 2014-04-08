@@ -19,19 +19,19 @@ import (
 )
 
 type Package struct {
-	name string
-	label string
-	install bool
+	name     string
+	label    string
+	install  bool
 	src, dst string
-	pkgDst string
-	tmpDir string
-	tmpPath string
-	goPath string
-	rw *rewriter
-	fset *token.FileSet
-	cache *cache.Cache
-	cfg *config.Config
-	files []string
+	pkgDst   string
+	tmpDir   string
+	tmpPath  string
+	goPath   string
+	rw       *rewriter
+	fset     *token.FileSet
+	cache    *cache.Cache
+	cfg      *config.Config
+	files    []string
 }
 
 func NewPackage(pkgName, label, tmpDir, goRoot string, cfg *config.Config) (*Package, error) {
@@ -48,19 +48,19 @@ func NewPackage(pkgName, label, tmpDir, goRoot string, cfg *config.Config) (*Pac
 	tmpPath := getTmpPath(tmpDir)
 
 	return &Package{
-		name: pkgName,
-		label: label,
+		name:    pkgName,
+		label:   label,
 		install: true,
-		src: codeSrc,
-		dst: filepath.Join(tmpPath, "src", label),
-		pkgDst: filepath.Join(tmpPath, "pkg", GetOsArch(), label + ".a"),
-		tmpDir: tmpDir,
+		src:     codeSrc,
+		dst:     filepath.Join(tmpPath, "src", label),
+		pkgDst:  filepath.Join(tmpPath, "pkg", GetOsArch(), label+".a"),
+		tmpDir:  tmpDir,
 		tmpPath: tmpPath,
-		goPath: goRoot,
-		rw: nil,
-		fset: token.NewFileSet(),
-		cache: cache,
-		cfg: cfg,
+		goPath:  goRoot,
+		rw:      nil,
+		fset:    token.NewFileSet(),
+		cache:   cache,
+		cfg:     cfg,
 	}, nil
 }
 
@@ -79,19 +79,19 @@ func NewStdlibPackage(pkgName, label, tmpDir, goRoot string, cfg *config.Config,
 	tmpRoot := getTmpRoot(tmpDir)
 
 	return &Package{
-		name: pkgName,
-		label: label,
+		name:    pkgName,
+		label:   label,
 		install: true,
-		src: codeSrc,
-		dst: filepath.Join(tmpRoot, "src", "pkg", label),
-		pkgDst: filepath.Join(tmpRoot, "pkg", GetOsArch(), label + ".a"),
-		tmpDir: tmpDir,
+		src:     codeSrc,
+		dst:     filepath.Join(tmpRoot, "src", "pkg", label),
+		pkgDst:  filepath.Join(tmpRoot, "pkg", GetOsArch(), label+".a"),
+		tmpDir:  tmpDir,
 		tmpPath: tmpPath,
-		goPath: goRoot,
-		rw: rw,
-		fset: token.NewFileSet(),
-		cache: cache,
-		cfg: cfg,
+		goPath:  goRoot,
+		rw:      rw,
+		fset:    token.NewFileSet(),
+		cache:   cache,
+		cfg:     cfg,
 	}, nil
 }
 
@@ -145,7 +145,7 @@ func (p *Package) getImports(tests bool) (importSet, error) {
 					mode = importMock
 				case strings.HasPrefix(comment, "replace("):
 					mode = importReplace
-					path2 = comment[8:len(comment)-1]
+					path2 = comment[8 : len(comment)-1]
 				}
 
 				err := imports.Set(path, mode, path2)
@@ -249,7 +249,7 @@ func (p *Package) Rewrite() (importSet, error) {
 func (p *Package) DisableAllMocks() ([]string, error) {
 	var imports []string
 
-	disableFile:= func(path, rel string) error {
+	disableFile := func(path, rel string) error {
 		target := filepath.Join(p.dst, rel)
 
 		p.files = append(p.files, path)
@@ -307,7 +307,7 @@ func (p *Package) Deps() ([]string, error) {
 
 		f, err := parser.ParseFile(p.fset, path, nil, parser.ImportsOnly)
 		if err != nil {
-			return utils.Err{"ParseFile("+path+")", err}
+			return utils.Err{"ParseFile(" + path + ")", err}
 		}
 
 		for _, imp := range f.Imports {
@@ -341,8 +341,8 @@ func (p *Package) insideCommand(command string, args ...string) *exec.Cmd {
 	}
 
 	// Setup the environment variables that we want
-	env = append(env, "GOPATH=" + p.tmpPath)
-	env = append(env, "GOROOT=" + getTmpRoot(p.tmpDir))
+	env = append(env, "GOPATH="+p.tmpPath)
+	env = append(env, "GOROOT="+getTmpRoot(p.tmpDir))
 	//env = append(env, "ORIG_GOPATH=" + c.origPath)
 
 	cmd := exec.Command(command, args...)
