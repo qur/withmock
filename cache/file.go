@@ -155,6 +155,16 @@ func (f *CacheFile) Write(p []byte) (int, error) {
 func (f *CacheFile) WriteFunc(w func(string) error) error {
 	f.written = true
 
+	if !f.cache.enabled {
+		if err := w(f.dest); err != nil {
+			return utils.Err{"w", err}
+		}
+
+		// TODO - use os.Stat to reset written if nothing got created?
+
+		return nil
+	}
+
 	// Currently creating a tempfile is the only way to get a filename ...
 
 	if err := f.open(); err != nil {
@@ -227,19 +237,21 @@ func (f *CacheFile) Close() error {
 		f.f = nil
 	}
 
-	f.hash = hex.EncodeToString(f.h.Sum(nil))
+	if f.cache.enabled {
+		f.hash = hex.EncodeToString(f.h.Sum(nil))
 
-	name := filepath.Join(f.cache.root, "files", f.hash)
+		name := filepath.Join(f.cache.root, "files", f.hash)
 
-	if err := os.Rename(f.tmpName, name); err != nil {
-		return utils.Err{"os.Rename", err}
+		if err := os.Rename(f.tmpName, name); err != nil {
+			return utils.Err{"os.Rename", err}
+		}
+
+		if err := os.Chmod(name, 0400); err != nil {
+			return utils.Err{"os.Chmod", err}
+		}
+
+		f.data[Data] = f.hash
 	}
-
-	if err := os.Chmod(name, 0400); err != nil {
-		return utils.Err{"os.Chmod", err}
-	}
-
-	f.data[Data] = f.hash
 
 	return nil
 }
