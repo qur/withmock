@@ -237,21 +237,23 @@ func (f *CacheFile) Close() error {
 		f.f = nil
 	}
 
-	if f.cache.enabled {
-		f.hash = hex.EncodeToString(f.h.Sum(nil))
-
-		name := filepath.Join(f.cache.root, "files", f.hash)
-
-		if err := os.Rename(f.tmpName, name); err != nil {
-			return utils.Err{"os.Rename", err}
-		}
-
-		if err := os.Chmod(name, 0400); err != nil {
-			return utils.Err{"os.Chmod", err}
-		}
-
-		f.data[Data] = f.hash
+	if !f.cache.enabled {
+		return nil
 	}
+
+	f.hash = hex.EncodeToString(f.h.Sum(nil))
+
+	name := filepath.Join(f.cache.root, "files", f.hash)
+
+	if err := os.Rename(f.tmpName, name); err != nil {
+		return utils.Err{"os.Rename", err}
+	}
+
+	if err := os.Chmod(name, 0400); err != nil {
+		return utils.Err{"os.Chmod", err}
+	}
+
+	f.data[Data] = f.hash
 
 	return nil
 }
