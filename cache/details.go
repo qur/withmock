@@ -11,18 +11,18 @@ import (
 	"os"
 	"time"
 
-	"github.com/qur/withmock/utils"
 	"encoding/gob"
-	"path/filepath"
+	"github.com/qur/withmock/utils"
 	"io/ioutil"
+	"path/filepath"
 )
 
 type cacheFileDetails struct {
-	Src string `json:"src"`
-	Size int64 `json:"size"`
-	Mode os.FileMode `json:"mode"`
-	ModTime time.Time `json:"mod_time"`
-	Hash string `json:"hash"`
+	Src     string      `json:"src"`
+	Size    int64       `json:"size"`
+	Mode    os.FileMode `json:"mode"`
+	ModTime time.Time   `json:"mod_time"`
+	Hash    string      `json:"hash"`
 }
 
 func newDetails(path string) (cacheFileDetails, error) {
@@ -32,9 +32,9 @@ func newDetails(path string) (cacheFileDetails, error) {
 	}
 
 	return cacheFileDetails{
-		Src: path,
-		Size: st.Size(),
-		Mode: st.Mode(),
+		Src:     path,
+		Size:    st.Size(),
+		Mode:    st.Mode(),
 		ModTime: st.ModTime(),
 	}, nil
 }

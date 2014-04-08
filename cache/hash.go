@@ -5,10 +5,10 @@
 package cache
 
 import (
-	"hash"
-	"crypto/sha512"
 	"bytes"
+	"crypto/sha512"
 	"encoding/binary"
+	"hash"
 )
 
 type CacheHash struct {

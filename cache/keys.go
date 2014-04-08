@@ -8,18 +8,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/qur/withmock/utils"
 	"github.com/qur/withmock/config"
+	"github.com/qur/withmock/utils"
 )
 
 type CacheFileKey struct {
-	GoRoot string `json:"goroot"`
-	GoVersion string `json:"goversion"`
-	Self string `json:"self"`
-	Op string `json:"op"`
-	Files []string `json:"files"`
-	Config *config.MockConfig `json:"config"`
-	hash string
+	GoRoot    string             `json:"goroot"`
+	GoVersion string             `json:"goversion"`
+	Self      string             `json:"self"`
+	Op        string             `json:"op"`
+	Files     []string           `json:"files"`
+	Config    *config.MockConfig `json:"config"`
+	hash      string
 }
 
 func (c *Cache) NewCacheFileKey(op string, srcs ...string) (*CacheFileKey, error) {
@@ -29,17 +29,17 @@ func (c *Cache) NewCacheFileKey(op string, srcs ...string) (*CacheFileKey, error
 	for i, src := range srcs {
 		files[i], err = c.lookupDetails(src)
 		if err != nil {
-			return nil, utils.Err{"c.getDetails("+src+")", err}
+			return nil, utils.Err{"c.getDetails(" + src + ")", err}
 		}
 	}
 
 	return &CacheFileKey{
-		GoRoot: c.goRoot,
+		GoRoot:    c.goRoot,
 		GoVersion: c.goVersion,
-		Self: c.self,
-		Op: op,
-		Files: files,
-		Config: c.cfg,
+		Self:      c.self,
+		Op:        op,
+		Files:     files,
+		Config:    c.cfg,
 	}, nil
 }
 

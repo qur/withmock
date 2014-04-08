@@ -13,13 +13,13 @@ import (
 )
 
 type Cache struct {
-	enabled bool
-	ignore bool
-	root string
-	goRoot string
+	enabled   bool
+	ignore    bool
+	root      string
+	goRoot    string
 	goVersion string
-	self string
-	cfg *config.MockConfig
+	self      string
+	cfg       *config.MockConfig
 }
 
 var self string
@@ -53,12 +53,12 @@ func OpenCache(goRoot, goVersion string, cfg *config.MockConfig) (*Cache, error)
 	}
 
 	return &Cache{
-		enabled: enabled,
-		ignore: ignore,
-		root: root,
-		goRoot: goRoot,
+		enabled:   enabled,
+		ignore:    ignore,
+		root:      root,
+		goRoot:    goRoot,
 		goVersion: goVersion,
-		self: self,
-		cfg: cfg,
+		self:      self,
+		cfg:       cfg,
 	}, nil
 }

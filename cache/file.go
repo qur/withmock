@@ -27,28 +27,28 @@ func init() {
 }
 
 type CacheFile struct {
-	key *CacheFileKey
-	dest string
-	f *os.File
+	key     *CacheFileKey
+	dest    string
+	f       *os.File
 	tmpName string
 	written bool
 	changed bool
-	h hash.Hash
-	cache *Cache
-	hash string
-	data map[string]interface{}
+	h       hash.Hash
+	cache   *Cache
+	hash    string
+	data    map[string]interface{}
 }
 
 func (c *Cache) loadFile(key *CacheFileKey, dest string) (*CacheFile, error) {
 	cf := &CacheFile{
-		key: key,
-		dest: dest,
+		key:     key,
+		dest:    dest,
 		written: false,
 		changed: false,
-		h: NewCacheHash(),
-		cache: c,
-		hash: "",
-		data: nil,
+		h:       NewCacheHash(),
+		cache:   c,
+		hash:    "",
+		data:    nil,
 	}
 
 	path := filepath.Join(c.root, "metadata", key.Hash())
@@ -83,14 +83,14 @@ func (c *Cache) GetFile(key *CacheFileKey, dest string) (*CacheFile, error) {
 	}
 
 	return &CacheFile{
-		key: key,
-		dest: dest,
+		key:     key,
+		dest:    dest,
 		written: false,
 		changed: false,
-		h: NewCacheHash(),
-		cache: c,
-		hash: "",
-		data: make(map[string]interface{}),
+		h:       NewCacheHash(),
+		cache:   c,
+		hash:    "",
+		data:    make(map[string]interface{}),
 	}, nil
 }
 
