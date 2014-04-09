@@ -1130,7 +1130,9 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 		}
 	}
 
-	fmt.Fprintf(out, "package %s\n\n", f.Name)
+	pkgName := f.Name.Name
+
+	fmt.Fprintf(out, "package %s\n\n", pkgName)
 
 	fmt.Fprintf(out, "import (\n")
 	fmt.Fprintf(out, "\t__gmrt \"runtime\"\n")
@@ -1160,7 +1162,8 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 				fmt.Fprintf(out, "\tdefer __gmrt.RestoreMocking(__mockState)\n")
 			}
 
-			if f.Name.Name == "tRunner" {
+			if pkgName == "testing" && f.Name.Name == "tRunner" {
+				// Intercept testing test runner to enable mocking
 				for _, line := range f.Body.List[:len(f.Body.List)-1] {
 					if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
 						return nil, utils.Err{"copyData", err}
@@ -1199,6 +1202,16 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 
 	fmt.Fprintf(out, "\n// Make sure __gmif and __gmrt are used\n")
 	fmt.Fprintf(out, "var _ __gmrt.Error = nil\n")
+
+	// gocheck has it's own test runner etc that we need to intercept.
+	if f.Name.Name == "gocheck" && filepath.Base(src) == "gocheck.go" {
+		fmt.Fprintf(out, "\nfunc (m *methodType) Call(in []reflect.Value) []reflect.Value {\n")
+		fmt.Fprintf(out, "\t__mockState := __gmrt.EnableMocking()\n")
+		fmt.Fprintf(out, "\tdefer __gmrt.RestoreMocking(__mockState)\n")
+		fmt.Fprintf(out, "\n")
+		fmt.Fprintf(out, "\treturn m.Value.Call(in)\n")
+		fmt.Fprintf(out, "}\n")
+	}
 
 	return imports, nil
 }
