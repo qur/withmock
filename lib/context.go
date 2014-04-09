@@ -328,6 +328,11 @@ func (c *Context) mockStdlib() error {
 		src := filepath.Join(c.goRoot, path)
 		dst := filepath.Join(c.tmpRoot, path)
 
+		if _, err := os.Stat(src); os.IsNotExist(err) {
+			// Ignore if the source doesn't exist
+			continue
+		}
+
 		dstDir := filepath.Dir(dst)
 
 		if err := os.MkdirAll(dstDir, 0700); err != nil {
