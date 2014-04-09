@@ -161,18 +161,34 @@ func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
 }
 
 func (c *Context) installPackages() error {
+	pkgs := make(map[string]*Package)
+	deps := make(map[string]map[string]bool)
+
 	for _, pkg := range c.packages {
 		if c.stdlibImports[pkg.Label()] || pkg.Name() == "github.com/qur/gomock/interfaces" {
 			// stdlib imports don't need installing
 			continue
 		}
 
-		if err := pkg.Install(); err != nil {
-			return utils.Err{"pkg.Install", err}
+		pkgs[pkg.Name()] = pkg
+		deps[pkg.Name()] = make(map[string]bool)
+	}
+
+	for pkgName, pkg := range pkgs {
+		imports, err := pkg.Deps()
+		if err != nil {
+			return utils.Err{"pkg.Deps", err}
+		}
+
+		for _, name := range imports {
+			if c.stdlibImports[name] || name == "github.com/qur/gomock/interfaces" {
+				continue
+			}
+			deps[pkgName][name] = true
 		}
 	}
 
-	return nil
+	return installInReverseOrder(pkgs, deps)
 }
 
 func (c *Context) mockStdlib() error {
@@ -344,6 +360,10 @@ func (c *Context) mockStdlib() error {
 		}
 	}
 
+	return installInReverseOrder(pkgs, deps)
+}
+
+func installInReverseOrder(pkgs map[string]*Package, deps map[string]map[string]bool) error {
 	// Install the packages in reverse depedency order
 	last := len(deps)
 	for len(deps) > 0 {
@@ -375,7 +395,7 @@ func (c *Context) mockStdlib() error {
 		}
 
 		if len(deps) == last {
-			return fmt.Errorf("Unable to resolve dependencies for stdlib")
+			return fmt.Errorf("Unable to resolve dependencies: %v", deps)
 		}
 
 		last = len(deps)
