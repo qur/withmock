@@ -174,6 +174,17 @@ func (c *Context) installPackages() error {
 		deps[pkg.Name()] = make(map[string]bool)
 	}
 
+	gmPkg := "github.com/qur/gomock/gomock"
+	if _, found := pkgs[gmPkg]; !found {
+		pkg, err := c.getPkg(gmPkg, gmPkg)
+		if err != nil {
+			return utils.Err{"c.getPkg", err}
+		}
+
+		pkgs[pkg.Name()] = pkg
+		deps[pkg.Name()] = make(map[string]bool)
+	}
+
 	for pkgName, pkg := range pkgs {
 		imports, err := pkg.Deps()
 		if err != nil {
