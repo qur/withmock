@@ -28,13 +28,22 @@ void
 }
 
 extern void ·copyMocking(uintptr, uintptr);
+extern void ·clearMocking(uintptr);
+
 extern G* _real_newproc1(FuncVal *fn, byte *argp, int32 narg, int32 nret, void *callerpc);
+extern void _real_goexit(void);
 
 G*
 runtime·newproc1(FuncVal *fn, byte *argp, int32 narg, int32 nret, void *callerpc) {
 	G *gp = _real_newproc1(fn, argp, narg, nret, callerpc);
 	·copyMocking((uintptr)g, (uintptr)gp);
 	return gp;
+}
+
+void
+runtime·goexit(void) {
+	·clearMocking((uintptr)g);
+	_real_goexit();
 }
 `
 
@@ -61,6 +70,13 @@ func copyMocking(src, dst uintptr) {
 	if mockDisabled[src] {
 		mockDisabled[dst] = true
 	}
+}
+
+func clearMocking(id uintptr) {
+	lockMock()
+	defer unlockMock()
+
+	delete(mockDisabled, id)
 }
 
 func RestoreMocking(val bool) {

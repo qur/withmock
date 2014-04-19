@@ -213,8 +213,9 @@ func (c *Context) mockStdlib() error {
 
 	runtimerw := NewRewriter(nil)
 
-	// We want to intercept goroutine creation
+	// We want to intercept goroutine creation & exit
 	runtimerw.Rewrite("runtime·newproc1(FuncVal ", "_real_newproc1(FuncVal ")
+	runtimerw.Rewrite("runtime·goexit(void)\n", "_real_goexit(void)\n")
 
 	for _, line := range list {
 		pkgName := strings.TrimSpace(line)
