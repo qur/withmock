@@ -1113,7 +1113,7 @@ func copyData(a, b token.Pos, fset *token.FileSet, data io.ReadSeeker, out io.Wr
 func addMockDisables(src string, out io.Writer) ([]string, error) {
 	fset := token.NewFileSet()
 
-	f, err := parser.ParseFile(fset, src, nil, 0)
+	f, err := parser.ParseFile(fset, src, nil, parser.ParseComments)
 	if err != nil {
 		return nil, utils.Err{"ParseFile", err}
 	}
@@ -1123,6 +1123,17 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 		return nil, utils.Err{"os.Open", err}
 	}
 	defer data.Close()
+
+	if len(f.Comments) > 0 {
+		for _, cg := range f.Comments {
+			if strings.HasPrefix(cg.Text(), "+build") {
+				for _, c := range cg.List {
+					fmt.Fprintf(out, "%s\n", c.Text)
+				}
+				fmt.Fprintf(out, "\n")
+			}
+		}
+	}
 
 	if f.Doc != nil {
 		for _, cmt := range f.Doc.List {
@@ -1155,6 +1166,14 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 				return nil, utils.Err{"copyData", err}
 			}
 
+			if f.Body == nil {
+				// TODO: we want to put disabling into external functions, but
+				// that means renaming that function so that we can wrap it ...
+				// and it's currently too late to add rewrites.
+				fmt.Fprintf(out, "\n")
+				continue
+			}
+
 			fmt.Fprintf(out, " {\n")
 
 			if f.Name.IsExported() {
@@ -1185,6 +1204,10 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 
 			fmt.Fprintf(out, "\n}")
 		} else {
+			if g, ok := decl.(*ast.GenDecl); ok && g.Doc != nil {
+				fmt.Fprintf(out, "/*\n%s*/\n", g.Doc.Text())
+			}
+
 			start := int64(fset.Position(decl.Pos()).Offset)
 			end := int64(fset.Position(decl.End()).Offset)
 
@@ -1204,7 +1227,7 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 	fmt.Fprintf(out, "var _ __gmrt.Error = nil\n")
 
 	// gocheck has it's own test runner etc that we need to intercept.
-	if f.Name.Name == "gocheck" && filepath.Base(src) == "gocheck.go" {
+	if pkgName == "gocheck" && filepath.Base(src) == "gocheck.go" {
 		fmt.Fprintf(out, "\nfunc (m *methodType) Call(in []reflect.Value) []reflect.Value {\n")
 		fmt.Fprintf(out, "\t__mockState := __gmrt.EnableMocking()\n")
 		fmt.Fprintf(out, "\tdefer __gmrt.RestoreMocking(__mockState)\n")
