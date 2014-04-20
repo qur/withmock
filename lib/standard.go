@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/qur/withmock/config"
+	"github.com/qur/withmock/utils"
 )
 
 type rewrite struct {
@@ -114,6 +115,12 @@ func mockFileImports(src, dst string, change map[string]string, cfg *config.Conf
 		_, err = w.WriteString(rw.content)
 		if err != nil {
 			return err
+		}
+	}
+
+	if strings.HasSuffix(src, "_test.go") {
+		if err := addMockEnables(dst); err != nil {
+			return utils.Err{"addMockEnables", err}
 		}
 	}
 

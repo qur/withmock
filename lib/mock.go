@@ -243,7 +243,7 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 			fmt.Fprintf(out, "p%d...", args-1)
 			fmt.Fprintf(out, ")\n")
 			if len(fi.results) == 0 {
-				fmt.Fprintf(out, "\treturn")
+				fmt.Fprintf(out, "\t\treturn\n")
 			}
 			fmt.Fprintf(out, "\t}\n")
 		}
@@ -284,7 +284,7 @@ func (fi *funcInfo) writeMock(out io.Writer) {
 			}
 			fmt.Fprintf(out, ")\n")
 			if len(fi.results) == 0 {
-				fmt.Fprintf(out, "\treturn")
+				fmt.Fprintf(out, "\t\treturn\n")
 			}
 			fmt.Fprintf(out, "\t}\n")
 		}
@@ -1181,25 +1181,11 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 				fmt.Fprintf(out, "\tdefer __gmrt.RestoreMocking(__mockState)\n")
 			}
 
-			if pkgName == "testing" && f.Name.Name == "tRunner" {
-				// Intercept testing test runner to enable mocking
-				for _, line := range f.Body.List[:len(f.Body.List)-1] {
-					if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
-						return nil, utils.Err{"copyData", err}
-					}
-					fmt.Fprintf(out, "\n")
+			for _, line := range f.Body.List {
+				if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
+					return nil, utils.Err{"copyData", err}
 				}
 				fmt.Fprintf(out, "\n")
-				fmt.Fprintf(out, "\t__mockState := __gmrt.EnableMocking()\n")
-				fmt.Fprintf(out, "\tdefer __gmrt.RestoreMocking(__mockState)\n")
-				fmt.Fprintf(out, "\ttest.F(t)\n")
-			} else {
-				for _, line := range f.Body.List {
-					if err := copyData(line.Pos(), line.End(), fset, data, out); err != nil {
-						return nil, utils.Err{"copyData", err}
-					}
-					fmt.Fprintf(out, "\n")
-				}
 			}
 
 			fmt.Fprintf(out, "\n}")
@@ -1223,20 +1209,90 @@ func addMockDisables(src string, out io.Writer) ([]string, error) {
 		fmt.Fprintf(out, "\n")
 	}
 
-	fmt.Fprintf(out, "\n// Make sure __gmif and __gmrt are used\n")
+	fmt.Fprintf(out, "\n// Make sure __gmrt is used\n")
 	fmt.Fprintf(out, "var _ __gmrt.Error = nil\n")
 
-	// gocheck has it's own test runner etc that we need to intercept.
-	if pkgName == "gocheck" && filepath.Base(src) == "gocheck.go" {
-		fmt.Fprintf(out, "\nfunc (m *methodType) Call(in []reflect.Value) []reflect.Value {\n")
-		fmt.Fprintf(out, "\t__mockState := __gmrt.EnableMocking()\n")
-		fmt.Fprintf(out, "\tdefer __gmrt.RestoreMocking(__mockState)\n")
-		fmt.Fprintf(out, "\n")
-		fmt.Fprintf(out, "\treturn m.Value.Call(in)\n")
-		fmt.Fprintf(out, "}\n")
+	return imports, nil
+}
+
+// addMockEnables updates all the public functions and methods to enable
+// mocking, whilst at the same time being carfeul to keep the original line
+// numbering.
+func addMockEnables(dst string) error {
+	fset := token.NewFileSet()
+
+	f, err := parser.ParseFile(fset, dst, nil, parser.ParseComments)
+	if err != nil {
+		return utils.Err{"ParseFile", err}
 	}
 
-	return imports, nil
+	src := dst + ".orig"
+
+	if err := os.Rename(dst, src); err != nil {
+		return utils.Err{"os.Rename", err}
+	}
+
+	data, err := os.Open(src)
+	if err != nil {
+		return utils.Err{"os.Open", err}
+	}
+	defer data.Close()
+
+	if err := os.Remove(src); err != nil {
+		return utils.Err{"os.Remove", err}
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return utils.Err{"os.Open", err}
+	}
+	defer data.Close()
+
+	last := int64(0)
+	seenImport := false
+
+	for _, decl := range f.Decls {
+		if d, ok := decl.(*ast.GenDecl); ok && d.Tok == token.IMPORT && !seenImport {
+			start := int64(fset.Position(d.Pos()).Offset)
+			if _, err := io.CopyN(out, data, start-last); err != nil {
+				return utils.Err{"io.CopyN", err}
+			}
+			last = start
+
+			fmt.Fprintf(out, "import __gmrt \"runtime\"; ")
+
+			seenImport = true
+		} else if f, ok := decl.(*ast.FuncDecl); ok {
+			if f.Body == nil {
+				continue
+			}
+
+			start := int64(fset.Position(f.Body.Pos()+1).Offset)
+			if _, err := io.CopyN(out, data, start-last); err != nil {
+				return utils.Err{"io.CopyN", err}
+			}
+			last = start
+
+			if f.Name.IsExported() {
+				fmt.Fprintf(out, " __mockState := __gmrt.EnableMocking();")
+				fmt.Fprintf(out, " defer __gmrt.RestoreMocking(__mockState);")
+			}
+		}
+	}
+
+	st, err := data.Stat()
+	if err != nil {
+		return utils.Err{"os.File.Stat", err}
+	}
+
+	if _, err := io.CopyN(out, data, st.Size()-last); err != nil {
+		return utils.Err{"io.CopyN", err}
+	}
+
+	fmt.Fprintf(out, "\n// Make sure __gmrt is used\n")
+	fmt.Fprintf(out, "var _ __gmrt.Error = nil\n")
+
+	return nil
 }
 
 func loadInterfaceInfo(impPath string) (*ifInfo, error) {
