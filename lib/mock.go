@@ -596,58 +596,6 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 	return imports, nil
 }
 
-func (m *mockGen) literal(name string) (string, bool) {
-	exp := m.types[name]
-	switch v := exp.(type) {
-	case *ast.SelectorExpr:
-		return m.exprString(exp), true
-	case *ast.FuncType:
-		return m.exprString(exp), true
-	case *ast.BasicLit:
-		return v.Value, false
-	case *ast.CompositeLit:
-		s := m.exprString(v.Type) + "{"
-		for i := range v.Elts {
-			if i > 0 {
-				s += ", "
-			}
-			s += m.exprString(v.Elts[i])
-		}
-		s += "}"
-		return s, false
-	case *ast.StructType, *ast.ArrayType:
-		return name + "{}", false
-	case *ast.MapType, *ast.ChanType:
-		return "make(" + name + ")", false
-	case *ast.Ident:
-		alias := v.String()
-		if _, ok := m.types[alias]; ok && alias != name {
-			lit, cast := m.literal(alias)
-			return fmt.Sprintf("(%s)(%s)", name, lit), cast
-		}
-		switch alias {
-		case "int", "int8", "int16", "int32", "int64":
-			fallthrough
-		case "uint", "uint8", "uint16", "uint32", "uint64":
-			fallthrough
-		case "rune", "byte", "uintptr", "float32", "float64":
-			return name + "(0)", false
-		case "string":
-			return name + "(\"\")", false
-		case "bool":
-			return "false", false
-		case "complex64", "complex128":
-			return name + "(0+0i)", false
-		default:
-			panic(fmt.Sprintf("Can't convert %s:(%v)%T to string in literal",
-				name, exp, exp))
-		}
-	default:
-		panic(fmt.Sprintf("Can't convert %s:(%v)%T to string in literal",
-			name, exp, exp))
-	}
-}
-
 func (m *mockGen) exprString(exp ast.Expr) string {
 	switch v := exp.(type) {
 	case *ast.BasicLit:
@@ -974,16 +922,9 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 			fmt.Fprintf(out, "type %s struct {\n", mock)
 			fmt.Fprintf(out, "\t%s\n", name)
 			fmt.Fprintf(out, "}\n")
-			lit, cast := m.literal(name)
-			if cast {
-				fmt.Fprintf(out, "func (_ *_meta) New%s(val %s) %s {\n",
-					name, lit, retType)
-				fmt.Fprintf(out, "\treturn %s%s{(%s)(val)}\n", mod, mock, name)
-			} else {
-				fmt.Fprintf(out, "func (_ *_meta) New%s() %s {\n", name,
-					retType)
-				fmt.Fprintf(out, "\treturn %s%s{%s}\n", mod, mock, lit)
-			}
+			fmt.Fprintf(out, "func (_ *_meta) New%s() %s {\n", name,
+				retType)
+			fmt.Fprintf(out, "\treturn %s%s{}\n", mod, mock)
 			fmt.Fprintf(out, "}\n\n")
 		}
 		fmt.Fprintf(out, "type %s struct {\n", rec)
@@ -1058,7 +999,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 	}
 	defer data.Close()
 
-	// Make sure data is available to exprString/literal
+	// Make sure data is available to exprString
 	m.data = data
 
 	buildTags := false
