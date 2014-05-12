@@ -586,6 +586,23 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 		return s
 	case *ast.BinaryExpr:
 		return m.exprString(v.X) + v.Op.String() + m.exprString(v.Y)
+	case *ast.SliceExpr:
+		s := m.exprString(v.X) + "["
+		if v.Low != nil {
+			s += m.exprString(v.Low)
+		}
+		s += ":"
+		if v.High != nil {
+			s += m.exprString(v.High)
+		}
+		if v.Slice3 {
+			s += ":"
+			if v.Max != nil {
+				s += m.exprString(v.Max)
+			}
+		}
+		s += "]"
+		return s
 	default:
 		panic(fmt.Sprintf("Can't convert (%v)%T to string in exprString", exp, exp))
 	}
