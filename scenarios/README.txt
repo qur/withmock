@@ -152,3 +152,8 @@ other_c_code    - When a package contains a sub directory with a .go file in it
                   path because we saw it as a subdirectory then we shouldn't try
                   to install it.  We should only install packages that are
                   imported as part of the import chain from the test code.
+
+protobuf        - We weren't able to process the goprotobuf package reliably.
+                  Because there are two definitions of a type with build
+                  contraints selecting the one to actually use we would flip
+                  between literal depending on the processing order.
