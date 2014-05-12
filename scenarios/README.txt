@@ -157,3 +157,5 @@ protobuf        - We weren't able to process the goprotobuf package reliably.
                   Because there are two definitions of a type with build
                   contraints selecting the one to actually use we would flip
                   between literal depending on the processing order.
+
+var_slice       - We weren't handling slice expressions in exprString.
