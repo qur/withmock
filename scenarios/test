@@ -5,6 +5,14 @@ cd "$(dirname "$0")"
 ret=0
 
 function check() {
+    if [ -e "$2/.needs" ]; then
+        for pkg in $(cat "$2/.needs"); do
+            if [ "$(go list -e -f '{{.Incomplete}}' "$pkg")" == "true" ]; then
+                echo -ne "\e[35;1mDEPS\e[0m"
+                return
+            fi
+        done
+    fi
     if [ -e "$2/.bug" ]; then
 	if [ $1 -ne 0 ]; then
             echo -ne "\e[35;1mBUG \e[0m"
