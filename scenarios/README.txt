@@ -159,3 +159,10 @@ protobuf        - We weren't able to process the goprotobuf package reliably.
                   between literal depending on the processing order.
 
 var_slice       - We weren't handling slice expressions in exprString.
+
+separate        - Code and test in separate directories - run withmock against
+                  code.
+
+separate_stdlib - Code and test in separate directories (mocking a stdlib
+                  package). - run withmock against
+                  code.
