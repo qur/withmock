@@ -130,7 +130,7 @@ func TestMockFile(t *testing.T) {
 	}
 
 	for i, path := range files {
-		if strings.Contains(path, "/badpkg/") {
+		if strings.Contains(path, "/badpkg/") || strings.Contains(path, "/notest/") {
 			fmt.Printf("SKIP    (%d/%d): %s\n", i+1, len(files), path)
 			continue
 		}
