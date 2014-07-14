@@ -1,0 +1,4 @@
+#!/bin/bash
+
+go get labix.org/v2/mgo
+go get github.com/alecthomas/gozmq
