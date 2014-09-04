@@ -814,12 +814,14 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 		if v.High != nil {
 			s += m.exprString(v.High)
 		}
+/*
 		if v.Slice3 {
 			s += ":"
 			if v.Max != nil {
 				s += m.exprString(v.Max)
 			}
 		}
+*/
 		s += "]"
 		return s
 	default:
