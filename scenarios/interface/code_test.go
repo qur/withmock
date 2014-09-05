@@ -35,7 +35,7 @@ func TestLocalInterface(t *testing.T) {
 
 	code_mocks.SetController(ctrl)
 
-	toot := code_mocks.NewTooter()
+	toot := &code_mocks.MockTooter{}
 
 	toot.EXPECT().Toot().Return(nil)
 
