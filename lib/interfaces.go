@@ -270,9 +270,6 @@ func (i Interfaces) genExtInterface(name string, extPkg string) error {
 		// Make sure that our mock satisifies the interface
 		fmt.Fprintf(out, "var _ %s = &Mock%s{}\n", tname, tname)
 
-		fmt.Fprintf(out, "func New%s() *Mock%s {\n", tname, tname)
-		fmt.Fprintf(out, "\treturn &Mock%s{}\n", tname)
-		fmt.Fprintf(out, "}\n")
 		fmt.Fprintf(out, "func (_m *Mock%s) %s() *_mock_%s_rec {\n",
 			tname, info.EXPECT, tname)
 		fmt.Fprintf(out, "\treturn &_mock_%s_rec{_m}\n", tname)
