@@ -1,0 +1,3 @@
+#!/bin/bash
+
+exec withmock go test -tags something "$@"

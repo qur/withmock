@@ -166,3 +166,8 @@ separate        - Code and test in separate directories - run withmock against
 separate_stdlib - Code and test in separate directories (mocking a stdlib
                   package). - run withmock against
                   code.
+
+tags            - We need to allow the user to specify extra tags the should be
+                  included (i.e. the -tags options to go build).  Without this
+                  any code that we are mocking that uses tags won't ever be
+                  included.
