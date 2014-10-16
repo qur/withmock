@@ -174,3 +174,6 @@ tags            - We need to allow the user to specify extra tags the should be
 
 var_multi_value - We don't currently support multiple values for a single var
                   statement (or line for a multiple var statement).
+
+const_multi     - We support even less in the way of multiple constants on a
+                  line than we do with variables.
