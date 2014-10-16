@@ -940,7 +940,11 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (*mockFileIn
 					case 1:
 						fmt.Fprintf(out, " = %s", m.exprString(s.Values[0]))
 					default:
-						return nil, fmt.Errorf("Multiple values for a var not implemented")
+						values := make([]string, 0, len(s.Values))
+						for _, value := range s.Values {
+							values = append(values, m.exprString(value))
+						}
+						fmt.Fprintf(out, " = "+strings.Join(values, ", "))
 					}
 					fmt.Fprintf(out, "\n")
 				}
