@@ -171,3 +171,6 @@ tags            - We need to allow the user to specify extra tags the should be
                   included (i.e. the -tags options to go build).  Without this
                   any code that we are mocking that uses tags won't ever be
                   included.
+
+var_multi_value - We don't currently support multiple values for a single var
+                  statement (or line for a multiple var statement).
