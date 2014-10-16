@@ -953,10 +953,11 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (*mockFileIn
 				fmt.Fprintf(out, "const (\n")
 				for _, spec := range d.Specs {
 					s := spec.(*ast.ValueSpec)
-					if len(s.Names) != 1 {
-						return nil, fmt.Errorf("Multiple names for a constant not implemented")
+					names := make([]string, 0, len(s.Names))
+					for _, ident := range s.Names {
+						names = append(names, ident.Name)
 					}
-					fmt.Fprintf(out, "\t%s", s.Names[0])
+					fmt.Fprintf(out, "\t"+strings.Join(names, ", "))
 					if s.Type != nil {
 						fmt.Fprintf(out, " %s", m.exprString(s.Type))
 					}
@@ -965,7 +966,11 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (*mockFileIn
 					case 1:
 						fmt.Fprintf(out, " = %s", m.exprString(s.Values[0]))
 					default:
-						return nil, fmt.Errorf("Multiple values for a constant not implemented")
+						values := make([]string, 0, len(s.Values))
+						for _, value := range s.Values {
+							values = append(values, m.exprString(value))
+						}
+						fmt.Fprintf(out, " = "+strings.Join(values, ", "))
 					}
 					fmt.Fprintf(out, "\n")
 				}
