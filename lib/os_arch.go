@@ -24,16 +24,19 @@ var knownOS = map[string]bool{
 	"dragonfly": true,
 	"freebsd":   true,
 	"linux":     true,
+	"nacl":      true,
 	"netbsd":    true,
 	"openbsd":   true,
 	"plan9":     true,
+	"solaris":   true,
 	"windows":   true,
 }
 
 var knownArch = map[string]bool{
-	"386":   true,
-	"amd64": true,
-	"arm":   true,
+	"386":      true,
+	"amd64":    true,
+	"amd64p32": true,
+	"arm":      true,
 }
 
 // goodOSArchFile returns false if the name contains a $GOOS or $GOARCH
