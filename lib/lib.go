@@ -249,6 +249,7 @@ func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSe
 	if err != nil {
 		return nil, err
 	}
+	cfg.MatchOSArch = true
 	imports, err := MakePkg(src, dst, name, mock, cfg)
 	if err != nil {
 		return nil, err

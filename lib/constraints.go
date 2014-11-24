@@ -39,7 +39,12 @@ func goodOSArchConstraints(file *ast.File) (ok bool) {
 		for _, cmt := range comment.List {
 			line := cmt.Text
 			line = strings.TrimLeft(line, "/")
-			line = strings.TrimSpace(line)[7:]
+			line = strings.TrimSpace(line)
+
+			if len(line) == 0 {
+				continue
+			}
+			line = line[7:]
 
 			satisfied := false
 
