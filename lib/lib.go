@@ -261,7 +261,7 @@ func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSe
 
 func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	// Write a mock version of the package
-	src := filepath.Join(srcRoot, "src/pkg", name)
+	src := filepath.Join(srcRoot, "src", name)
 	dst := filepath.Join(dstRoot, "src", markImport(name, mockMark))
 	err := os.MkdirAll(dst, 0700)
 	if err != nil {
