@@ -444,7 +444,11 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 			continue
 		}
 		if entry.IsDir() {
-			imports.Set(filepath.Join(pkgName, name), importNoInstall, "")
+			if name == "internal" {
+				os.Symlink(filepath.Join(srcPath, name), filepath.Join(dstPath, name))
+			} else {
+				imports.Set(filepath.Join(pkgName, name), importNoInstall, "")
+			}
 			continue
 		}
 		if entry.IsDir() || strings.HasSuffix(name, ".go") {
@@ -1107,7 +1111,11 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 							return nil, err
 						}
 					}
-					fmt.Fprintf(out, "%s\n", s.Path.Value)
+					if strings.HasSuffix(s.Path.Value, `/internal"`) && m.mockPrototypes {
+						fmt.Fprintf(out, "%s\n", `"_`+s.Path.Value[2:])
+					} else {
+						fmt.Fprintf(out, "%s\n", s.Path.Value)
+					}
 				}
 				fmt.Fprintf(out, ")\n\n")
 			case token.TYPE:
