@@ -71,12 +71,18 @@ issue17         - We were trying to rewrite packages with non-Go code in them
                   ignore the non-Go files, otherwise the toolchain will try and
                   include those too).
 
+issue17b        - Same as issue17, but with the C code removed.
+
 nongocode       - Make sure that we can test packages that include non-go code.
 
+nongocode2      - Same as nongocode, but with the C code removed.
+
 issue18         - If an imported package includes non-Go code, then we don't
-                  adds any package it imports into the list of packages to be
+                  add any package it imports into the list of packages to be
                   installed.  This then results in go test failing to compile
                   the test binary.
+
+issue18b        - Same as issue18, but with the C code replaced with asm code.
 
 issue19         - If two packages are dot-imported then we will get name
                   conflicts over the MOCK and EXPECT functions that we add to
