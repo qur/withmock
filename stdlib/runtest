@@ -1,5 +1,7 @@
 #!/bin/bash
 
+pass=0
+total=0
 ret=0
 
 test_file="code_test.go"
@@ -35,6 +37,7 @@ for pkg in $(go list std); do
     output=$("$@" 2>&1)
     if [ "$?" -eq 0 ]; then
         echo "pass"
+        (( pass = $pass + 1 ));
     else
         ret=1
         echo "fail"
@@ -42,8 +45,18 @@ for pkg in $(go list std); do
         echo -e "$output"
         echo "----------------------------------------------------"
     fi
+    (( total = $total + 1 ));
 done
 
 rm -r ${test_file}
+
+if [ $pass -eq 0 ]; then
+    echo -ne "\e[31;1m" >&3
+elif [ $pass -eq $total ]; then
+    echo -ne "\e[32;1m" >&3
+else
+    echo -ne "\e[33;1m" >&3
+fi
+echo -e "${pass}/${total}\e[0m" >&3
 
 exit $ret

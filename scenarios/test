@@ -81,11 +81,13 @@ for d in ${names}; do
     echo -ne "\n"
 done
 
-echo -ne "\nOverall: "
-if [ $ret -eq 0 ]; then
-    echo -e "\e[32;1mPASS\e[0m"
-else
-    echo -e "\e[31;1mFAIL\e[0m"
+if [ -z "${WITHMOCK_TEST_MAIN}" ]; then
+    echo -ne "\nOverall: "
+    if [ $ret -eq 0 ]; then
+        echo -e "\e[32;1mPASS\e[0m"
+    else
+        echo -e "\e[31;1mFAIL\e[0m"
+    fi
 fi
 
 exit $ret
