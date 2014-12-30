@@ -30,10 +30,7 @@ for goroot in $(ls -vd */go); do
     ret=$?
     echo
 
-    if [ $ret -eq 0 ]; then
-        echo -e "\033[32;1mPASS\033[0m" >&3
-    else
-        echo -e "\033[31;1mFAIL\033[0m" >&3
+    if [ $ret -ne 0 ]; then
         result=1
     fi
 done

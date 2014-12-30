@@ -2,6 +2,19 @@
 
 ret=0
 
+export WITHMOCK_TEST_MAIN="true"
+
+if [ -n "$1" ]; then
+    stdlib="$(cd "stdlib"; pwd)"
+    export GOROOT="${stdlib}/$1/go"
+    export PATH="$GOROOT/bin:$PATH"
+
+    if ! [ -d "${GOROOT}" ]; then
+        echo -e "\e[31;1mERROR - No such version: $1\e[0m"
+        exit 1
+    fi
+fi
+
 echo -e "\e[33;1mgo install\e[0m"
 echo -e "=========="
 echo -n "withmock: "
@@ -81,5 +94,12 @@ for path in lib; do
         echo -e "\e[32;1mPASS\e[0m"
     fi
 done
+
+echo -ne "\nOverall: "
+if [ $ret -eq 0 ]; then
+    echo -e "\e[32;1mPASS\e[0m"
+else
+    echo -e "\e[31;1mFAIL\e[0m"
+fi
 
 exit $ret
