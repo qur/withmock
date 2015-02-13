@@ -3,7 +3,7 @@ package code
 import (
 	"testing"
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/qur/gomock/gomock"
 
 	"github.com/qur/withmock/scenarios/issue17b/lib_asm2" // mock
 )

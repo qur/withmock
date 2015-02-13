@@ -7,7 +7,7 @@ import (
 
 	"github.com/qur/withmock/scenarios/separate_stdlib/code"
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/qur/gomock/gomock"
 )
 
 func TestShow(t *testing.T) {
