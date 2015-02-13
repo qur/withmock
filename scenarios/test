@@ -6,7 +6,6 @@ ret=0
 
 function check() {
     local ver="$(go version | awk '{print $3}' | awk -F. '{print $2}')"
-    echo "VERSION: $ver" >> test.log
 
     if [ -e "$2/.needs" ]; then
         for pkg in $(cat "$2/.needs"); do
@@ -17,7 +16,6 @@ function check() {
         done
     fi
 
-    echo "X: $1 $2 $ver" >> test.log
     if [ $1 -ne 0 ] && [ -e "$2/.uses_c" ] && [ $ver -ge 4 ]; then
         echo -ne "\e[33;1mGO_VERSION\e[0m"
         return
