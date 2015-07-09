@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"launchpad.net/goyaml"
+	"gopkg.in/yaml.v2"
 )
 
 func readPackages(path string) ([]string, error) {
@@ -109,7 +109,7 @@ func ReadConfig(path string) (*Config, error) {
 
 	cfg := &Config{}
 
-	err = goyaml.Unmarshal(data, cfg)
+	err = yaml.Unmarshal(data, cfg)
 	if err != nil {
 		return nil, err
 	}
