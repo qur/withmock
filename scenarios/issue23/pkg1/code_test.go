@@ -3,7 +3,7 @@ package code
 import (
 	"testing"
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/golang/mock/gomock"
 
 	"github.com/qur/withmock/scenarios/issue23/pkg1/lib" // mock
 	"github.com/qur/withmock/scenarios/issue23/shared" // mock

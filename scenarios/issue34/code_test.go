@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/golang/mock/gomock"
 
 	"os/signal" //mock
 )

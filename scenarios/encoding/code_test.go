@@ -5,7 +5,7 @@ import (
 
 	"fmt" // mock
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/golang/mock/gomock"
 
 	"encoding/json" // mock
 	"encoding/base64" // mock

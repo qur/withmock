@@ -863,7 +863,7 @@ func fixup(filename string) error {
 func (m *mockGen) pkg(out io.Writer, name string) error {
 	fmt.Fprintf(out, "package %s\n\n", name)
 
-	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
+	fmt.Fprintf(out, "import \"github.com/golang/mock/gomock\"\n\n")
 
 	fmt.Fprintf(out, "type _meta struct{}\n")
 	fmt.Fprintf(out, "type _packageMock struct{int}\n")
@@ -1048,7 +1048,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 
 	fmt.Fprintf(out, "package %s\n\n", f.Name)
 
-	fmt.Fprintf(out, "import \"code.google.com/p/gomock/gomock\"\n\n")
+	fmt.Fprintf(out, "import \"github.com/golang/mock/gomock\"\n\n")
 
 	for _, decl := range f.Decls {
 		switch d := decl.(type) {
@@ -1061,7 +1061,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				if len(d.Specs) == 1 {
 					s := d.Specs[0].(*ast.ImportSpec)
 					impPath := strings.Trim(s.Path.Value, "\"")
-					if impPath == "code.google.com/p/gomock/gomock" {
+					if impPath == "github.com/golang/mock/gomock" {
 						continue
 					}
 					if s.Doc != nil {
@@ -1091,7 +1091,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				for _, spec := range d.Specs {
 					s := spec.(*ast.ImportSpec)
 					impPath := strings.Trim(s.Path.Value, "\"")
-					if impPath == "code.google.com/p/gomock/gomock" {
+					if impPath == "github.com/golang/mock/gomock" {
 						continue
 					}
 					fmt.Fprintf(out, "\t")
@@ -1276,7 +1276,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 	fmt.Fprintf(out, "}\n")
 
 	i := map[string]bool{
-		"code.google.com/p/gomock/gomock": false,
+		"github.com/golang/mock/gomock": false,
 	}
 
 	for _, impPath := range imports {

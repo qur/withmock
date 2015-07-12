@@ -5,7 +5,7 @@ import (
 
 	"fmt" // mock
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/golang/mock/gomock"
 )
 
 func TestShow(t *testing.T) {

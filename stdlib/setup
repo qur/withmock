@@ -99,7 +99,7 @@ mkdir -p "tst/src"
 export GOROOT="${gr}"
 export GOPATH="${mydir}/tst"
 echo -n "  download: " >&3
-go get -d code.google.com/p/gomock/gomock
+go get -d github.com/golang/mock/gomock
 if [ $? -eq 0 ]; then
     echo "ok" >&3
 else

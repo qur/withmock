@@ -98,7 +98,7 @@ func NewContext() (*Context, error) {
 		cache:          cache,
 		packages:       make(map[string]Package),
 		// create excludes already including gomock, as we can't mock it.
-		excludes: map[string]bool{"code.google.com/p/gomock/gomock": true},
+		excludes: map[string]bool{"github.com/golang/mock/gomock": true},
 	}, nil
 }
 

@@ -1,7 +1,7 @@
 package code
 
 import (
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/qur/withmock/scenarios/basic/lib"
 )
 

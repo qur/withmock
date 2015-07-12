@@ -199,7 +199,7 @@ func (i Interfaces) genInterface(name string) error {
 	for name, impPath := range info.imports {
 		fmt.Fprintf(out, "\t%s \"%s\"\n", name, impPath)
 	}
-	fmt.Fprintf(out, "\tgomock \"code.google.com/p/gomock/gomock\"\n")
+	fmt.Fprintf(out, "\tgomock \"github.com/golang/mock/gomock\"\n")
 	fmt.Fprintf(out, ")\n\n")
 	for tname := range info.types {
 		fmt.Fprintf(out, "type Mock%s struct{int}\n", tname)
@@ -248,7 +248,7 @@ func (i Interfaces) genExtInterface(name string, extPkg string) error {
 	for name, impPath := range info.imports {
 		fmt.Fprintf(out, "\t%s \"%s\"\n", name, impPath)
 	}
-	fmt.Fprintf(out, "\tgomock \"code.google.com/p/gomock/gomock\"\n")
+	fmt.Fprintf(out, "\tgomock \"github.com/golang/mock/gomock\"\n")
 	fmt.Fprintf(out, ")\n\n")
 
 	fmt.Fprintf(out, "var (\n")

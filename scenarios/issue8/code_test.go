@@ -5,7 +5,7 @@ import (
 
 	"github.com/qur/withmock/scenarios/issue8/bug" // mock
 
-	"code.google.com/p/gomock/gomock"
+	"github.com/golang/mock/gomock"
 )
 
 func TestTryMe(t *testing.T) {

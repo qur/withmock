@@ -14,8 +14,8 @@ As you might expect:
     go get github.com/qur/withmock
     go get github.com/qur/withmock/mocktest
 
-You will also need to install goimports (github.com/bradfitz/goimports), and
-gomock (code.google.com/p/gomock/gomock).
+You will also need to install goimports (golang.org/x/tools/cmd/goimports), and
+gomock (github.com/golang/mock/gomock).
 
 How do I use it?
 ----------------

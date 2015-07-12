@@ -5,7 +5,7 @@ import (
 
 	"github.com/qur/withmock/scenarios/basic/lib"
 
-	"code.google.com/p/go-sqlite/go1/sqlite3"
+	"github.com/mxk/go-sqlite/sqlite3"
 )
 
 func TryMe() error {
