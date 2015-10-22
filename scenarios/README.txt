@@ -183,3 +183,6 @@ var_multi_value - We don't currently support multiple values for a single var
 
 const_multi     - We support even less in the way of multiple constants on a
                   line than we do with variables.
+
+issue51         - We want to be able to mock type that have both pointer and
+                  pointer receiver methods.
