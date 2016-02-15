@@ -3,7 +3,7 @@ package withdeps
 import (
 	"testing"
 
-	"code.google.com/p/gcfg" // mock
+	"gopkg.in/gcfg.v1" // mock
 
 	"github.com/golang/mock/gomock"
 )
