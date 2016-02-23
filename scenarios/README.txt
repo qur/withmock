@@ -186,3 +186,6 @@ const_multi     - We support even less in the way of multiple constants on a
 
 issue51         - We want to be able to mock type that have both pointer and
                   pointer receiver methods.
+
+issue55         - When mocking the gin framework there is a problem with
+                  channels not being processed correctly.
