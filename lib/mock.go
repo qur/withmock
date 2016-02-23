@@ -30,9 +30,24 @@ func isLocalExpr(expr string) bool {
 	return !strings.Contains(expr, ".")
 }
 
+func isChannel(expr string) (prefix, subtype string) {
+	if !strings.Contains(expr, " ") {
+		return "", ""
+	}
+	parts := strings.SplitN(expr, " ", 2)
+	switch parts[0] {
+	case "chan", "<-chan", "chan->":
+		return parts[0], parts[1]
+	}
+	return "", ""
+}
+
 func scopeName(name, scope string) string {
 	if strings.HasPrefix(name, "[]") {
 		return "[]" + scopeName(name[2:], scope)
+	}
+	if channel, sub := isChannel(name); channel != "" {
+		return channel + " " + scopeName(sub, scope)
 	}
 	if isLocalExpr(name) {
 		return scope + "." + name
@@ -45,7 +60,7 @@ func scopeFields(fields []field, scope string) []field {
 	for i, f := range fields {
 		newFields[i] = field{
 			names: f.names,
-			expr: scopeName(f.expr, scope),
+			expr:  scopeName(f.expr, scope),
 		}
 	}
 	return newFields
@@ -70,16 +85,16 @@ type funcInfo struct {
 
 func (fi *funcInfo) AddScope(scope string) *funcInfo {
 	return &funcInfo{
-		name: fi.name,
-		varidic: fi.varidic,
+		name:         fi.name,
+		varidic:      fi.varidic,
 		realDisabled: fi.realDisabled,
-		recv: struct{name, expr string}{
+		recv: struct{ name, expr string }{
 			fi.recv.name,
 			scopeName(fi.recv.expr, scope),
 		},
-		params: scopeFields(fi.params, scope),
+		params:  scopeFields(fi.params, scope),
 		results: scopeFields(fi.results, scope),
-		body: fi.body,
+		body:    fi.body,
 	}
 }
 
@@ -572,7 +587,7 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 	// Load up a rewriter with the rewrites for the external functions
 	rw := NewRewriter(nil)
 	for _, name := range externalFunctions {
-		rw.Rewrite("·" + name + "(", "·_real_" + name + "(")
+		rw.Rewrite("·"+name+"(", "·_real_"+name+"(")
 	}
 
 	// Now copy the non go source files through the rewriter
