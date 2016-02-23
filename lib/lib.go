@@ -120,7 +120,7 @@ func GetImports(path string, tests bool) (importSet, error) {
 					mode = importMock
 				case strings.HasPrefix(comment, "replace("):
 					mode = importReplace
-					path2 = comment[8:len(comment)-1]
+					path2 = comment[8 : len(comment)-1]
 				}
 
 				err := imports.Set(path, mode, path2)
@@ -262,7 +262,7 @@ func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSe
 func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	// Write a mock version of the package
 	var src string
-	if _, err := os.Stat(srcRoot+"/src/pkg"); err == nil {
+	if _, err := os.Stat(srcRoot + "/src/pkg"); err == nil {
 		src = filepath.Join(srcRoot, "src/pkg", name)
 	} else {
 		src = filepath.Join(srcRoot, "src", name)

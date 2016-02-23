@@ -39,7 +39,7 @@ type Context struct {
 
 	cfg *Config
 
-	cache *Cache
+	cache    *Cache
 	packages map[string]Package
 }
 
@@ -143,8 +143,8 @@ func (c *Context) insideCommand(command string, args ...string) *exec.Cmd {
 	}
 
 	// Setup the environment variables that we want
-	env = append(env, "GOPATH=" + c.tmpPath)
-	env = append(env, "ORIG_GOPATH=" + c.origPath)
+	env = append(env, "GOPATH="+c.tmpPath)
+	env = append(env, "ORIG_GOPATH="+c.origPath)
 
 	cmd := exec.Command(command, args...)
 	cmd.Env = env
@@ -293,7 +293,7 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				// Update imports from the package we just processed, but it
 				// can only add actual packages, not mocks
 				c.wantToProcess(false, pkgImports)
-			
+
 				continue
 			}
 

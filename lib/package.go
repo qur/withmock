@@ -30,14 +30,14 @@ type Package interface {
 }
 
 type realPackage struct {
-	name string
-	label string
-	install bool
-	path string
+	name     string
+	label    string
+	install  bool
+	path     string
 	src, dst string
-	tmpDir string
-	tmpPath string
-	goPath string
+	tmpDir   string
+	tmpPath  string
+	goPath   string
 }
 
 func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
@@ -54,15 +54,15 @@ func NewPackage(pkgName, label, tmpDir, goPath string) (Package, error) {
 	tmpPath := getTmpPath(tmpDir)
 
 	return &realPackage{
-		name: pkgName,
-		label: label,
+		name:    pkgName,
+		label:   label,
 		install: true,
-		path: path,
-		src: codeSrc,
-		dst: filepath.Join(tmpPath, "src", label),
-		tmpDir: tmpDir,
+		path:    path,
+		src:     codeSrc,
+		dst:     filepath.Join(tmpPath, "src", label),
+		tmpDir:  tmpDir,
 		tmpPath: tmpPath,
-		goPath: goPath,
+		goPath:  goPath,
 	}, nil
 }
 
@@ -117,7 +117,7 @@ func (p *realPackage) insideCommand(command string, args ...string) *exec.Cmd {
 	}
 
 	// Setup the environment variables that we want
-	env = append(env, "GOPATH=" + p.tmpPath)
+	env = append(env, "GOPATH="+p.tmpPath)
 	//env = append(env, "ORIG_GOPATH=" + c.origPath)
 
 	cmd := exec.Command(command, args...)

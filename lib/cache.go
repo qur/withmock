@@ -11,8 +11,8 @@ import (
 
 type Cache struct {
 	enabled bool
-	root string
-	tmpDir string
+	root    string
+	tmpDir  string
 }
 
 func NewCache(tmpDir string) *Cache {
@@ -30,8 +30,8 @@ func NewCache(tmpDir string) *Cache {
 
 	return &Cache{
 		enabled: enabled,
-		root: root,
-		tmpDir: tmpDir,
+		root:    root,
+		tmpDir:  tmpDir,
 	}
 }
 
@@ -61,4 +61,3 @@ func (c *Cache) Fetch(path string) (Package, error) {
 
 type cachePackage struct {
 }
-

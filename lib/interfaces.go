@@ -35,7 +35,7 @@ func (id *ifDetails) addMethod(name string, f *ast.FuncType) []string {
 				expr: m.exprString(param.Type),
 			}
 			fi.params = append(fi.params, field)
-			for i:=1; i<len(param.Names); i++ {
+			for i := 1; i < len(param.Names); i++ {
 				fi.params = append(fi.params, field)
 			}
 			_, fi.varidic = param.Type.(*ast.Ellipsis)
@@ -47,7 +47,7 @@ func (id *ifDetails) addMethod(name string, f *ast.FuncType) []string {
 				expr: m.exprString(result.Type),
 			}
 			fi.results = append(fi.results, field)
-			for i:=1; i<len(result.Names); i++ {
+			for i := 1; i < len(result.Names); i++ {
 				fi.results = append(fi.results, field)
 			}
 		}
@@ -147,10 +147,10 @@ func (i Interfaces) getMethods(name string, tname string) ([]*funcInfo, error) {
 		// Special case for error, which is a builtin interface type
 		if n == "error" {
 			methods = append(methods, &funcInfo{
-				name: "Error",
+				name:         "Error",
 				realDisabled: true,
-				varidic: false,
-				results: []field{{expr: "string"}},
+				varidic:      false,
+				results:      []field{{expr: "string"}},
 			})
 			continue
 		}
