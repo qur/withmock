@@ -7,6 +7,7 @@ package lib
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -234,6 +235,8 @@ func (c *Context) wantToProcess(mockAllowed bool, imports importSet) map[string]
 			// Special mocks package that we don't want to process
 			c.processed[label] = true
 		}
+
+		log.Printf("wantToProcess: label: %s, name: %s, processed: %v", label, name, c.processed[label])
 	}
 
 	// remove nop rewites from the names map, and add real ones to
@@ -280,6 +283,8 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				name = n
 				mock = true
 			}
+
+			log.Printf("installImports: label: %s, name: %s, mock: %v", label, name, mock)
 
 			if imports[name].IsReplace() {
 				// Install the requested package in place of the
@@ -337,6 +342,8 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			if err != nil {
 				return nil, Cerr{"GenPkg", err}
 			}
+
+			log.Printf("process deps")
 
 			// Update imports from the package we just processed, but it can
 			// only add actual packages, not mocks

@@ -10,13 +10,18 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
+	"log"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 )
 
-func isLocalExpr(expr string) bool {
+func isLocalExpr(expr string) (ret bool) {
+	defer func() {
+		log.Printf("isLocalExpr: [%s] = %v", expr, ret)
+	}()
 	switch expr {
 	case "int", "int8", "int16", "int32", "int64":
 		return false
@@ -25,6 +30,12 @@ func isLocalExpr(expr string) bool {
 	case "rune", "byte", "uintptr", "float32", "float64":
 		return false
 	case "string", "bool", "error", "complex64", "complex128":
+		return false
+	}
+	if strings.HasPrefix(expr, "struct{") {
+		return false
+	}
+	if strings.HasPrefix(expr, "interface{") {
 		return false
 	}
 	return !strings.Contains(expr, ".")
@@ -401,6 +412,7 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 }
 
 type mockGen struct {
+	pkgName        string
 	fset           *token.FileSet
 	srcPath        string
 	mockByDefault  bool
@@ -459,7 +471,7 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 			continue
 		}
 		if entry.IsDir() {
-			if name == "internal" {
+			if name == "internal" || name == "vendor" {
 				os.Symlink(filepath.Join(srcPath, name), filepath.Join(dstPath, name))
 			} else {
 				imports.Set(filepath.Join(pkgName, name), importNoInstall, "")
@@ -482,6 +494,7 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 
 	for name, pkg := range pkgs {
 		m := &mockGen{
+			pkgName:        pkgName,
 			fset:           fset,
 			srcPath:        srcPath,
 			mockByDefault:  mock,
@@ -682,6 +695,9 @@ func (m *mockGen) exprString(exp ast.Expr) string {
 		m.registerScope(scope)
 		return scope + "." + v.Sel.Name
 	case *ast.StructType:
+		if len(v.Fields.List) == 0 {
+			return "struct{}"
+		}
 		s := "struct {\n"
 		for _, field := range v.Fields.List {
 			names := make([]string, 0, len(field.Names))
@@ -976,7 +992,36 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 
 var pkgNames = map[string]string{}
 
-func getPackageName(impPath, srcPath string) (string, error) {
+func getVendorPaths(pkgName string) []string {
+	vendors := []string{}
+	for len(pkgName) > 0 {
+		log.Printf("getVendorPaths: %s", pkgName)
+		vendor := path.Join(pkgName, "vendor")
+		vendors = append(vendors, vendor)
+		pkgName, _ = path.Split(pkgName)
+		if strings.HasSuffix(pkgName, "/") {
+			pkgName = pkgName[:len(pkgName)-1]
+		}
+	}
+	return append(vendors, "vendor")
+}
+
+func lookupImportName(main string, alternates ...string) (string, error) {
+	name, err := GetOutput("go", "list", "-f", "{{.Name}}", main)
+	if err == nil {
+		return name, nil
+	}
+	for _, alternate := range alternates {
+		if name, err := GetOutput("go", "list", "-f", "{{.Name}}", alternate); err == nil {
+			return name, nil
+		}
+	}
+	return "", err
+}
+
+func getPackageName(impPath, srcPath, pkgName string) (string, error) {
+	log.Printf("getPackageName: imp: %s, src: %s, pkg: %s", impPath, srcPath, pkgName)
+
 	// Special case for the magic "C" package
 	if impPath == "C" {
 		return "", nil
@@ -987,36 +1032,46 @@ func getPackageName(impPath, srcPath string) (string, error) {
 		return name, nil
 	}
 
+	chdir := ""
 	cache := true
 	lookupPath := impPath
 
 	if strings.HasPrefix(impPath, "./") {
 		// relative import, no caching, need to change directory
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", err
-		}
-		defer os.Chdir(cwd)
-
-		os.Chdir(srcPath)
+		chdir = srcPath
 		cache = false
 	}
 
 	if strings.HasPrefix(impPath, "_/") {
 		// outside of GOPATH, need to change directory and use "." for the
 		// lookup path
+		chdir = impPath[1:]
+		lookupPath = "."
+	}
 
+	if chdir != "" {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return "", err
 		}
 		defer os.Chdir(cwd)
 
-		os.Chdir(impPath[1:])
-		lookupPath = "."
+		os.Chdir(chdir)
 	}
 
-	name, err := GetOutput("go", "list", "-f", "{{.Name}}", lookupPath)
+	lookupPaths := []string{}
+
+	if chdir == "" && pkgName != "" {
+		for _, vsrc := range getVendorPaths(pkgName) {
+			path := vsrc + "/" + lookupPath
+			log.Printf("vendor: %s", path)
+			lookupPaths = append(lookupPaths, path)
+		}
+	}
+
+	log.Printf("LookupPaths: %s", lookupPaths)
+
+	name, err := lookupImportName(lookupPath, lookupPaths...)
 	if err != nil {
 		return "", fmt.Errorf("Failed to get name for '%s': %s", impPath, err)
 	}
@@ -1087,7 +1142,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 						fmt.Fprintf(out, "%s ", s.Name)
 						imports[s.Name.String()] = impPath
 					} else {
-						name, err := getPackageName(impPath, m.srcPath)
+						name, err := getPackageName(impPath, m.srcPath, m.pkgName)
 						if err == nil {
 							fmt.Fprintf(out, "%s ", name)
 							imports[name] = impPath
@@ -1096,7 +1151,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 							// tags.  If there are build tags then this file
 							// might not actually be compiled - so the package
 							// being missing may not be a problem ...
-							return nil, err
+							return nil, Cerr{"getPackageName", err}
 						}
 					}
 					fmt.Fprintf(out, "%s\n\n", s.Path.Value)
@@ -1114,7 +1169,8 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 						fmt.Fprintf(out, "%s ", s.Name)
 						imports[s.Name.String()] = impPath
 					} else {
-						name, err := getPackageName(impPath, m.srcPath)
+						log.Printf("Import: %s (src: %s, name: %s)", impPath, m.srcPath, m.pkgName)
+						name, err := getPackageName(impPath, m.srcPath, m.pkgName)
 						if err == nil {
 							fmt.Fprintf(out, "%s ", name)
 							imports[name] = impPath
@@ -1123,7 +1179,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 							// tags.  If there are build tags then this file
 							// might not actually be compiled - so the package
 							// being missing may not be a problem ...
-							return nil, err
+							return nil, Cerr{"getPackageName", err}
 						}
 					}
 					if strings.HasSuffix(s.Path.Value, `/internal"`) && m.mockPrototypes {
@@ -1333,7 +1389,8 @@ func loadInterfaceInfo(impPath string) (*ifInfo, error) {
 				if i.Name != nil {
 					imports[i.Name.String()] = impPath
 				} else {
-					name, err := getPackageName(impPath, path)
+					// TODO: pkgName for vendor paths?
+					name, err := getPackageName(impPath, path, "")
 					if err != nil {
 						return nil, err
 					}
@@ -1371,7 +1428,8 @@ func MockInterfaces(tmpPath, pkgName string, cfg *MockConfig) error {
 		return err
 	}
 
-	name, err := getPackageName(pkgName, path)
+	// TODO: pkgName for vendor paths?
+	name, err := getPackageName(pkgName, path, "")
 	if err != nil {
 		return err
 	}

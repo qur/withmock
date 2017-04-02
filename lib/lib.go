@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"go/parser"
 	"go/token"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -159,7 +160,8 @@ func GetMockedPackages(path string) (map[string]string, error) {
 		if i.Name != nil {
 			imports[i.Name.String()] = impPath
 		} else {
-			name, err := getPackageName(impPath, filepath.Dir(path))
+			// TODO: pkgName for vendor paths?
+			name, err := getPackageName(impPath, filepath.Dir(path), "")
 			if err != nil {
 				return nil, err
 			}
@@ -260,6 +262,7 @@ func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSe
 }
 
 func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
+	log.Printf("MockStandard: src: %s, dst: %s, name: %s", srcRoot, dstRoot, name)
 	// Write a mock version of the package
 	var src string
 	if _, err := os.Stat(srcRoot + "/src/pkg"); err == nil {
@@ -276,6 +279,16 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	cfg.IgnoreInits = true
 	cfg.MatchOSArch = true
 	cfg.IgnoreNonGoFiles = true
+
+	// Some versions of go include a vendor folder ...
+       // TODO: check it exists first
+	vsrc := filepath.Join(srcRoot, "src", "vendor")
+	vdst := filepath.Join(dst, "vendor")
+	log.Printf("vendor: src: %s, dst: %s", vsrc, vdst)
+	if err := os.Symlink(vsrc, vdst); err != nil {
+		return Cerr{"Vendor Symlink", err}
+	}
+
 	_, err = MakePkg(src, dst, name, true, cfg)
 	if err != nil {
 		return Cerr{"MakePkg", err}
