@@ -1084,9 +1084,10 @@ func getPackageName(impPath, srcPath, pkgName string) (string, error) {
 }
 
 func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]bool, error) {
+	log.Printf("MOCK: %s", filename)
 	data, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return nil, Cerr{"Open", err}
 	}
 	defer data.Close()
 
@@ -1309,7 +1310,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				fi.body = make([]byte, pos2.Offset-pos1.Offset+1)
 				_, err := data.ReadAt(fi.body, int64(pos1.Offset))
 				if err != nil {
-					return nil, err
+					return nil, Cerr{"ReadAt", err}
 				}
 			}
 

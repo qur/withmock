@@ -231,6 +231,7 @@ func getMark(label string) mark {
 }
 
 func GenPkg(srcPath, dstRoot, name string, mock bool, cfg *MockConfig) (importSet, error) {
+	log.Printf("GenPkg: srcPath:%s, dstRoot:%s, name:%s, mock:%v", srcPath, dstRoot, name, mock)
 	// Find the package source, it may be in any entry in srcPath
 	srcRoot := ""
 	for _, src := range filepath.SplitList(srcPath) {
@@ -281,7 +282,7 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	cfg.IgnoreNonGoFiles = true
 
 	// Some versions of go include a vendor folder ...
-       // TODO: check it exists first
+	// TODO: check it exists first
 	vsrc := filepath.Join(srcRoot, "src", "vendor")
 	vdst := filepath.Join(dst, "vendor")
 	log.Printf("vendor: src: %s, dst: %s", vsrc, vdst)

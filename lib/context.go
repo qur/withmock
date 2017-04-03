@@ -252,6 +252,15 @@ func (c *Context) wantToProcess(mockAllowed bool, imports importSet) map[string]
 	return names
 }
 
+func internalPkg(path string) bool {
+	for _, part := range strings.Split(path, "/") {
+		if part == "internal" {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Context) installImports(imports importSet) (map[string]string, error) {
 	// Start by updating processed to include anything in imports we haven't
 	// seen before, this also gives us the name rewrite map we need to return
@@ -304,6 +313,12 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 
 			if c.stdlibImports[name] && !mock {
 				// Ignore standard packages that we aren't mocking
+				continue
+			}
+
+			if internalPkg(name) {
+				// Internal packages should already be sorted by linking the
+				// internal directory elsewhere
 				continue
 			}
 
