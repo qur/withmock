@@ -1064,7 +1064,6 @@ func getPackageName(impPath, srcPath, pkgName string) (string, error) {
 	if chdir == "" && pkgName != "" {
 		for _, vsrc := range getVendorPaths(pkgName) {
 			path := vsrc + "/" + lookupPath
-			log.Printf("vendor: %s", path)
 			lookupPaths = append(lookupPaths, path)
 		}
 	}

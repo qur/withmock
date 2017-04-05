@@ -343,6 +343,12 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			}
 
 			if c.stdlibImports[name] {
+				// Make sure we hven't already mocked this stdlib library
+				if c.processed[name] {
+					log.Printf("%s already installed", name)
+					continue
+				}
+
 				// We already checked earlier for unmocked stdlib, so
 				// this is mocked stdlib
 				err := MockStandard(c.goRoot, c.tmpPath, name, cfg)

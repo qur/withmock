@@ -7,6 +7,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"syscall"
@@ -59,6 +60,17 @@ func doit() error {
 
 	flag.Usage = usage
 	flag.Parse()
+
+	if !*debug {
+		// Debug not enabled, so send logging into the void
+		w, err := os.OpenFile(os.DevNull, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: Failed to open null output: %s", err)
+			os.Exit(1)
+		}
+		defer w.Close()
+		log.SetOutput(w)
+	}
 
 	// We need at least one argument
 

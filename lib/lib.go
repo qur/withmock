@@ -285,9 +285,12 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	// TODO: check it exists first
 	vsrc := filepath.Join(srcRoot, "src", "vendor")
 	vdst := filepath.Join(dst, "vendor")
-	log.Printf("vendor: src: %s, dst: %s", vsrc, vdst)
-	if err := os.Symlink(vsrc, vdst); err != nil {
-		return Cerr{"Vendor Symlink", err}
+	if _, err := os.Stat(vsrc); err == nil {
+		// stdlib has a vendor directory, so symlink it
+		log.Printf("vendor: src: %s, dst: %s", vsrc, vdst)
+		if err := os.Symlink(vsrc, vdst); err != nil {
+			return Cerr{"Vendor Symlink", err}
+		}
 	}
 
 	_, err = MakePkg(src, dst, name, true, cfg)

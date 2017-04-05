@@ -5,14 +5,35 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/qur/withmock/lib"
 )
 
+var (
+	debug = flag.Bool("debug", false, "enable extra output for debugging mock genertion issues")
+)
+
 func main() {
-	srcPath, dstPath, impPath := os.Args[1], os.Args[2], os.Args[3]
+	flag.Parse()
+
+	if !*debug {
+		// Debug not enabled, so send logging into the void
+		w, err := os.OpenFile(os.DevNull, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: Failed to open null output: %s", err)
+			os.Exit(1)
+		}
+		defer w.Close()
+		log.SetOutput(w)
+	}
+
+	args := flag.Args()
+
+	srcPath, dstPath, impPath := args[1], args[2], args[3]
 
 	cfg := &lib.MockConfig{
 		MOCK:   "MOCK",
