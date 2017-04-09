@@ -288,8 +288,16 @@ func MockStandard(srcRoot, dstRoot, name string, cfg *MockConfig) error {
 	if _, err := os.Stat(vsrc); err == nil {
 		// stdlib has a vendor directory, so symlink it
 		log.Printf("vendor: src: %s, dst: %s", vsrc, vdst)
-		if err := os.Symlink(vsrc, vdst); err != nil {
-			return Cerr{"Vendor Symlink", err}
+		lnk, err := os.Readlink(vdst)
+		if os.IsNotExist(err) {
+			if err := os.Symlink(vsrc, vdst); err != nil {
+				return Cerr{"Vendor Symlink", err}
+			}
+		} else if err != nil {
+			return Cerr{"Check vendor link", err}
+		} else if lnk != vsrc {
+			err := fmt.Errorf("Vendor link wrong: got %s, want %s", lnk, vsrc)
+			return Cerr{"Check vendor link", err}
 		}
 	}
 
