@@ -1095,16 +1095,24 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 
 	buildTags := false
 
+	// Look for buildTags
 	if len(f.Comments) > 0 {
 		for _, cg := range f.Comments {
-			if strings.HasPrefix(cg.Text(), "+build") {
-				buildTags = true
-				for _, c := range cg.List {
+			if cg.Pos() >= f.Package {
+				// Reached package keyword
+				break
+			}
+			for _, c := range cg.List {
+				if strings.HasPrefix(c.Text, "// +build") {
+					buildTags = true
 					fmt.Fprintf(out, "%s\n", c.Text)
 				}
-				fmt.Fprintf(out, "\n")
 			}
 		}
+	}
+	if buildTags {
+		// Make sure build tags don't touch package statement
+		fmt.Fprintf(out, "\n")
 	}
 
 	if f.Doc != nil {
