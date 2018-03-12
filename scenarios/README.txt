@@ -189,3 +189,7 @@ issue51         - We want to be able to mock type that have both pointer and
 
 issue55         - When mocking the gin framework there is a problem with
                   channels not being processed correctly.
+
+ssh             - When importing golang.org/x/crypto/ssh we encounter a build
+                  constraint issue, where the constraint line is part of a
+                  larger comment, not standalone.
