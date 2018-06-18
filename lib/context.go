@@ -336,9 +336,15 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 			if c.excludes[name] {
 				// this package has been specifically excluded from mocking, so
 				// we just link it, even if mocked is indicated.
-				if _, err := pkg.Link(); err != nil {
+				pkgImports, err := pkg.Link()
+				if err != nil {
 					return nil, Cerr{"pkg.Link", err}
 				}
+
+				// Update imports from the package we just processed, but it can
+				// only add actual packages, not mocks
+				c.wantToProcess(false, pkgImports)
+
 				continue
 			}
 
