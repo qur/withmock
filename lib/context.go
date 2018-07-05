@@ -320,12 +320,6 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 				continue
 			}
 
-			if internalPkg(name) {
-				// Internal packages should already be sorted by linking the
-				// internal directory elsewhere
-				continue
-			}
-
 			pkg, err := c.getPkg(name, label)
 			if err != nil {
 				return nil, Cerr{"context.getPkg", err}
@@ -335,6 +329,20 @@ func (c *Context) installImports(imports importSet) (map[string]string, error) {
 
 			if !imports[name].ShouldInstall() {
 				pkg.DisableInstall()
+			}
+
+			if internalPkg(name) {
+				// If the package is an internal package, then we just link it.
+				pkgImports, err := pkg.Link()
+				if err != nil {
+					return nil, Cerr{"pkg.Link", err}
+				}
+
+				// Update imports from the package we just processed, but it can
+				// only add actual packages, not mocks
+				c.wantToProcess(false, pkgImports)
+
+				continue
 			}
 
 			if c.excludes[name] {

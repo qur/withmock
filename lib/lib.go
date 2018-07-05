@@ -437,6 +437,10 @@ func symlinkPackage(src, dst string) error {
 			return os.MkdirAll(target, 0700)
 		}
 
+		if exists(target) {
+			return nil
+		}
+
 		return os.Symlink(path, target)
 	}
 
