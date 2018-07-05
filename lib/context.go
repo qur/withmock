@@ -495,7 +495,7 @@ func (c *Context) Run(command string, args ...string) error {
 	// Install the packages inside the context
 
 	if err := c.installPackages(); err != nil {
-		return err
+		return Cerr{"install", err}
 	}
 
 	// Create a Command object
@@ -529,5 +529,8 @@ func (c *Context) Run(command string, args ...string) error {
 
 	// Then run the given command
 
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return Cerr{"Run", err}
+	}
+	return nil
 }
