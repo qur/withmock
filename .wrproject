@@ -1,0 +1,22 @@
+default = "1-10"
+
+[crates.1-8]
+    image = "qurx/withmock-dev:1.8"
+    mount-home = false
+    project-mount = "/workspace/go/src/github.com/qur/withmock"
+    working-dir = "project, match"
+    cap-add = ["SYS_PTRACE"]
+
+[crates.1-8-4]
+    image = "qurx/withmock-dev:1.8.4"
+    mount-home = false
+    project-mount = "/workspace/go/src/github.com/qur/withmock"
+    working-dir = "project, match"
+    cap-add = ["SYS_PTRACE"]
+
+[crates.1-10]
+    image = "qurx/withmock-dev:1.10"
+    mount-home = false
+    project-mount = "/workspace/go/src/github.com/qur/withmock"
+    working-dir = "project, match"
+    cap-add = ["SYS_PTRACE"]
