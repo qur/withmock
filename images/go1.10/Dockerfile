@@ -3,7 +3,7 @@ FROM golang:1.10
 ENV GOPATH=/workspace/go
 
 RUN apt-get update && \
-    apt-get install -y libzmq3-dev && \
+    apt-get install -y libzmq3-dev libsasl2-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/ *
 
