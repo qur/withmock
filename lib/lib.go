@@ -211,7 +211,10 @@ func markImport(name string, m mark) string {
 	case noMark, normalMark:
 		return name
 	case mockMark, testMark, replaceMark:
-		return string(m) + name[1:]
+		if len(name) < 2 {
+			panic(fmt.Sprintf("Unable to mark name (too short): %s", name))
+		}
+		return string(name[0]) + string(m) + name[2:]
 	default:
 		panic(fmt.Sprintf("Unknown import mark: %s", m))
 	}
