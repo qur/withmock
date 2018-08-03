@@ -1103,7 +1103,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				break
 			}
 			for _, c := range cg.List {
-				if strings.HasPrefix(c.Text, "// +build") {
+				if strings.HasPrefix(c.Text, "// +build") || strings.HasPrefix(c.Text, "//+build") {
 					buildTags = true
 					fmt.Fprintf(out, "%s\n", c.Text)
 				}
