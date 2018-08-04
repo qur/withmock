@@ -411,6 +411,24 @@ func (fi *funcInfo) writeRecorder(out io.Writer, recorder string) {
 	fmt.Fprintf(out, "}\n")
 }
 
+type taggedRecorders struct {
+	r map[string]map[string]string
+}
+
+func (t *taggedRecorders) Add(tags []string, recv, name string) {
+	if t.r == nil {
+		t.r = make(map[string]map[string]string)
+	}
+	key := "|"
+	for _, line := range tags {
+		key += line + "|"
+	}
+	if _, found := t.r[key]; !found {
+		t.r[key] = make(map[string]string)
+	}
+	t.r[key][recv] = name
+}
+
 type mockGen struct {
 	pkgName        string
 	fset           *token.FileSet
@@ -422,6 +440,7 @@ type mockGen struct {
 	matchOS        bool
 	types          map[string]ast.Expr
 	recorders      map[string]string
+	taggedRec      taggedRecorders
 	data           io.ReaderAt
 	ifInfo         *ifInfo
 	scopes         map[string]bool
@@ -582,6 +601,23 @@ func MakePkg(srcPath, dstPath, pkgName string, mock bool, cfg *MockConfig) (impo
 		err = fixup(filename)
 		if err != nil {
 			return nil, Cerr{"fixup", err}
+		}
+
+		for tags := range m.taggedRec.r {
+			filename := filepath.Join(dstPath, name+"_mock_"+tags+".go")
+			out, err := os.Create(filename)
+			if err != nil {
+				return nil, Cerr{"os.Create", err}
+			}
+			defer out.Close()
+			if err = m.extra(out, tags, name); err != nil {
+				return nil, Cerr{"m.pkg", err}
+			}
+			// TODO: currently we need to use goimports to add missing imports,
+			// we need to sort out our own imports, then we can switch to gofmt.
+			if err = fixup(filename); err != nil {
+				return nil, Cerr{"fixup", err}
+			}
 		}
 
 		externalFunctions = append(externalFunctions, m.extFunctions...)
@@ -990,6 +1026,61 @@ func (m *mockGen) pkg(out io.Writer, name string) error {
 	return nil
 }
 
+func (m *mockGen) extra(out io.Writer, tags, name string) error {
+	for _, line := range strings.Split(tags, "|") {
+		if len(line) == 0 {
+			continue
+		}
+		fmt.Fprintf(out, "// +build %s\n", line)
+	}
+	fmt.Fprintf(out, "\n")
+
+	fmt.Fprintf(out, "package %s\n\n", name)
+
+	fmt.Fprintf(out, "import \"github.com/golang/mock/gomock\"\n\n")
+
+	recorders := m.taggedRec.r[tags]
+	for base, rec := range recorders {
+		if _, found := m.recorders[base]; found {
+			// already in the primary mock file
+			continue
+		}
+
+		if _, found := recorders[base[1:]]; base[0] == '*' && found {
+			// If pointer and non-pointer receiver, just use the non-pointer
+			continue
+		}
+		name := base
+		mock := "Mock_" + name
+		retType := mock
+		mod := ""
+		if base[0] == '*' {
+			name = base[1:]
+			mock = "Mock_" + name
+			retType = "*" + mock
+			mod = "&"
+		}
+		_, isInterface := m.types[name].(*ast.InterfaceType)
+		if !isInterface && !ast.IsExported(name) {
+			fmt.Fprintf(out, "type %s struct {\n", mock)
+			fmt.Fprintf(out, "\t%s\n", name)
+			fmt.Fprintf(out, "}\n")
+			fmt.Fprintf(out, "func (_ *_meta) New%s() %s {\n", name,
+				retType)
+			fmt.Fprintf(out, "\treturn %s%s{}\n", mod, mock)
+			fmt.Fprintf(out, "}\n\n")
+		}
+		fmt.Fprintf(out, "type %s struct {\n", rec)
+		fmt.Fprintf(out, "\tmock %s\n", base)
+		fmt.Fprintf(out, "}\n\n")
+		fmt.Fprintf(out, "func (_m %s) %s() *%s {\n", base, m.ObjEXPECT, rec)
+		fmt.Fprintf(out, "\treturn &%s{_m}\n", rec)
+		fmt.Fprintf(out, "}\n\n")
+	}
+
+	return nil
+}
+
 var pkgNames = map[string]string{}
 
 func getVendorPaths(pkgName string) []string {
@@ -1093,7 +1184,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 	// Make sure data is available to exprString
 	m.data = data
 
-	buildTags := false
+	buildTags := []string{}
 
 	// Look for buildTags
 	if len(f.Comments) > 0 {
@@ -1103,14 +1194,20 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				break
 			}
 			for _, c := range cg.List {
-				if strings.HasPrefix(c.Text, "// +build") || strings.HasPrefix(c.Text, "//+build") {
-					buildTags = true
+				if strings.HasPrefix(c.Text, "// +build") {
+					buildTags = append(buildTags, strings.TrimSpace(c.Text[9:]))
+					log.Printf("BUILD TAG: %s", filename)
+					fmt.Fprintf(out, "%s\n", c.Text)
+				}
+				if strings.HasPrefix(c.Text, "//+build") {
+					buildTags = append(buildTags, strings.TrimSpace(c.Text[8:]))
+					log.Printf("BUILD TAG: %s", filename)
 					fmt.Fprintf(out, "%s\n", c.Text)
 				}
 			}
 		}
 	}
-	if buildTags {
+	if len(buildTags) != 0 {
 		// Make sure build tags don't touch package statement
 		fmt.Fprintf(out, "\n")
 	}
@@ -1154,7 +1251,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 						if err == nil {
 							fmt.Fprintf(out, "%s ", name)
 							imports[name] = impPath
-						} else if !buildTags {
+						} else if len(buildTags) == 0 {
 							// We only return an error if there are no build
 							// tags.  If there are build tags then this file
 							// might not actually be compiled - so the package
@@ -1182,7 +1279,7 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 						if err == nil {
 							fmt.Fprintf(out, "%s ", name)
 							imports[name] = impPath
-						} else if !buildTags {
+						} else if len(buildTags) == 0 {
 							// We only return an error if there are no build
 							// tags.  If there are build tags then this file
 							// might not actually be compiled - so the package
@@ -1286,7 +1383,11 @@ func (m *mockGen) file(out io.Writer, f *ast.File, filename string) (map[string]
 				if s, ok := d.Recv.List[0].Type.(*ast.StarExpr); ok {
 					recorder = fmt.Sprintf("_%s_Rec", m.exprString(s.X))
 				}
-				m.recorders[t] = recorder
+				if len(buildTags) == 0 {
+					m.recorders[t] = recorder
+				} else {
+					m.taggedRec.Add(buildTags, t, recorder)
+				}
 			}
 			for _, param := range d.Type.Params.List {
 				p := field{
