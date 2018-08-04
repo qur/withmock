@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [ -z "$WHARFRAT_NAME" ] && [ -z "$WM_HOST_BUILD" ]; then
+    exec wr "$0" "$@"
+fi
+
 ret=0
 
 export WITHMOCK_TEST_MAIN="true"

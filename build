@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [ -z "$WHARFRAT_NAME" ] && [ -z "$WM_HOST_BUILD" ]; then
+    exec wr "$0" "$@"
+fi
+
 ret=0
 
 echo -e "\e[33;1mgo install\e[0m"
