@@ -57,6 +57,9 @@ func scopeName(name, scope string) string {
 	if strings.HasPrefix(name, "[]") {
 		return "[]" + scopeName(name[2:], scope)
 	}
+	if strings.HasPrefix(name, "*") {
+		return "*" + scopeName(name[1:], scope)
+	}
 	if channel, sub := isChannel(name); channel != "" {
 		return channel + " " + scopeName(sub, scope)
 	}
