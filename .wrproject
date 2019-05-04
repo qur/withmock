@@ -1,0 +1,9 @@
+default = "1-12"
+
+[crates.1-12]
+    image = "qurx/withmock-dev:1.12"
+    mount-home = false
+    project-mount = "/project"
+    working-dir = "project"
+    cap-add = ["SYS_PTRACE"]
+    shell = "/bin/sh"
