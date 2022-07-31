@@ -1,9 +1,23 @@
-default = "1-12"
+default = "1-18"
+
+[crates.1-18]
+  image = "qurx/withmock-dev:1.18"
+  mount-home = false
+  project-mount = "/project"
+  working-dir = "project"
+  cap-add = ["SYS_PTRACE"]
+  shell = "/bin/sh"
+  export-bin = [
+    "/usr/local/go/bin/*",
+    "/go/bin/*",
+    "/usr/bin/np*",
+  ]
+
 
 [crates.1-12]
-    image = "qurx/withmock-dev:1.12"
-    mount-home = false
-    project-mount = "/project"
-    working-dir = "project"
-    cap-add = ["SYS_PTRACE"]
-    shell = "/bin/sh"
+  image = "qurx/withmock-dev:1.12"
+  mount-home = false
+  project-mount = "/project"
+  working-dir = "project"
+  cap-add = ["SYS_PTRACE"]
+  shell = "/bin/sh"
