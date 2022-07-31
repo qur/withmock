@@ -8,12 +8,13 @@ if [ -z "$WHARFRAT_NAME" ]; then
     exec wharfrat run --auto-clean "./$(basename "$0")" "$@";
 fi
 
-ver=$(
-cat << EOF | base64 | tr -d '\n'
-{"version":"$(git describe --dirty --match "v[0-9]*")","commit":"$(git rev-parse HEAD)","buildtime":"$(date --utc +%Y-%m-%dT%H:%M:%SZ)"}
-EOF
-)
+#ver=$(
+#cat << EOF | base64 | tr -d '\n'
+#{"version":"$(git describe --dirty --match "v[0-9]*")","commit":"$(git rev-parse HEAD)","buildtime":"$(date --utc +%Y-%m-%dT%H:%M:%SZ)"}
+#EOF
+#)
 
-CGO_ENABLED=0 go build -a -tags netgo -installsuffix . -ldflags "-X github.com/qur/withmock/lib/version.versionString=${ver}" -o dist/withmock ./cmd/withmock
+#CGO_ENABLED=0 go build -a -tags netgo -installsuffix . -ldflags "-X github.com/qur/withmock/lib/version.versionString=${ver}" -o dist/withmock ./cmd/withmock
+CGO_ENABLED=0 go build -a -tags netgo -installsuffix . -o dist/withmock ./cmd/withmock
 
 echo "built dist/withmock"
