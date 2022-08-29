@@ -33,12 +33,9 @@ func (d *Dir) Info(mod, ver string) (*api.Info, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			return nil, fmt.Errorf("failed to prep info cache (%s, %s): %w", mod, ver, err)
-		}
-		f, err := os.Create(path)
+		f, err := d.createEntry(mod, ver, "info.json", nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create info cache (%s, %s): %w", mod, ver, err)
+			return nil, err
 		}
 		defer f.Close()
 		if err := json.NewEncoder(f).Encode(info); err != nil {
@@ -91,7 +88,7 @@ func (d *Dir) Source(mod, ver string) (io.Reader, error) {
 
 type newFile struct {
 	src     io.Reader
-	dst     io.ReadCloser
+	dst     io.WriteCloser
 	tee     io.Reader
 	errored bool
 	temp    string
@@ -99,17 +96,18 @@ type newFile struct {
 }
 
 var _ io.ReadCloser = (*newFile)(nil)
+var _ io.Writer = (*newFile)(nil)
 
 func (d *Dir) createEntry(mod, ver, filename string, src io.Reader) (*newFile, error) {
 	dir := filepath.Join(d.cache, mod, ver)
 	tempPath := filepath.Join(dir, "."+filename)
 	path := filepath.Join(dir, filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to prep info cache (%s, %s): %w", mod, ver, err)
+		return nil, fmt.Errorf("failed to prep cache (%s, %s): %w", mod, ver, err)
 	}
 	f, err := os.Create(tempPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create info cache (%s, %s): %w", mod, ver, err)
+		return nil, fmt.Errorf("failed to create cache (%s, %s): %w", mod, ver, err)
 	}
 	return &newFile{
 		src:  src,
@@ -118,6 +116,10 @@ func (d *Dir) createEntry(mod, ver, filename string, src io.Reader) (*newFile, e
 		temp: tempPath,
 		path: path,
 	}, nil
+}
+
+func (f *newFile) Write(p []byte) (int, error) {
+	return f.dst.Write(p)
 }
 
 func (f *newFile) Read(p []byte) (int, error) {
