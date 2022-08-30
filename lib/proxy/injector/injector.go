@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,6 +54,7 @@ func (i *Injector) Source(mod, ver string) (io.Reader, error) {
 		defer closer.Close()
 	}
 	dir := filepath.Join(i.d, mod, ver, uuid.New())
+	log.Printf("INJECT: %s %s -> %s", mod, ver, dir)
 	orig := filepath.Join(dir, "original.zip")
 	src := filepath.Join(dir, "src")
 	modded := filepath.Join(dir, "modded.zip")

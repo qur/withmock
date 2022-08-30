@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
@@ -38,7 +37,6 @@ func (s *Store) List(mod string) ([]string, error) {
 func (s *Store) Info(mod, ver string) (*api.Info, error) {
 	url := fmt.Sprintf("%s/%s/@v/v%s.info", s.url, mod, ver)
 	r, err := http.Get(url)
-	log.Printf("INFO (%s, %s): %s %s", mod, ver, r.Status, err)
 	if err != nil {
 		return nil, err
 	}

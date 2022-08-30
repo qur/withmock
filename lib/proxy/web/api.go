@@ -49,7 +49,7 @@ func (a apiProvider) info(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
-		log.Printf("ERROR: failed to get list response (%s): %s", mod, err)
+		log.Printf("ERROR: failed to get info response (%s): %s", mod, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -70,7 +70,7 @@ func (a apiProvider) mod(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
-		log.Printf("ERROR: failed to get list response (%s): %s", mod, err)
+		log.Printf("ERROR: failed to get modfile response (%s): %s", mod, err)
 		return
 	}
 	if closer, ok := mf.(io.Closer); ok {
@@ -94,7 +94,7 @@ func (a apiProvider) zip(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
-		log.Printf("ERROR: failed to get list response (%s): %s", mod, err)
+		log.Printf("ERROR: failed to get source response (%s): %s", mod, err)
 		return
 	}
 	if closer, ok := src.(io.Closer); ok {
