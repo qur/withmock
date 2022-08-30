@@ -4,14 +4,19 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/qur/withmock/lib/codemod"
 	"github.com/qur/withmock/lib/proxy/cache"
+	"github.com/qur/withmock/lib/proxy/injector"
 	"github.com/qur/withmock/lib/proxy/upstream"
 	"github.com/qur/withmock/lib/proxy/web"
 )
 
 func main() {
+	m := codemod.NewModifier()
+
 	u := upstream.NewStore("https://proxy.golang.org")
-	c := cache.NewDir("cache", u)
+	i := injector.NewInjector(m, "scratch", u)
+	c := cache.NewDir("cache", i)
 	handler := web.Register(c)
 
 	server := &http.Server{
