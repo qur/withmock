@@ -72,7 +72,14 @@ func (i *Injector) Source(mod, ver string) (io.Reader, error) {
 	if err := pack(src, modded, headers); err != nil {
 		return nil, fmt.Errorf("failed to pack zip (%s, %s): %w", mod, ver, err)
 	}
-	return os.Open(modded)
+	f, err := os.Open(modded)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open zip (%s, %s): %w", mod, ver, err)
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		return nil, fmt.Errorf("failed to clean zip (%s, %s): %w", mod, ver, err)
+	}
+	return f, nil
 }
 
 func save(dest string, src io.Reader) error {
