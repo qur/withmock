@@ -14,7 +14,7 @@ import (
 )
 
 type Modifier interface {
-	Modify(path string) error
+	Modify(path string) ([]string, error)
 }
 
 type Injector struct {
@@ -68,9 +68,11 @@ func (i *Injector) Source(mod, ver string) (io.Reader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack zip (%s, %s): %w", mod, ver, err)
 	}
-	if err := i.m.Modify(src); err != nil {
+	extraFiles, err := i.m.Modify(src)
+	if err != nil {
 		return nil, fmt.Errorf("failed to modify zip (%s, %s): %w", mod, ver, err)
 	}
+	headers = expandHeaders(headers, extraFiles)
 	if err := pack(src, modded, headers); err != nil {
 		return nil, fmt.Errorf("failed to pack zip (%s, %s): %w", mod, ver, err)
 	}
@@ -159,4 +161,14 @@ func addFile(path string, w io.Writer) error {
 	defer f.Close()
 	_, err = io.Copy(w, f)
 	return err
+}
+
+func expandHeaders(headers []zip.FileHeader, extraFiles []string) []zip.FileHeader {
+	for _, extra := range extraFiles {
+		headers = append(headers, zip.FileHeader{
+			Name:   extra,
+			Method: zip.Deflate,
+		})
+	}
+	return headers
 }
