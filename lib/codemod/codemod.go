@@ -53,6 +53,78 @@ func processPackage(fset *token.FileSet, base string, pkg *ast.Package) ([]strin
 	log.Printf("PROCESS %s: %s", base, pkg.Name)
 	for path, f := range pkg.Files {
 		log.Printf("PROCESS: %s", path)
+		for _, node := range f.Decls {
+			switch n := node.(type) {
+			case *ast.FuncDecl:
+				if !n.Name.IsExported() {
+					// ignore private functions
+					continue
+				}
+				log.Printf("FUNC: %s (%v)", n.Name, n.Recv != nil)
+				n.Body.List = append([]ast.Stmt{&ast.IfStmt{
+					Init: &ast.AssignStmt{
+						Lhs: []ast.Expr{
+							ast.NewIdent("mock"),
+							ast.NewIdent("ret"),
+						},
+						Tok: token.DEFINE,
+						Rhs: []ast.Expr{
+							&ast.CallExpr{
+								Fun: &ast.SelectorExpr{
+									X:   ast.NewIdent("wmqe_main_controller"),
+									Sel: ast.NewIdent("MethodCalled"),
+								},
+								Args: []ast.Expr{
+									ast.NewIdent("wmqe_package"),
+									&ast.BasicLit{
+										Kind:  token.STRING,
+										Value: `""`,
+									},
+									&ast.BasicLit{
+										Kind:  token.STRING,
+										Value: `"` + n.Name.Name + `"`,
+									},
+								},
+							},
+						},
+					},
+					Cond: ast.NewIdent("mock"),
+					Body: &ast.BlockStmt{
+						List: []ast.Stmt{
+							&ast.ReturnStmt{
+								Results: []ast.Expr{&ast.TypeAssertExpr{
+									X: &ast.IndexExpr{
+										X: ast.NewIdent("ret"),
+										Index: &ast.BasicLit{
+											Kind:  token.INT,
+											Value: "0",
+										},
+									},
+									Type: ast.NewIdent("string"),
+								}},
+							},
+						},
+					},
+				}}, n.Body.List...)
+			case *ast.GenDecl:
+				log.Printf("GEN: %s", n.Tok)
+				if n.Tok == token.TYPE {
+					for _, spec := range n.Specs {
+						t := spec.(*ast.TypeSpec)
+						if !t.Name.IsExported() {
+							// ignore private types
+							continue
+						}
+						log.Printf("TYPE: %s (%T)", t.Name, t.Type)
+						if s, ok := t.Type.(*ast.StructType); ok {
+							s.Fields.List = append(s.Fields.List, &ast.Field{
+								Type: ast.NewIdent("WMQE_Mock"),
+							})
+						}
+					}
+				}
+			}
+		}
 		if err := save(path, fset, f); err != nil {
 			return nil, fmt.Errorf("failed to format %s: %w", path, err)
 		}
