@@ -56,7 +56,7 @@ func (m *Modifier) Modify(ctx context.Context, base string) ([]string, error) {
 }
 
 func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *ast.Package) ([]string, error) {
-	log.Printf("PROCESS %s: %s", base, pkg.Name)
+	//log.Printf("PROCESS %s: %s", base, pkg.Name)
 	for path, f := range pkg.Files {
 		log.Printf("PROCESS: %s", path)
 		for _, node := range f.Decls {
@@ -70,11 +70,12 @@ func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *
 					// ignore private functions
 					continue
 				}
-				log.Printf("FUNC: %s (%v)", n.Name, n.Recv != nil)
+				// log.Printf("FUNC: %s (%v)", n.Name, n.Recv != nil)
 				rType := ""
 				if n.Recv != nil {
 					// TODO: set rType here to the receiver type
 				}
+				// log.Printf("ARGS: '%s' '%s'", rType, n.Name.Name)
 				args := []ast.Expr{
 					ast.NewIdent("wmqe_package"),
 					&ast.BasicLit{
@@ -88,13 +89,15 @@ func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *
 				}
 				for _, param := range n.Type.Params.List {
 					for _, name := range param.Names {
+						// log.Printf("ARG: %s", name.Name)
 						args = append(args, ast.NewIdent(name.Name))
 					}
 				}
+				// log.Printf("ARGS: %d, %d, %#v", len(n.Type.Params.List), len(args), args)
 				var results []ast.Expr
 				if n.Type.Results != nil {
 					for _, result := range n.Type.Results.List {
-						if len(result.Names) == 0 {
+						addResult := func() {
 							results = append(results, &ast.TypeAssertExpr{
 								X: &ast.IndexExpr{
 									X: ast.NewIdent("ret"),
@@ -105,18 +108,12 @@ func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *
 								},
 								Type: result.Type,
 							})
+						}
+						if len(result.Names) == 0 {
+							addResult()
 						} else {
 							for range result.Names {
-								results = append(results, &ast.TypeAssertExpr{
-									X: &ast.IndexExpr{
-										X: ast.NewIdent("ret"),
-										Index: &ast.BasicLit{
-											Kind:  token.INT,
-											Value: strconv.FormatInt(int64(len(results)), 10),
-										},
-									},
-									Type: result.Type,
-								})
+								addResult()
 							}
 						}
 					}
@@ -148,7 +145,7 @@ func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *
 					},
 				}}, n.Body.List...)
 			case *ast.GenDecl:
-				log.Printf("GEN: %s", n.Tok)
+				//log.Printf("GEN: %s", n.Tok)
 				if n.Tok == token.TYPE {
 					for _, spec := range n.Specs {
 						t := spec.(*ast.TypeSpec)
@@ -156,7 +153,7 @@ func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *
 							// ignore private types
 							continue
 						}
-						log.Printf("TYPE: %s (%T)", t.Name, t.Type)
+						//log.Printf("TYPE: %s (%T)", t.Name, t.Type)
 						if s, ok := t.Type.(*ast.StructType); ok {
 							s.Fields.List = append(s.Fields.List, &ast.Field{
 								Type: ast.NewIdent("WMQE_Mock"),
@@ -170,6 +167,7 @@ func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *
 			return nil, fmt.Errorf("failed to format %s: %w", path, err)
 		}
 	}
+	//log.Printf("EXTRAS FOR %s", pkg.Name)
 	return writeExtras(base, fset, pkg.Name)
 }
 
@@ -183,7 +181,7 @@ func save(dest string, fset *token.FileSet, node any) error {
 }
 
 func writeExtras(base string, fset *token.FileSet, pkg string) ([]string, error) {
-	path := filepath.Join(base, "wmqe_extras.go")
+	path := filepath.Join(base, "wmqe_extras_"+pkg+".go")
 	src, err := extras.Controller(pkg)
 	if err != nil {
 		return nil, err
