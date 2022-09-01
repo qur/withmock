@@ -2,6 +2,7 @@ package injector
 
 import (
 	"archive/zip"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -14,7 +15,7 @@ import (
 )
 
 type Modifier interface {
-	Modify(path string) ([]string, error)
+	Modify(ctx context.Context, path string) ([]string, error)
 }
 
 type Injector struct {
@@ -33,20 +34,20 @@ func NewInjector(modify Modifier, scratchDir string, s api.Store) *Injector {
 	}
 }
 
-func (i *Injector) List(mod string) ([]string, error) {
-	return i.s.List(mod)
+func (i *Injector) List(ctx context.Context, mod string) ([]string, error) {
+	return i.s.List(ctx, mod)
 }
 
-func (i *Injector) Info(mod, ver string) (*api.Info, error) {
-	return i.s.Info(mod, ver)
+func (i *Injector) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
+	return i.s.Info(ctx, mod, ver)
 }
 
-func (i *Injector) ModFile(mod, ver string) (io.Reader, error) {
-	return i.s.ModFile(mod, ver)
+func (i *Injector) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
+	return i.s.ModFile(ctx, mod, ver)
 }
 
-func (i *Injector) Source(mod, ver string) (io.Reader, error) {
-	r, err := i.s.Source(mod, ver)
+func (i *Injector) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
+	r, err := i.s.Source(ctx, mod, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +69,7 @@ func (i *Injector) Source(mod, ver string) (io.Reader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack zip (%s, %s): %w", mod, ver, err)
 	}
-	extraFiles, err := i.m.Modify(src)
+	extraFiles, err := i.m.Modify(ctx, src)
 	if err != nil {
 		return nil, fmt.Errorf("failed to modify zip (%s, %s): %w", mod, ver, err)
 	}

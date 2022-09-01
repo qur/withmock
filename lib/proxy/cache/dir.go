@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,15 +22,15 @@ func NewDir(cache string, s api.Store) *Dir {
 	return &Dir{cache: cache, s: s}
 }
 
-func (d *Dir) List(mod string) ([]string, error) {
-	return d.s.List(mod)
+func (d *Dir) List(ctx context.Context, mod string) ([]string, error) {
+	return d.s.List(ctx, mod)
 }
 
-func (d *Dir) Info(mod, ver string) (*api.Info, error) {
+func (d *Dir) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
 	path := filepath.Join(d.cache, mod, ver, "info.json")
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		info, err := d.s.Info(mod, ver)
+		info, err := d.s.Info(ctx, mod, ver)
 		if err != nil {
 			return nil, err
 		}
@@ -54,11 +55,11 @@ func (d *Dir) Info(mod, ver string) (*api.Info, error) {
 	return &info, nil
 }
 
-func (d *Dir) ModFile(mod, ver string) (io.Reader, error) {
+func (d *Dir) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
 	path := filepath.Join(d.cache, mod, ver, "go.mod")
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		mf, err := d.s.ModFile(mod, ver)
+		mf, err := d.s.ModFile(ctx, mod, ver)
 		if err != nil {
 			return nil, err
 		}
@@ -70,11 +71,11 @@ func (d *Dir) ModFile(mod, ver string) (io.Reader, error) {
 	return f, nil
 }
 
-func (d *Dir) Source(mod, ver string) (io.Reader, error) {
+func (d *Dir) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
 	path := filepath.Join(d.cache, mod, ver, "go.zip")
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		src, err := d.s.Source(mod, ver)
+		src, err := d.s.Source(ctx, mod, ver)
 		if err != nil {
 			return nil, err
 		}

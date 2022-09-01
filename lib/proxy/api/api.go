@@ -1,16 +1,17 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
 )
 
 type Store interface {
-	List(mod string) ([]string, error)
-	Info(mod, ver string) (*Info, error)
-	ModFile(mod, ver string) (io.Reader, error)
-	Source(mod, ver string) (io.Reader, error)
+	List(ctx context.Context, mod string) ([]string, error)
+	Info(ctx context.Context, mod, ver string) (*Info, error)
+	ModFile(ctx context.Context, mod, ver string) (io.Reader, error)
+	Source(ctx context.Context, mod, ver string) (io.Reader, error)
 }
 
 type Info struct {

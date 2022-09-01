@@ -1,6 +1,7 @@
 package codemod
 
 import (
+	"context"
 	"fmt"
 	"go/ast"
 	"go/format"
@@ -21,7 +22,7 @@ func NewModifier() *Modifier {
 	return &Modifier{}
 }
 
-func (m *Modifier) Modify(base string) ([]string, error) {
+func (m *Modifier) Modify(ctx context.Context, base string) ([]string, error) {
 	log.Printf("MODIFY: %s", base)
 	fset := token.NewFileSet()
 	extraFiles := []string{}
@@ -34,7 +35,11 @@ func (m *Modifier) Modify(base string) ([]string, error) {
 			return fmt.Errorf("failed to parse %s: %w", path, err)
 		}
 		for name, pkg := range pkgs {
-			extras, err := processPackage(fset, path, pkg)
+			if err := ctx.Err(); err != nil {
+				// request cancelled, give up
+				return err
+			}
+			extras, err := processPackage(ctx, fset, path, pkg)
 			if err != nil {
 				return fmt.Errorf("failed to process %s (%s): %w", path, name, err)
 			}
@@ -50,11 +55,15 @@ func (m *Modifier) Modify(base string) ([]string, error) {
 	})
 }
 
-func processPackage(fset *token.FileSet, base string, pkg *ast.Package) ([]string, error) {
+func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *ast.Package) ([]string, error) {
 	log.Printf("PROCESS %s: %s", base, pkg.Name)
 	for path, f := range pkg.Files {
 		log.Printf("PROCESS: %s", path)
 		for _, node := range f.Decls {
+			if err := ctx.Err(); err != nil {
+				// request cancelled, give up
+				return nil, err
+			}
 			switch n := node.(type) {
 			case *ast.FuncDecl:
 				if !n.Name.IsExported() {

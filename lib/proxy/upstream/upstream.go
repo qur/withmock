@@ -1,6 +1,7 @@
 package upstream
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,7 +15,7 @@ type Store struct {
 	url string
 }
 
-func (s *Store) List(mod string) ([]string, error) {
+func (s *Store) List(ctx context.Context, mod string) ([]string, error) {
 	url := fmt.Sprintf("%s/%s/@v/list", s.url, mod)
 	r, err := http.Get(url)
 	if err != nil {
@@ -34,7 +35,7 @@ func (s *Store) List(mod string) ([]string, error) {
 	return strings.Split(string(data), "\n"), nil
 }
 
-func (s *Store) Info(mod, ver string) (*api.Info, error) {
+func (s *Store) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
 	url := fmt.Sprintf("%s/%s/@v/v%s.info", s.url, mod, ver)
 	r, err := http.Get(url)
 	if err != nil {
@@ -54,7 +55,7 @@ func (s *Store) Info(mod, ver string) (*api.Info, error) {
 	return &info, nil
 }
 
-func (s *Store) ModFile(mod, ver string) (io.Reader, error) {
+func (s *Store) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
 	url := fmt.Sprintf("%s/%s/@v/v%s.mod", s.url, mod, ver)
 	r, err := http.Get(url)
 	if err != nil {
@@ -69,7 +70,7 @@ func (s *Store) ModFile(mod, ver string) (io.Reader, error) {
 	return r.Body, nil
 }
 
-func (s *Store) Source(mod, ver string) (io.Reader, error) {
+func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
 	url := fmt.Sprintf("%s/%s/@v/v%s.zip", s.url, mod, ver)
 	r, err := http.Get(url)
 	if err != nil {
