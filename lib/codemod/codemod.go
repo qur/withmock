@@ -30,7 +30,7 @@ func (m *Modifier) Modify(ctx context.Context, base string) ([]string, error) {
 		if err != nil || !d.IsDir() {
 			return err
 		}
-		pkgs, err := parser.ParseDir(fset, path, nil, parser.ParseComments)
+		pkgs, err := parser.ParseDir(fset, path, nil, 0 /* parser.ParseComments */)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", path, err)
 		}
