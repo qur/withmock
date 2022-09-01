@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/qur/withmock/lib/extras"
 )
@@ -61,6 +62,56 @@ func processPackage(fset *token.FileSet, base string, pkg *ast.Package) ([]strin
 					continue
 				}
 				log.Printf("FUNC: %s (%v)", n.Name, n.Recv != nil)
+				rType := ""
+				if n.Recv != nil {
+					// TODO: set rType here to the receiver type
+				}
+				args := []ast.Expr{
+					ast.NewIdent("wmqe_package"),
+					&ast.BasicLit{
+						Kind:  token.STRING,
+						Value: `"` + rType + `"`,
+					},
+					&ast.BasicLit{
+						Kind:  token.STRING,
+						Value: `"` + n.Name.Name + `"`,
+					},
+				}
+				for _, param := range n.Type.Params.List {
+					for _, name := range param.Names {
+						args = append(args, ast.NewIdent(name.Name))
+					}
+				}
+				var results []ast.Expr
+				if n.Type.Results != nil {
+					for _, result := range n.Type.Results.List {
+						if len(result.Names) == 0 {
+							results = append(results, &ast.TypeAssertExpr{
+								X: &ast.IndexExpr{
+									X: ast.NewIdent("ret"),
+									Index: &ast.BasicLit{
+										Kind:  token.INT,
+										Value: strconv.FormatInt(int64(len(results)), 10),
+									},
+								},
+								Type: result.Type,
+							})
+						} else {
+							for range result.Names {
+								results = append(results, &ast.TypeAssertExpr{
+									X: &ast.IndexExpr{
+										X: ast.NewIdent("ret"),
+										Index: &ast.BasicLit{
+											Kind:  token.INT,
+											Value: strconv.FormatInt(int64(len(results)), 10),
+										},
+									},
+									Type: result.Type,
+								})
+							}
+						}
+					}
+				}
 				n.Body.List = append([]ast.Stmt{&ast.IfStmt{
 					Init: &ast.AssignStmt{
 						Lhs: []ast.Expr{
@@ -74,17 +125,7 @@ func processPackage(fset *token.FileSet, base string, pkg *ast.Package) ([]strin
 									X:   ast.NewIdent("wmqe_main_controller"),
 									Sel: ast.NewIdent("MethodCalled"),
 								},
-								Args: []ast.Expr{
-									ast.NewIdent("wmqe_package"),
-									&ast.BasicLit{
-										Kind:  token.STRING,
-										Value: `""`,
-									},
-									&ast.BasicLit{
-										Kind:  token.STRING,
-										Value: `"` + n.Name.Name + `"`,
-									},
-								},
+								Args: args,
 							},
 						},
 					},
@@ -92,16 +133,7 @@ func processPackage(fset *token.FileSet, base string, pkg *ast.Package) ([]strin
 					Body: &ast.BlockStmt{
 						List: []ast.Stmt{
 							&ast.ReturnStmt{
-								Results: []ast.Expr{&ast.TypeAssertExpr{
-									X: &ast.IndexExpr{
-										X: ast.NewIdent("ret"),
-										Index: &ast.BasicLit{
-											Kind:  token.INT,
-											Value: "0",
-										},
-									},
-									Type: ast.NewIdent("string"),
-								}},
+								Results: results,
 							},
 						},
 					},
