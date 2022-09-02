@@ -22,9 +22,9 @@ type WMQE_Mock struct {
 	WMQE_Controller wmqe_controller
 }
 
-func (s WMQE_Mock) methodCalled(p, t, m string, arguments ...interface{}) (mock bool, ret []interface{}) {
+func (s WMQE_Mock) MethodCalled(p, t, m string, arguments ...interface{}) (mock bool, ret []interface{}) {
 	if s.WMQE_Controller != nil {
 		return s.WMQE_Controller.MethodCalled(p, t, m, arguments...)
 	}
-	return wmqe_main_controller.MethodCalled(p, t, m, arguments)
+	return wmqe_main_controller.MethodCalled(p, t, m, arguments...)
 }

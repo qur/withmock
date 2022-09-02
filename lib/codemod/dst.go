@@ -73,12 +73,14 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 				}
 				// log.Printf("FUNC: %s (%v)", n.Name, n.Recv != nil)
 				rType := ""
+				var controller dst.Expr = dst.NewIdent("wmqe_main_controller")
 				if n.Recv != nil {
 					// TODO: set rType here to the receiver type
 					if len(n.Recv.List) != 1 {
 						return nil, fmt.Errorf("don't know how to handle receiver with %d fields", len(n.Recv.List))
 					}
-					switch t := n.Recv.List[0].Type.(type) {
+					recv := n.Recv.List[0]
+					switch t := recv.Type.(type) {
 					case *dst.Ident:
 						if t.Path != "" {
 							rType = t.Path + "." + t.Name
@@ -93,6 +95,18 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 								rType = i.Name
 							}
 						}
+					}
+					switch len(recv.Names) {
+					case 0:
+						recv.Names = append(recv.Names, dst.NewIdent("wmqe_self"))
+						fallthrough
+					case 1:
+						controller = &dst.SelectorExpr{
+							X:   dst.NewIdent(recv.Names[0].Name),
+							Sel: dst.NewIdent("WMQE_Mock"),
+						}
+					default:
+						return nil, fmt.Errorf("how can a receiver have multiple names? %s.%s", rType, n.Name)
 					}
 				}
 				// log.Printf("ARGS: '%s' '%s'", rType, n.Name.Name)
@@ -149,7 +163,7 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 							Rhs: []dst.Expr{
 								&dst.CallExpr{
 									Fun: &dst.SelectorExpr{
-										X:   dst.NewIdent("wmqe_main_controller"),
+										X:   controller,
 										Sel: dst.NewIdent("MethodCalled"),
 									},
 									Args: args,
@@ -176,10 +190,6 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 				if n.Tok == token.TYPE {
 					for _, spec := range n.Specs {
 						t := spec.(*dst.TypeSpec)
-						if !t.Name.IsExported() {
-							// ignore private types
-							continue
-						}
 						//log.Printf("TYPE: %s (%T)", t.Name, t.Type)
 						if s, ok := t.Type.(*dst.StructType); ok {
 							s.Fields.List = append(s.Fields.List, &dst.Field{
