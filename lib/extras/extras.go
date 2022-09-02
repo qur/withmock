@@ -11,7 +11,7 @@ var content embed.FS
 func Controller(pkg string) ([]byte, error) {
 	data, err := content.ReadFile("content/controller.go")
 	if err == nil {
-		data = bytes.Replace(data, []byte("package wmqe_package_name"), []byte("package "+pkg), 1)
+		data = bytes.Replace(data, []byte("wmqe_package_name"), []byte(pkg), -1)
 	}
 	return data, err
 }

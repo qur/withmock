@@ -59,7 +59,7 @@ func (m *DstModifier) Modify(ctx context.Context, base string) ([]string, error)
 func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *dst.Package) ([]string, error) {
 	//log.Printf("PROCESS %s: %s", base, pkg.Name)
 	for path, f := range pkg.Files {
-		log.Printf("PROCESS: %s", path)
+		// log.Printf("PROCESS: %s", path)
 		for _, node := range f.Decls {
 			if err := ctx.Err(); err != nil {
 				// request cancelled, give up
@@ -75,6 +75,25 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 				rType := ""
 				if n.Recv != nil {
 					// TODO: set rType here to the receiver type
+					if len(n.Recv.List) != 1 {
+						return nil, fmt.Errorf("don't know how to handle receiver with %d fields", len(n.Recv.List))
+					}
+					switch t := n.Recv.List[0].Type.(type) {
+					case *dst.Ident:
+						if t.Path != "" {
+							rType = t.Path + "." + t.Name
+						} else {
+							rType = t.Name
+						}
+					case *dst.StarExpr:
+						if i, ok := t.X.(*dst.Ident); ok {
+							if i.Path != "" {
+								rType = i.Path + "." + i.Name
+							} else {
+								rType = i.Name
+							}
+						}
+					}
 				}
 				// log.Printf("ARGS: '%s' '%s'", rType, n.Name.Name)
 				args := []dst.Expr{
@@ -119,37 +138,39 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 						}
 					}
 				}
-				n.Body.List = append([]dst.Stmt{&dst.IfStmt{
-					Init: &dst.AssignStmt{
-						Lhs: []dst.Expr{
-							dst.NewIdent("mock"),
-							dst.NewIdent("ret"),
-						},
-						Tok: token.DEFINE,
-						Rhs: []dst.Expr{
-							&dst.CallExpr{
-								Fun: &dst.SelectorExpr{
-									X:   dst.NewIdent("wmqe_main_controller"),
-									Sel: dst.NewIdent("MethodCalled"),
+				if n.Body != nil {
+					n.Body.List = append([]dst.Stmt{&dst.IfStmt{
+						Init: &dst.AssignStmt{
+							Lhs: []dst.Expr{
+								dst.NewIdent("mock"),
+								dst.NewIdent("ret"),
+							},
+							Tok: token.DEFINE,
+							Rhs: []dst.Expr{
+								&dst.CallExpr{
+									Fun: &dst.SelectorExpr{
+										X:   dst.NewIdent("wmqe_main_controller"),
+										Sel: dst.NewIdent("MethodCalled"),
+									},
+									Args: args,
 								},
-								Args: args,
 							},
 						},
-					},
-					Cond: dst.NewIdent("mock"),
-					Body: &dst.BlockStmt{
-						List: []dst.Stmt{
-							&dst.ReturnStmt{
-								Results: results,
+						Cond: dst.NewIdent("mock"),
+						Body: &dst.BlockStmt{
+							List: []dst.Stmt{
+								&dst.ReturnStmt{
+									Results: results,
+								},
 							},
 						},
-					},
-					Decs: dst.IfStmtDecorations{
-						NodeDecs: dst.NodeDecs{
-							After: dst.EmptyLine,
+						Decs: dst.IfStmtDecorations{
+							NodeDecs: dst.NodeDecs{
+								After: dst.EmptyLine,
+							},
 						},
-					},
-				}}, n.Body.List...)
+					}}, n.Body.List...)
+				}
 			case *dst.GenDecl:
 				//log.Printf("GEN: %s", n.Tok)
 				if n.Tok == token.TYPE {

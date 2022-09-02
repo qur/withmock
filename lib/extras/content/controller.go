@@ -1,6 +1,6 @@
 package wmqe_package_name
 
-const wmqe_package = "..."
+const wmqe_package = "wmqe_package_name"
 
 var wmqe_main_controller wmqe_controller = wmqe_stub{}
 
