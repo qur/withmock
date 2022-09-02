@@ -16,13 +16,13 @@ import (
 	"github.com/qur/withmock/lib/extras"
 )
 
-type Modifier struct{}
+type AstModifier struct{}
 
-func NewModifier() *Modifier {
-	return &Modifier{}
+func NewAstModifier() *AstModifier {
+	return &AstModifier{}
 }
 
-func (m *Modifier) Modify(ctx context.Context, base string) ([]string, error) {
+func (m *AstModifier) Modify(ctx context.Context, base string) ([]string, error) {
 	log.Printf("MODIFY: %s", base)
 	fset := token.NewFileSet()
 	extraFiles := []string{}
@@ -39,7 +39,7 @@ func (m *Modifier) Modify(ctx context.Context, base string) ([]string, error) {
 				// request cancelled, give up
 				return err
 			}
-			extras, err := processPackage(ctx, fset, path, pkg)
+			extras, err := m.processPackage(ctx, fset, path, pkg)
 			if err != nil {
 				return fmt.Errorf("failed to process %s (%s): %w", path, name, err)
 			}
@@ -55,7 +55,7 @@ func (m *Modifier) Modify(ctx context.Context, base string) ([]string, error) {
 	})
 }
 
-func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *ast.Package) ([]string, error) {
+func (m *AstModifier) processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *ast.Package) ([]string, error) {
 	//log.Printf("PROCESS %s: %s", base, pkg.Name)
 	for path, f := range pkg.Files {
 		log.Printf("PROCESS: %s", path)
@@ -163,15 +163,15 @@ func processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *
 				}
 			}
 		}
-		if err := save(path, fset, f); err != nil {
+		if err := m.save(path, fset, f); err != nil {
 			return nil, fmt.Errorf("failed to format %s: %w", path, err)
 		}
 	}
 	//log.Printf("EXTRAS FOR %s", pkg.Name)
-	return writeExtras(base, fset, pkg.Name)
+	return m.writeExtras(base, fset, pkg.Name)
 }
 
-func save(dest string, fset *token.FileSet, node any) error {
+func (*AstModifier) save(dest string, fset *token.FileSet, node any) error {
 	f, err := os.Create(dest)
 	if err != nil {
 		return err
@@ -180,7 +180,7 @@ func save(dest string, fset *token.FileSet, node any) error {
 	return format.Node(f, fset, node)
 }
 
-func writeExtras(base string, fset *token.FileSet, pkg string) ([]string, error) {
+func (m *AstModifier) writeExtras(base string, fset *token.FileSet, pkg string) ([]string, error) {
 	path := filepath.Join(base, "wmqe_extras_"+pkg+".go")
 	src, err := extras.Controller(pkg)
 	if err != nil {
@@ -190,5 +190,5 @@ func writeExtras(base string, fset *token.FileSet, pkg string) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
-	return []string{path}, save(path, fset, f)
+	return []string{path}, m.save(path, fset, f)
 }

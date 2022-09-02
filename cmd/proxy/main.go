@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	m := codemod.NewModifier()
+	m := codemod.NewDstModifier()
 
 	u := upstream.NewStore("https://proxy.golang.org")
 	i := injector.NewInjector(m, "scratch", u)
