@@ -31,15 +31,15 @@ func (m *DstModifier) Modify(ctx context.Context, base string) ([]string, error)
 		if err != nil || !d.IsDir() {
 			return err
 		}
+		if err := ctx.Err(); err != nil {
+			// request cancelled, give up
+			return err
+		}
 		pkgs, err := decorator.ParseDir(fset, path, nil, parser.ParseComments)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", path, err)
 		}
 		for name, pkg := range pkgs {
-			if err := ctx.Err(); err != nil {
-				// request cancelled, give up
-				return err
-			}
 			extras, err := m.processPackage(ctx, fset, path, pkg)
 			if err != nil {
 				return fmt.Errorf("failed to process %s (%s): %w", path, name, err)
