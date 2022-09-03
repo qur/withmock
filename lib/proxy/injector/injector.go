@@ -15,7 +15,7 @@ import (
 )
 
 type Modifier interface {
-	Modify(ctx context.Context, path string) ([]string, error)
+	Modify(ctx context.Context, mod, ver, path string) ([]string, error)
 }
 
 type Injector struct {
@@ -69,7 +69,7 @@ func (i *Injector) Source(ctx context.Context, mod, ver string) (io.Reader, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack zip (%s, %s): %w", mod, ver, err)
 	}
-	extraFiles, err := i.m.Modify(ctx, src)
+	extraFiles, err := i.m.Modify(ctx, mod, ver, src)
 	if err != nil {
 		return nil, fmt.Errorf("failed to modify zip (%s, %s): %w", mod, ver, err)
 	}

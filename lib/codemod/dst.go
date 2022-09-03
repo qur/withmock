@@ -17,13 +17,19 @@ import (
 	"github.com/qur/withmock/lib/extras"
 )
 
-type DstModifier struct{}
-
-func NewDstModifier() *DstModifier {
-	return &DstModifier{}
+type DstModifier struct {
+	pkgFilter map[string]bool
 }
 
-func (m *DstModifier) Modify(ctx context.Context, base string) ([]string, error) {
+func NewDstModifier() *DstModifier {
+	return &DstModifier{
+		pkgFilter: map[string]bool{
+			"golang.org/x/net/@v/html/atom:main": true,
+		},
+	}
+}
+
+func (m *DstModifier) Modify(ctx context.Context, mod, ver, base string) ([]string, error) {
 	log.Printf("MODIFY: %s", base)
 	fset := token.NewFileSet()
 	extraFiles := []string{}
@@ -35,15 +41,25 @@ func (m *DstModifier) Modify(ctx context.Context, base string) ([]string, error)
 			// request cancelled, give up
 			return err
 		}
+		rel, err := filepath.Rel(filepath.Join(base, mod+"@v"+ver), path)
+		if err != nil {
+			return fmt.Errorf("failed to resolve relative path %s: %s", path, err)
+		}
 		pkgs, err := decorator.ParseDir(fset, path, nil, parser.ParseComments)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", path, err)
 		}
 		for name, pkg := range pkgs {
+			if m.pkgFilter[mod+"/@v/"+rel+":"+name] {
+				// package filtered, ignore
+				continue
+			}
 			extras, err := m.processPackage(ctx, fset, path, pkg)
 			if err != nil {
 				return fmt.Errorf("failed to process %s (%s): %w", path, name, err)
 			}
+			// we want to return the extra paths as being relative to the base
+			// path.
 			for _, path := range extras {
 				extra, err := filepath.Rel(base, path)
 				if err != nil {
