@@ -91,10 +91,10 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 				rType := ""
 				rValue := "nil"
 				if n.Recv != nil {
-					// TODO: set rType here to the receiver type
 					if len(n.Recv.List) != 1 {
 						return nil, fmt.Errorf("don't know how to handle receiver with %d fields", len(n.Recv.List))
 					}
+					// set rType here to the receiver type
 					recv := n.Recv.List[0]
 					switch t := recv.Type.(type) {
 					case *dst.Ident:
