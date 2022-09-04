@@ -83,8 +83,8 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 			}
 			switch n := node.(type) {
 			case *dst.FuncDecl:
-				if !n.Name.IsExported() {
-					// ignore private functions
+				if !n.Name.IsExported() || n.Body == nil {
+					// ignore private functions or functions without bodies
 					continue
 				}
 				// log.Printf("FUNC: %s (%v)", n.Name, n.Recv != nil)
@@ -175,39 +175,37 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 				if len(results) > 0 {
 					retName = "ret"
 				}
-				if n.Body != nil {
-					n.Body.List = append([]dst.Stmt{&dst.IfStmt{
-						Init: &dst.AssignStmt{
-							Lhs: []dst.Expr{
-								dst.NewIdent("mock"),
-								dst.NewIdent(retName),
-							},
-							Tok: token.DEFINE,
-							Rhs: []dst.Expr{
-								&dst.CallExpr{
-									Fun: &dst.SelectorExpr{
-										X:   dst.NewIdent("wmqe_main_controller"),
-										Sel: dst.NewIdent("MethodCalled"),
-									},
-									Args: args,
+				n.Body.List = append([]dst.Stmt{&dst.IfStmt{
+					Init: &dst.AssignStmt{
+						Lhs: []dst.Expr{
+							dst.NewIdent("mock"),
+							dst.NewIdent(retName),
+						},
+						Tok: token.DEFINE,
+						Rhs: []dst.Expr{
+							&dst.CallExpr{
+								Fun: &dst.SelectorExpr{
+									X:   dst.NewIdent("wmqe_main_controller"),
+									Sel: dst.NewIdent("MethodCalled"),
 								},
+								Args: args,
 							},
 						},
-						Cond: dst.NewIdent("mock"),
-						Body: &dst.BlockStmt{
-							List: []dst.Stmt{
-								&dst.ReturnStmt{
-									Results: results,
-								},
+					},
+					Cond: dst.NewIdent("mock"),
+					Body: &dst.BlockStmt{
+						List: []dst.Stmt{
+							&dst.ReturnStmt{
+								Results: results,
 							},
 						},
-						Decs: dst.IfStmtDecorations{
-							NodeDecs: dst.NodeDecs{
-								After: dst.EmptyLine,
-							},
+					},
+					Decs: dst.IfStmtDecorations{
+						NodeDecs: dst.NodeDecs{
+							After: dst.EmptyLine,
 						},
-					}}, n.Body.List...)
-				}
+					},
+				}}, n.Body.List...)
 				// case *dst.GenDecl:
 				// 	//log.Printf("GEN: %s", n.Tok)
 				// 	if n.Tok == token.TYPE {
