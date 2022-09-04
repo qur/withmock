@@ -89,7 +89,7 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 				}
 				// log.Printf("FUNC: %s (%v)", n.Name, n.Recv != nil)
 				rType := ""
-				var controller dst.Expr = dst.NewIdent("wmqe_main_controller")
+				rValue := "nil"
 				if n.Recv != nil {
 					// TODO: set rType here to the receiver type
 					if len(n.Recv.List) != 1 {
@@ -114,19 +114,17 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 					}
 					switch len(recv.Names) {
 					case 0:
-						recv.Names = append(recv.Names, dst.NewIdent("wmqe_self"))
-						fallthrough
+						rValue = "wmqe_self"
+						recv.Names = append(recv.Names, dst.NewIdent(rValue))
 					case 1:
-						controller = &dst.SelectorExpr{
-							X:   dst.NewIdent(recv.Names[0].Name),
-							Sel: dst.NewIdent("WMQE_Mock"),
-						}
+						rValue = recv.Names[0].Name
 					default:
 						return nil, fmt.Errorf("how can a receiver have multiple names? %s.%s", rType, n.Name)
 					}
 				}
 				// log.Printf("ARGS: '%s' '%s'", rType, n.Name.Name)
 				args := []dst.Expr{
+					dst.NewIdent(rValue),
 					dst.NewIdent("wmqe_package"),
 					&dst.BasicLit{
 						Kind:  token.STRING,
@@ -168,18 +166,22 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 						}
 					}
 				}
+				retName := "_"
+				if len(results) > 0 {
+					retName = "ret"
+				}
 				if n.Body != nil {
 					n.Body.List = append([]dst.Stmt{&dst.IfStmt{
 						Init: &dst.AssignStmt{
 							Lhs: []dst.Expr{
 								dst.NewIdent("mock"),
-								dst.NewIdent("ret"),
+								dst.NewIdent(retName),
 							},
 							Tok: token.DEFINE,
 							Rhs: []dst.Expr{
 								&dst.CallExpr{
 									Fun: &dst.SelectorExpr{
-										X:   controller,
+										X:   dst.NewIdent("wmqe_main_controller"),
 										Sel: dst.NewIdent("MethodCalled"),
 									},
 									Args: args,
@@ -201,19 +203,19 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 						},
 					}}, n.Body.List...)
 				}
-			case *dst.GenDecl:
-				//log.Printf("GEN: %s", n.Tok)
-				if n.Tok == token.TYPE {
-					for _, spec := range n.Specs {
-						t := spec.(*dst.TypeSpec)
-						//log.Printf("TYPE: %s (%T)", t.Name, t.Type)
-						if s, ok := t.Type.(*dst.StructType); ok {
-							s.Fields.List = append(s.Fields.List, &dst.Field{
-								Type: dst.NewIdent("WMQE_Mock"),
-							})
-						}
-					}
-				}
+				// case *dst.GenDecl:
+				// 	//log.Printf("GEN: %s", n.Tok)
+				// 	if n.Tok == token.TYPE {
+				// 		for _, spec := range n.Specs {
+				// 			t := spec.(*dst.TypeSpec)
+				// 			//log.Printf("TYPE: %s (%T)", t.Name, t.Type)
+				// 			if s, ok := t.Type.(*dst.StructType); ok {
+				// 				s.Fields.List = append(s.Fields.List, &dst.Field{
+				// 					Type: dst.NewIdent("WMQE_Mock"),
+				// 				})
+				// 			}
+				// 		}
+				// 	}
 			}
 		}
 		if err := m.save(path, fset, f); err != nil {
