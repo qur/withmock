@@ -136,9 +136,14 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 					},
 				}
 				for _, param := range n.Type.Params.List {
-					for _, name := range param.Names {
+					for i, name := range param.Names {
+						arg := name.Name
 						// log.Printf("ARG: %s", name.Name)
-						args = append(args, dst.NewIdent(name.Name))
+						if arg == "_" {
+							arg = fmt.Sprintf("wmqe_arg_%d", len(args))
+							param.Names[i] = dst.NewIdent(arg)
+						}
+						args = append(args, dst.NewIdent(arg))
 					}
 				}
 				// log.Printf("ARGS: %d, %d, %#v", len(n.Type.Params.List), len(args), args)
