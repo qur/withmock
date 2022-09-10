@@ -3,6 +3,7 @@ package codemod
 import (
 	"context"
 	"fmt"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -45,7 +46,7 @@ func (m *DstModifier) Modify(ctx context.Context, mod, ver, base string) ([]stri
 		if err != nil {
 			return fmt.Errorf("failed to resolve relative path %s: %s", path, err)
 		}
-		pkgs, err := decorator.ParseDir(fset, path, nil, parser.ParseComments)
+		pkgs, err := parser.ParseDir(fset, path, nil, parser.ParseComments)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", path, err)
 		}
@@ -72,11 +73,15 @@ func (m *DstModifier) Modify(ctx context.Context, mod, ver, base string) ([]stri
 	})
 }
 
-func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *dst.Package) ([]string, error) {
+func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, base string, pkg *ast.Package) ([]string, error) {
 	//log.Printf("PROCESS %s: %s", base, pkg.Name)
 	for path, f := range pkg.Files {
+		d, err := decorator.DecorateFile(fset, f)
+		if err != nil {
+			return nil, err
+		}
 		// log.Printf("PROCESS: %s", path)
-		for _, node := range f.Decls {
+		for _, node := range d.Decls {
 			if err := ctx.Err(); err != nil {
 				// request cancelled, give up
 				return nil, err
@@ -221,7 +226,7 @@ func (m *DstModifier) processPackage(ctx context.Context, fset *token.FileSet, b
 				// 	}
 			}
 		}
-		if err := m.save(path, fset, f); err != nil {
+		if err := m.save(path, fset, d); err != nil {
 			return nil, fmt.Errorf("failed to format %s: %w", path, err)
 		}
 	}
