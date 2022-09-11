@@ -23,7 +23,8 @@ func main() {
 	handler := web.Register(c)
 
 	uk := basic.NewUnknown()
-	r.Add("gowm.in/", uk)
+	p := basic.NewPrefixStripper("gowm.in/", uk)
+	r.Add("gowm.in/", p)
 
 	server := &http.Server{
 		Addr:    ":4000",
