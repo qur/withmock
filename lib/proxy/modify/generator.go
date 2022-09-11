@@ -1,7 +1,6 @@
 package modify
 
 import (
-	"archive/zip"
 	"context"
 	"fmt"
 	"io"
@@ -10,9 +9,12 @@ import (
 	"path/filepath"
 
 	"github.com/pborman/uuid"
+	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
+	"golang.org/x/mod/zip"
+
 	"github.com/qur/withmock/lib/extras"
 	"github.com/qur/withmock/lib/proxy/api"
-	"golang.org/x/mod/modfile"
 )
 
 type Generator interface {
@@ -98,35 +100,32 @@ func (i *InterfaceGenerator) Source(ctx context.Context, mod, ver string) (io.Re
 	src := filepath.Join(dir, "src")
 	dest := filepath.Join(dir, "dst")
 	output := filepath.Join(dir, "interface.zip")
+	mv := module.Version{Path: mod, Version: "v" + ver}
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to prep zip (%s, %s): %w", mod, ver, err)
 	}
 	if err := save(input, r); err != nil {
 		return nil, fmt.Errorf("failed to save zip (%s, %s): %w", mod, ver, err)
 	}
-	if _, err := unpack(input, src); err != nil {
+	if err := zip.Unzip(src, mv, input); err != nil {
 		return nil, fmt.Errorf("failed to unpack zip (%s, %s): %w", mod, ver, err)
 	}
 	if err := i.g.Generate(ctx, mod, ver, src, dest); err != nil {
 		return nil, fmt.Errorf("failed to modify zip (%s, %s): %w", mod, ver, err)
 	}
-	headers, err := getHeaders(dest)
+	f, err := os.Create(output)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create zip headers(%s, %s): %w", mod, ver, err)
+		return nil, fmt.Errorf("failed to create zip (%s, %s): %w", mod, ver, err)
 	}
-	if err := pack(src, output, headers); err != nil {
-		return nil, fmt.Errorf("failed to pack zip (%s, %s): %w", mod, ver, err)
+	if err := zip.CreateFromDir(f, mv, dest); err != nil {
+		return nil, fmt.Errorf("failed to write zip (%s, %s): %w", mod, ver, err)
 	}
-	f, err := os.Open(output)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open zip (%s, %s): %w", mod, ver, err)
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("failed to seek mod file (%s, %s): %w", mod, ver, err)
 	}
 	if err := os.RemoveAll(dir); err != nil {
 		return nil, fmt.Errorf("failed to clean zip (%s, %s): %w", mod, ver, err)
 	}
 	return f, nil
-}
-
-func getHeaders(path string) ([]zip.FileHeader, error) {
-	return nil, fmt.Errorf("getHeaders not implemented")
 }
