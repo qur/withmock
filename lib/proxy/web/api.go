@@ -21,7 +21,7 @@ func (a apiProvider) list(w http.ResponseWriter, r *http.Request) {
 	mod := mux.Vars(r)["module"]
 	log.Printf("LIST: %s", mod)
 	versions, err := a.s.List(r.Context(), mod)
-	if errors.Is(err, api.NotExist("")) {
+	if ne := api.NotExist(""); errors.As(err, &ne) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		log.Printf("DEBUG: unknown module (%s): %s", mod, err)
 		return
@@ -42,7 +42,7 @@ func (a apiProvider) info(w http.ResponseWriter, r *http.Request) {
 	ver := mux.Vars(r)["version"]
 	log.Printf("INFO: %s %s", mod, ver)
 	info, err := a.s.Info(r.Context(), mod, ver)
-	if errors.Is(err, api.NotExist("")) {
+	if ne := api.NotExist(""); errors.As(err, &ne) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		log.Printf("DEBUG: unknown module (%s): %s", mod, err)
 		return
@@ -63,7 +63,7 @@ func (a apiProvider) mod(w http.ResponseWriter, r *http.Request) {
 	ver := mux.Vars(r)["version"]
 	log.Printf("MOD: %s %s", mod, ver)
 	mf, err := a.s.ModFile(r.Context(), mod, ver)
-	if errors.Is(err, api.NotExist("")) {
+	if ne := api.NotExist(""); errors.As(err, &ne) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		log.Printf("DEBUG: unknown module (%s): %s", mod, err)
 		return
@@ -87,7 +87,7 @@ func (a apiProvider) zip(w http.ResponseWriter, r *http.Request) {
 	ver := mux.Vars(r)["version"]
 	log.Printf("ZIP: %s %s", mod, ver)
 	src, err := a.s.Source(r.Context(), mod, ver)
-	if errors.Is(err, api.NotExist("")) {
+	if ne := api.NotExist(""); errors.As(err, &ne) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		log.Printf("DEBUG: unknown module (%s): %s", mod, err)
 		return

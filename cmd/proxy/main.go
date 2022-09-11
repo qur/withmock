@@ -5,8 +5,10 @@ import (
 	"net/http"
 
 	"github.com/qur/withmock/lib/codemod"
+	"github.com/qur/withmock/lib/proxy/basic"
 	"github.com/qur/withmock/lib/proxy/cache"
 	"github.com/qur/withmock/lib/proxy/injector"
+	"github.com/qur/withmock/lib/proxy/router"
 	"github.com/qur/withmock/lib/proxy/upstream"
 	"github.com/qur/withmock/lib/proxy/web"
 )
@@ -16,8 +18,12 @@ func main() {
 
 	u := upstream.NewStore("https://proxy.golang.org")
 	i := injector.NewInjector(m, "scratch", u)
-	c := cache.NewDir("cache", i)
+	r := router.NewPrefixRouter(i)
+	c := cache.NewDir("cache", r)
 	handler := web.Register(c)
+
+	uk := basic.NewUnknown()
+	r.Add("gowm.in/", uk)
 
 	server := &http.Server{
 		Addr:    ":4000",

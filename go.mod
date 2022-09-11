@@ -3,6 +3,7 @@ module github.com/qur/withmock
 go 1.18
 
 require (
+	github.com/armon/go-radix v1.0.0
 	github.com/dave/dst v0.27.0
 	github.com/gorilla/mux v1.8.0
 	github.com/jessevdk/go-flags v1.5.0
