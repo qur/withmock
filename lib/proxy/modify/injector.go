@@ -1,4 +1,4 @@
-package injector
+package modify
 
 import (
 	"archive/zip"
