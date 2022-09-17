@@ -22,12 +22,17 @@ func main() {
 	c := cache.NewDir("cache", r)
 	handler := web.Register(c)
 
-	const prefix = "gowm.in/if/"
+	const ifPrefix = "gowm.in/if/"
 
-	ig := codemod.NewInterfaceGenerator(prefix)
-	p := basic.NewPrefixStripper(prefix, u)
-	g := modify.NewInterfaceGenerator(ig, "scratch", p)
-	r.Add(prefix, g)
+	ig := codemod.NewInterfaceGenerator(ifPrefix)
+	ip := basic.NewPrefixStripper(ifPrefix, u)
+	r.Add(ifPrefix, modify.NewInterfaceGenerator(ig, "scratch", ip))
+
+	const mockPrefix = "gowm.in/mock/"
+
+	mg := codemod.NewMockGenerator(mockPrefix)
+	mp := basic.NewPrefixStripper(mockPrefix, u)
+	r.Add(mockPrefix, modify.NewInterfaceGenerator(mg, "scratch", mp))
 
 	server := &http.Server{
 		Addr:    ":4000",
