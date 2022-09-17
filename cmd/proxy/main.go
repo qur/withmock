@@ -22,10 +22,12 @@ func main() {
 	c := cache.NewDir("cache", r)
 	handler := web.Register(c)
 
-	ig := codemod.NewInterfaceGenerator("gowm.in/")
-	p := basic.NewPrefixStripper("gowm.in/", u)
+	const prefix = "gowm.in/if/"
+
+	ig := codemod.NewInterfaceGenerator(prefix)
+	p := basic.NewPrefixStripper(prefix, u)
 	g := modify.NewInterfaceGenerator(ig, "scratch", p)
-	r.Add("gowm.in/", g)
+	r.Add(prefix, g)
 
 	server := &http.Server{
 		Addr:    ":4000",

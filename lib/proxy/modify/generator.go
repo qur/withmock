@@ -95,7 +95,7 @@ func (i *InterfaceGenerator) modFileFromModfile(ctx context.Context, mod, ver st
 }
 
 func (i *InterfaceGenerator) modFileFromSource(ctx context.Context, mod, ver string) (io.Reader, error) {
-	return i.s.ModFile(ctx, mod, ver)
+	return nil, fmt.Errorf("modFileFromSource not implemented")
 }
 
 func (i *InterfaceGenerator) Source(ctx context.Context, mod, ver string) (io.Reader, error) {

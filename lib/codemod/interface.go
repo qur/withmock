@@ -30,9 +30,6 @@ type InterfaceGenerator struct {
 func NewInterfaceGenerator(prefix string) *InterfaceGenerator {
 	return &InterfaceGenerator{
 		prefix: prefix,
-		pkgFilter: map[string]bool{
-			"golang.org/x/net/@v/html/atom:main": true,
-		},
 	}
 }
 
@@ -74,26 +71,21 @@ func (i *InterfaceGenerator) GenSource(ctx context.Context, mod, ver, zipfile, s
 	log.Printf("GENERATE INTERFACE: %s", src)
 	fset := token.NewFileSet()
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || !d.IsDir() {
-			return err
-		}
 		if err := ctx.Err(); err != nil {
 			// request cancelled, give up
 			return err
 		}
-		rel, err := filepath.Rel(filepath.Join(src, origMod+"@v"+ver), path)
-		if err != nil {
-			return fmt.Errorf("failed to resolve relative path %s: %s", path, err)
+		if err != nil || !d.IsDir() {
+			return err
+		}
+		if strings.HasPrefix(filepath.Base(path), ".") {
+			return fs.SkipDir
 		}
 		pkgs, err := parser.ParseDir(fset, path, nil, parser.ParseComments)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", path, err)
 		}
 		for name, pkg := range pkgs {
-			if i.pkgFilter[mod+"/@v/"+rel+":"+name] {
-				// package filtered, ignore
-				continue
-			}
 			if err := i.processPackage(ctx, fset, origMod, path, src, dest, pkg); err != nil {
 				return fmt.Errorf("failed to process %s (%s): %w", path, name, err)
 			}
@@ -103,6 +95,11 @@ func (i *InterfaceGenerator) GenSource(ctx context.Context, mod, ver, zipfile, s
 }
 
 func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.FileSet, mod, path, src, dest string, pkg *ast.Package) error {
+	rel, err := filepath.Rel(src, path)
+	if err != nil {
+		return err
+	}
+	pkgPath := filepath.Join(mod, rel)
 	for path, f := range pkg.Files {
 		in, err := decorator.DecorateFile(fset, f)
 		if err != nil {
@@ -125,7 +122,7 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 					Name: dst.NewIdent(origPkg),
 					Path: &dst.BasicLit{
 						Kind:  token.STRING,
-						Value: `"` + mod + `"`,
+						Value: `"` + pkgPath + `"`,
 					},
 				},
 			},
@@ -136,7 +133,8 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 				},
 			},
 		})
-		log.Printf("PROCESS: %s", path)
+		emptyLen := len(out.Decls)
+		log.Printf("PROCESS: %s %s", path, pkgPath)
 		for _, node := range in.Decls {
 			if err := ctx.Err(); err != nil {
 				// request cancelled, give up
@@ -240,6 +238,10 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 					})
 				}
 			}
+		}
+		if len(out.Decls) == emptyLen {
+			// nothing public was added, so skip the whole file
+			continue
 		}
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
