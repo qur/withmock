@@ -176,9 +176,6 @@ func (i *MockGenerator) processPackage(ctx context.Context, fset *token.FileSet,
 								Fields: &dst.FieldList{
 									List: []*dst.Field{
 										{
-											Names: []*dst.Ident{
-												dst.NewIdent("mock"),
-											},
 											Type: &dst.SelectorExpr{
 												X:   dst.NewIdent("mock"),
 												Sel: dst.NewIdent("Mock"),
