@@ -22,8 +22,9 @@ func main() {
 	c := cache.NewDir("cache", r)
 	handler := web.Register(c)
 
+	ig := codemod.NewInterfaceGenerator("gowm.in/")
 	p := basic.NewPrefixStripper("gowm.in/", u)
-	g := modify.NewInterfaceGenerator(nil, "scratch", p)
+	g := modify.NewInterfaceGenerator(ig, "scratch", p)
 	r.Add("gowm.in/", g)
 
 	server := &http.Server{
