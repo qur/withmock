@@ -125,7 +125,23 @@ func (i *MockGenerator) processPackage(ctx context.Context, fset *token.FileSet,
 		for _, imp := range in.Imports {
 			imports.Specs = append(imports.Specs, dst.Clone(imp).(*dst.ImportSpec))
 		}
-		out.Decls = append(out.Decls, imports)
+		out.Decls = append(out.Decls, imports, &dst.GenDecl{
+			Tok: token.IMPORT,
+			Specs: []dst.Spec{
+				&dst.ImportSpec{
+					Path: &dst.BasicLit{
+						Kind:  token.STRING,
+						Value: `"gowm.in/ctrl/mock"`,
+					},
+				},
+			},
+			Decs: dst.GenDeclDecorations{
+				NodeDecs: dst.NodeDecs{
+					Before: dst.EmptyLine,
+					After:  dst.EmptyLine,
+				},
+			},
+		})
 		emptyLen := len(out.Decls)
 		log.Printf("PROCESS: %s %s", path, pkgPath)
 		for _, node := range in.Decls {
