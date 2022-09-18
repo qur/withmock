@@ -17,21 +17,22 @@ func main() {
 	m := codemod.NewDstModifier()
 
 	u := upstream.NewStore("https://proxy.golang.org")
-	i := modify.NewInjector(m, "scratch", u)
+	uc := cache.NewDir("cache/input", u)
+	i := modify.NewInjector(m, "scratch", uc)
 	r := router.NewPrefixRouter(i)
-	c := cache.NewDir("cache", r)
+	c := cache.NewDir("cache/output", r)
 	handler := web.Register(c)
 
 	const ifPrefix = "gowm.in/if/"
 
 	ig := codemod.NewInterfaceGenerator(ifPrefix)
-	ip := basic.NewPrefixStripper(ifPrefix, u)
+	ip := basic.NewPrefixStripper(ifPrefix, uc)
 	r.Add(ifPrefix, modify.NewInterfaceGenerator(ig, "scratch", ip))
 
 	const mockPrefix = "gowm.in/mock/"
 
 	mg := codemod.NewMockGenerator(mockPrefix)
-	mp := basic.NewPrefixStripper(mockPrefix, u)
+	mp := basic.NewPrefixStripper(mockPrefix, uc)
 	r.Add(mockPrefix, modify.NewInterfaceGenerator(mg, "scratch", mp))
 
 	server := &http.Server{
