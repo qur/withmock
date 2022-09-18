@@ -30,9 +30,14 @@ type rawMock struct {
 
 type rawMockFile struct {
 	path    string
-	pkgName string
 	imports []*dst.ImportSpec
-	mocks   []rawMock
+	mocks   []string
+}
+
+type rawMockPackage struct {
+	name  string
+	files map[string]rawMockFile
+	mocks map[string]rawMock
 }
 
 type MockGenerator struct {
@@ -116,8 +121,8 @@ func (i *MockGenerator) GenSource(ctx context.Context, mod, ver, zipfile, src, d
 	return i.renderMocks(ctx, fset, dest, resolvedMocks)
 }
 
-func (i *MockGenerator) getInterfaces(ctx context.Context, fset *token.FileSet, src string) ([]rawMockFile, error) {
-	allMocks := []rawMockFile{}
+func (i *MockGenerator) getInterfaces(ctx context.Context, fset *token.FileSet, src string) ([]rawMockPackage, error) {
+	allMocks := []rawMockPackage{}
 
 	if err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err := ctx.Err(); err != nil {
@@ -139,7 +144,7 @@ func (i *MockGenerator) getInterfaces(ctx context.Context, fset *token.FileSet, 
 			if err != nil {
 				return fmt.Errorf("failed to process %s (%s): %w", path, name, err)
 			}
-			allMocks = append(allMocks, mocks...)
+			allMocks = append(allMocks, mocks)
 		}
 		return nil
 	}); err != nil {
@@ -149,19 +154,23 @@ func (i *MockGenerator) getInterfaces(ctx context.Context, fset *token.FileSet, 
 	return allMocks, nil
 }
 
-func (i *MockGenerator) processPackage(ctx context.Context, fset *token.FileSet, src string, pkg *ast.Package) ([]rawMockFile, error) {
-	files := []rawMockFile{}
+func (i *MockGenerator) processPackage(ctx context.Context, fset *token.FileSet, src string, pkg *ast.Package) (rawMockPackage, error) {
+	pkgInfo := rawMockPackage{
+		name:  pkg.Name,
+		files: map[string]rawMockFile{},
+		mocks: map[string]rawMock{},
+	}
 	for path, f := range pkg.Files {
 		in, err := decorator.DecorateFile(fset, f)
 		if err != nil {
-			return files, err
+			return pkgInfo, err
 		}
-		mocks := []rawMock{}
+		mocks := []string{}
 		// log.Printf("PROCESS: %s %s", path, pkgPath)
 		for _, node := range in.Decls {
 			if err := ctx.Err(); err != nil {
 				// request cancelled, give up
-				return files, err
+				return pkgInfo, err
 			}
 			n, ok := node.(*dst.GenDecl)
 			if !ok || n.Tok != token.TYPE {
@@ -180,10 +189,11 @@ func (i *MockGenerator) processPackage(ctx context.Context, fset *token.FileSet,
 					// log.Printf("METHOD: %s %T", f.Names, f.Type)
 					methods = append(methods, dst.Clone(f).(*dst.Field))
 				}
-				mocks = append(mocks, rawMock{
-					name:    "Mock" + t.Name.Name,
+				mocks = append(mocks, t.Name.Name)
+				pkgInfo.mocks[t.Name.Name] = rawMock{
+					name:    t.Name.Name,
 					methods: methods,
-				})
+				}
 			}
 		}
 		if len(mocks) == 0 {
@@ -192,16 +202,15 @@ func (i *MockGenerator) processPackage(ctx context.Context, fset *token.FileSet,
 		}
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
-			return files, fmt.Errorf("failed to resolve extra path %s: %s", path, err)
+			return pkgInfo, fmt.Errorf("failed to resolve extra path %s: %s", path, err)
 		}
-		files = append(files, rawMockFile{
+		pkgInfo.files[rel] = rawMockFile{
 			path:    rel,
-			pkgName: in.Name.Name,
 			imports: in.Imports,
 			mocks:   mocks,
-		})
+		}
 	}
-	return files, nil
+	return pkgInfo, nil
 }
 
 func (i *MockGenerator) stripPrefix(mod string) (string, error) {
@@ -223,98 +232,128 @@ func (*MockGenerator) save(dest string, fset *token.FileSet, node *dst.File) err
 	return decorator.Fprint(f, node)
 }
 
-func (i *MockGenerator) resolveMocks(ctx context.Context, fset *token.FileSet, files []rawMockFile) ([]rawMockFile, error) {
-	for _, file := range files {
-		if err := ctx.Err(); err != nil {
-			// request cancelled, give up
-			return files, err
+func (i *MockGenerator) resolveMocks(ctx context.Context, fset *token.FileSet, pkgs []rawMockPackage) ([]rawMockPackage, error) {
+	for _, pkg := range pkgs {
+		for _, file := range pkg.files {
+			if err := ctx.Err(); err != nil {
+				// request cancelled, give up
+				return pkgs, err
+			}
+			log.Printf("RESOLVE: %s", file.path)
+			for _, name := range file.mocks {
+				mock := pkg.mocks[name]
+				log.Printf("  TYPE: %s (%s)", name, mock.name)
+				for _, method := range mock.methods {
+					switch t := method.Type.(type) {
+					case *dst.SelectorExpr:
+						// this is probably a type from another package
+						if i, ok := t.X.(*dst.Ident); ok {
+							log.Printf("    NEED %s.%s", i, t.Sel)
+						}
+					case *dst.Ident:
+						if t.Path != "" {
+							// this is probably a type from another package
+							log.Printf("    NEED %s", t)
+							continue
+						}
+						// this is probably a type from the same package?
+						m := pkg.mocks[t.Name]
+						log.Printf("    NEED %s (found: %s)", t.Name, m.name)
+					case *dst.FuncType:
+						// this is already a method
+					}
+				}
+			}
 		}
-		log.Printf("RESOLVE: %s", file.path)
 	}
-	return files, nil
+	return pkgs, nil
 }
 
-func (i *MockGenerator) renderMocks(ctx context.Context, fset *token.FileSet, dest string, files []rawMockFile) error {
-	for _, file := range files {
-		if err := ctx.Err(); err != nil {
-			// request cancelled, give up
-			return err
-		}
-		out := &dst.File{
-			Name: dst.NewIdent(file.pkgName),
-		}
-		imports := &dst.GenDecl{
-			Tok: token.IMPORT,
-		}
-		for _, imp := range file.imports {
-			imports.Specs = append(imports.Specs, dst.Clone(imp).(*dst.ImportSpec))
-		}
-		out.Decls = append(out.Decls, imports, &dst.GenDecl{
-			Tok: token.IMPORT,
-			Specs: []dst.Spec{
-				&dst.ImportSpec{
-					Path: &dst.BasicLit{
-						Kind:  token.STRING,
-						Value: `"gowm.in/ctrl/mock"`,
+func (i *MockGenerator) renderMocks(ctx context.Context, fset *token.FileSet, dest string, pkgs []rawMockPackage) error {
+	for _, pkg := range pkgs {
+		for _, file := range pkg.files {
+			if err := ctx.Err(); err != nil {
+				// request cancelled, give up
+				return err
+			}
+			out := &dst.File{
+				Name: dst.NewIdent(pkg.name),
+			}
+			imports := &dst.GenDecl{
+				Tok: token.IMPORT,
+			}
+			for _, imp := range file.imports {
+				imports.Specs = append(imports.Specs, dst.Clone(imp).(*dst.ImportSpec))
+			}
+			out.Decls = append(out.Decls, imports, &dst.GenDecl{
+				Tok: token.IMPORT,
+				Specs: []dst.Spec{
+					&dst.ImportSpec{
+						Path: &dst.BasicLit{
+							Kind:  token.STRING,
+							Value: `"gowm.in/ctrl/mock"`,
+						},
 					},
 				},
-			},
-			Decs: dst.GenDeclDecorations{
-				NodeDecs: dst.NodeDecs{
-					Before: dst.EmptyLine,
-					After:  dst.EmptyLine,
+				Decs: dst.GenDeclDecorations{
+					NodeDecs: dst.NodeDecs{
+						Before: dst.EmptyLine,
+						After:  dst.EmptyLine,
+					},
 				},
-			},
-		})
-		for _, mock := range file.mocks {
-			out.Decls = append(out.Decls, &dst.GenDecl{
-				Tok: token.TYPE,
-				Specs: []dst.Spec{
-					&dst.TypeSpec{
-						Name: dst.NewIdent(mock.name),
-						Type: &dst.StructType{
-							Fields: &dst.FieldList{
-								List: []*dst.Field{
-									{
-										Type: &dst.SelectorExpr{
-											X:   dst.NewIdent("mock"),
-											Sel: dst.NewIdent("Mock"),
+			})
+			for _, typeName := range file.mocks {
+				mock := pkg.mocks[typeName]
+				name := "Mock" + mock.name
+				out.Decls = append(out.Decls, &dst.GenDecl{
+					Tok: token.TYPE,
+					Specs: []dst.Spec{
+						&dst.TypeSpec{
+							Name: dst.NewIdent(name),
+							Type: &dst.StructType{
+								Fields: &dst.FieldList{
+									List: []*dst.Field{
+										{
+											Type: &dst.SelectorExpr{
+												X:   dst.NewIdent("mock"),
+												Sel: dst.NewIdent("Mock"),
+											},
 										},
 									},
 								},
 							},
 						},
 					},
-				},
-				Decs: dst.GenDeclDecorations{
-					NodeDecs: dst.NodeDecs{
-						After: dst.EmptyLine,
+					Decs: dst.GenDeclDecorations{
+						NodeDecs: dst.NodeDecs{
+							After: dst.EmptyLine,
+						},
 					},
-				},
-			})
-			for _, method := range mock.methods {
-				if ft, ok := method.Type.(*dst.FuncType); ok {
-					out.Decls = append(out.Decls, &dst.FuncDecl{
-						Recv: &dst.FieldList{
-							List: []*dst.Field{
-								{
-									Names: []*dst.Ident{
-										dst.NewIdent("m"),
-									},
-									Type: &dst.StarExpr{
-										X: dst.NewIdent(mock.name),
+				})
+				for _, method := range mock.methods {
+					if ft, ok := method.Type.(*dst.FuncType); ok {
+						out.Decls = append(out.Decls, &dst.FuncDecl{
+							Recv: &dst.FieldList{
+								List: []*dst.Field{
+									{
+										Names: []*dst.Ident{
+											dst.NewIdent("m"),
+										},
+										Type: &dst.StarExpr{
+											X: dst.NewIdent(name),
+										},
 									},
 								},
 							},
-						},
-						Name: dst.NewIdent(method.Names[0].Name),
-						Type: ft,
-					})
+							Name: dst.NewIdent(method.Names[0].Name),
+							Type: ft,
+						})
+					}
 				}
 			}
-		}
-		if err := i.save(filepath.Join(dest, file.path), fset, out); err != nil {
-			return fmt.Errorf("failed to format %s: %w", file.path, err)
+			if err := i.save(filepath.Join(dest, file.path), fset, out); err != nil {
+				return fmt.Errorf("failed to format %s: %w", file.path, err)
+			}
 		}
 	}
 	return nil
