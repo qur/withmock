@@ -117,11 +117,11 @@ func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
 		if err != nil {
 			return err
 		}
-		n, err := mi.resolveInterfaces(ctx, rel)
+		pi, err := mi.resolveInterfaces(ctx, rel)
 		if err != nil {
 			return fmt.Errorf("failed to resolve interfaces for %s: %w", rel, err)
 		}
-		count += n
+		count += len(pi.interfaces)
 		return nil
 	}); err != nil {
 		return 0, err
@@ -130,11 +130,11 @@ func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-func (mi *modInfo) resolveInterfaces(ctx context.Context, path string) (int, error) {
+func (mi *modInfo) resolveInterfaces(ctx context.Context, path string) (*pkgInfo, error) {
 	log.Printf("RESOLVE INTERFACES: %s", path)
 	pkgs, err := parser.ParseDir(mi.fset, filepath.Join(mi.src, path), nil, parser.ParseComments)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse %s: %w", path, err)
+		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
 	}
 	names := []string{}
 	for name := range pkgs {
@@ -146,11 +146,11 @@ func (mi *modInfo) resolveInterfaces(ctx context.Context, path string) (int, err
 	switch len(names) {
 	case 0:
 		// not a go package, ignore it
-		return 0, nil
+		return nil, nil
 	case 1:
 		// this is what we want
 	default:
-		return 0, fmt.Errorf("don't know how to handle more than one package (got %s)", names)
+		return nil, fmt.Errorf("don't know how to handle more than one package (got %s)", names)
 	}
 	name := names[0]
 	pi := &pkgInfo{
@@ -159,10 +159,9 @@ func (mi *modInfo) resolveInterfaces(ctx context.Context, path string) (int, err
 		files:      map[string]*fileInfo{},
 		interfaces: map[string]*interfaceInfo{},
 	}
-	n, err := pi.resolveInterfaces(ctx, pkgs[name])
-	if err != nil {
-		return 0, fmt.Errorf("failed to process %s (%s): %w", path, name, err)
+	if err := pi.resolveInterfaces(ctx, pkgs[name]); err != nil {
+		return nil, fmt.Errorf("failed to process %s (%s): %w", path, name, err)
 	}
 	mi.pkgs[path] = pi
-	return n, nil
+	return pi, nil
 }
