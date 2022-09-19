@@ -3,11 +3,14 @@ package mock
 import (
 	"context"
 	"fmt"
+	"go/parser"
 	"go/token"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pborman/uuid"
 	"golang.org/x/mod/modfile"
@@ -92,5 +95,61 @@ func (m *MockGenerator) downloadModule(ctx context.Context, mod, ver, dest strin
 }
 
 func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
-	return 0, fmt.Errorf("not implemented")
+	count := 0
+
+	if err := filepath.WalkDir(mi.src, func(path string, d fs.DirEntry, err error) error {
+		if err := ctx.Err(); err != nil {
+			// request cancelled, give up
+			return err
+		}
+		if err != nil || !d.IsDir() {
+			return err
+		}
+		if strings.HasPrefix(filepath.Base(path), ".") {
+			return fs.SkipDir
+		}
+		rel, err := filepath.Rel(mi.src, path)
+		if err != nil {
+			return err
+		}
+		n, err := mi.resolveInterfaces(ctx, rel)
+		if err != nil {
+			return fmt.Errorf("failed to resolve interfaces for %s: %w", rel, err)
+		}
+		count += n
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (mi *modInfo) resolveInterfaces(ctx context.Context, path string) (int, error) {
+	log.Printf("RESOLVE INTERFACES: %s", path)
+	pkgs, err := parser.ParseDir(mi.fset, filepath.Join(mi.src, path), nil, parser.ParseComments)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse %s: %w", path, err)
+	}
+	names := []string{}
+	for name := range pkgs {
+		if strings.HasSuffix(name, "_test") {
+			continue
+		}
+		names = append(names, name)
+	}
+	if len(names) != 1 {
+		return 0, fmt.Errorf("don't know how to handle more than one package (got %s)", names)
+	}
+	name := names[0]
+	pi := &pkgInfo{
+		mod:  mi,
+		name: name,
+	}
+	n, err := pi.resolveInterfaces(ctx, pkgs[name])
+	if err != nil {
+		return 0, fmt.Errorf("failed to process %s (%s): %w", path, name, err)
+	}
+	mi.pkgs[path] = pi
+	return n, nil
 }
