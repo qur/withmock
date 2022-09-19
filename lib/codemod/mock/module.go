@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pborman/uuid"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/zip"
@@ -22,12 +23,17 @@ type modInfo struct {
 }
 
 func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod, ver string) (*modInfo, error) {
-	zipfile, err := m.downloadModule(ctx, mod, ver)
-	if err != nil {
+	path := filepath.Join(m.scratch, mod, ver, uuid.New())
+	if err := os.MkdirAll(path, 0755); err != nil {
 		return nil, err
 	}
 
-	src := filepath.Join(m.scratch, mod, ver, "src")
+	zipfile := filepath.Join(path, "src.zip")
+	if err := m.downloadModule(ctx, mod, ver, zipfile); err != nil {
+		return nil, err
+	}
+
+	src := filepath.Join(path, "src")
 	if err := os.MkdirAll(src, 0755); err != nil {
 		return nil, err
 	}
@@ -63,32 +69,26 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 	return mi, nil
 }
 
-func (m *MockGenerator) downloadModule(ctx context.Context, mod, ver string) (string, error) {
+func (m *MockGenerator) downloadModule(ctx context.Context, mod, ver, dest string) error {
 	src, err := m.s.Source(ctx, mod, ver)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if rc, ok := src.(io.ReadCloser); ok {
 		defer rc.Close()
 	}
 
-	path := filepath.Join(m.scratch, mod, ver, "src.zip")
-
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return "", err
-	}
-
-	f, err := os.Create(path)
+	f, err := os.Create(dest)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer f.Close()
 
 	if _, err := io.Copy(f, src); err != nil {
-		return "", err
+		return err
 	}
 
-	return path, nil
+	return nil
 }
 
 func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {

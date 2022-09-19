@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/qur/withmock/lib/codemod"
+	"github.com/qur/withmock/lib/codemod/mock"
 	"github.com/qur/withmock/lib/proxy/basic"
 	"github.com/qur/withmock/lib/proxy/cache"
 	"github.com/qur/withmock/lib/proxy/modify"
@@ -34,6 +35,12 @@ func main() {
 	mg := codemod.NewMockGenerator(mockPrefix)
 	mp := basic.NewPrefixStripper(mockPrefix, uc)
 	r.Add(mockPrefix, modify.NewInterfaceGenerator(mg, "scratch", mp))
+
+	const mock2Prefix = "gowm.in/mock2/"
+
+	m2g := mock.NewMockGenerator(mock2Prefix, "scratch", uc)
+	m2p := basic.NewPrefixStripper(mock2Prefix, uc)
+	r.Add(mock2Prefix, modify.NewInterfaceGenerator(m2g, "scratch", m2p))
 
 	server := &http.Server{
 		Addr:    ":4000",
