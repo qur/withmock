@@ -78,6 +78,10 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 		mi.depsTree.Insert(req.Mod.Path, req.Mod.Version[1:])
 	}
 
+	if err := mi.discoverPackages(ctx); err != nil {
+		return nil, err
+	}
+
 	return mi, nil
 }
 
@@ -103,10 +107,8 @@ func (m *MockGenerator) downloadModule(ctx context.Context, mod, ver, dest strin
 	return nil
 }
 
-func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
-	count := 0
-
-	if err := filepath.WalkDir(mi.src, func(path string, d fs.DirEntry, err error) error {
+func (mi *modInfo) discoverPackages(ctx context.Context) error {
+	return filepath.WalkDir(mi.src, func(path string, d fs.DirEntry, err error) error {
 		if err := ctx.Err(); err != nil {
 			// request cancelled, give up
 			return err
@@ -121,24 +123,17 @@ func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
 		if err != nil {
 			return err
 		}
-		pi, err := mi.resolveInterfaces(ctx, rel)
-		if err != nil {
+		if err := mi.parsePackage(ctx, rel); err != nil {
 			return fmt.Errorf("failed to resolve interfaces for %s: %w", rel, err)
 		}
-		count += len(pi.interfaces)
 		return nil
-	}); err != nil {
-		return 0, err
-	}
-
-	return count, nil
+	})
 }
 
-func (mi *modInfo) resolveInterfaces(ctx context.Context, path string) (*pkgInfo, error) {
-	log.Printf("RESOLVE INTERFACES: %s", path)
+func (mi *modInfo) parsePackage(ctx context.Context, path string) error {
 	pkgs, err := parser.ParseDir(mi.fset, filepath.Join(mi.src, path), nil, parser.ParseComments)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
+		return fmt.Errorf("failed to parse %s: %w", path, err)
 	}
 	names := []string{}
 	for name := range pkgs {
@@ -150,24 +145,35 @@ func (mi *modInfo) resolveInterfaces(ctx context.Context, path string) (*pkgInfo
 	switch len(names) {
 	case 0:
 		// not a go package, ignore it
-		return nil, nil
+		return nil
 	case 1:
 		// this is what we want
 	default:
-		return nil, fmt.Errorf("don't know how to handle more than one package (got %s)", names)
+		return fmt.Errorf("don't know how to handle more than one package (got %s)", names)
 	}
 	name := names[0]
 	pi := &pkgInfo{
 		mod:        mi,
 		name:       name,
+		pkg:        pkgs[name],
 		files:      map[string]*fileInfo{},
 		interfaces: map[string]*interfaceInfo{},
 	}
-	if err := pi.resolveInterfaces(ctx, pkgs[name]); err != nil {
-		return nil, fmt.Errorf("failed to process %s (%s): %w", path, name, err)
-	}
 	mi.pkgs[path] = pi
-	return pi, nil
+	return nil
+}
+
+func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
+	count := 0
+
+	for path, pkg := range mi.pkgs {
+		if err := pkg.resolveInterfaces(ctx); err != nil {
+			return 0, fmt.Errorf("failed to process %s (%s): %w", path, pkg.name, err)
+		}
+		count += len(pkg.interfaces)
+	}
+
+	return count, nil
 }
 
 func (mi *modInfo) findPackage(ctx context.Context, fullPath string) (*pkgInfo, error) {

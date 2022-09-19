@@ -13,12 +13,13 @@ import (
 type pkgInfo struct {
 	mod        *modInfo
 	name       string
+	pkg        *ast.Package
 	files      map[string]*fileInfo
 	interfaces map[string]*interfaceInfo
 }
 
-func (pi *pkgInfo) resolveInterfaces(ctx context.Context, pkg *ast.Package) error {
-	for path, f := range pkg.Files {
+func (pi *pkgInfo) resolveInterfaces(ctx context.Context) error {
+	for path, f := range pi.pkg.Files {
 		if err := ctx.Err(); err != nil {
 			// request cancelled, give up
 			return err
