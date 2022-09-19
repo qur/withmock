@@ -2,7 +2,9 @@ package mock
 
 import (
 	"context"
+	"fmt"
 	"go/token"
+	"log"
 
 	"github.com/dave/dst"
 )
@@ -15,6 +17,7 @@ type fileInfo struct {
 }
 
 func (fi *fileInfo) discoverInterfaces(ctx context.Context, file *dst.File) error {
+	fi.interfaces = map[string]*interfaceInfo{}
 	for _, node := range file.Decls {
 		if err := ctx.Err(); err != nil {
 			// request cancelled, give up
@@ -45,4 +48,40 @@ func (fi *fileInfo) discoverInterfaces(ctx context.Context, file *dst.File) erro
 		}
 	}
 	return nil
+}
+
+func (fi *fileInfo) getPackages(ctx context.Context) error {
+	fi.pkgs = map[string]*pkgInfo{}
+	for _, imp := range fi.imports {
+		if err := ctx.Err(); err != nil {
+			// request cancelled, give up
+			return err
+		}
+		path := imp.Path.Value
+		log.Printf("RESOLVE IMPORT: %s", path)
+		pkg, err := fi.pkg.mod.findPackage(ctx, path[1:len(path)-1])
+		if err != nil {
+			return err
+		}
+		name := pkg.name
+		if imp.Name != nil {
+			name = imp.Name.Name
+		}
+		fi.pkgs[name] = pkg
+	}
+	return nil
+}
+
+func (fi *fileInfo) findPackage(ctx context.Context, name string) (*pkgInfo, error) {
+	if fi.pkgs == nil {
+		if err := fi.getPackages(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	if pkg := fi.pkgs[name]; pkg != nil {
+		return pkg, nil
+	}
+
+	return nil, fmt.Errorf("unknown package: %s", name)
 }

@@ -28,10 +28,7 @@ func (pi *pkgInfo) resolveInterfaces(ctx context.Context, pkg *ast.Package) erro
 			return err
 		}
 		fi := &fileInfo{
-			pkg:        pi,
-			imports:    []*dst.ImportSpec{},
-			pkgs:       map[string]*pkgInfo{},
-			interfaces: map[string]*interfaceInfo{},
+			pkg: pi,
 		}
 		for _, imp := range in.Imports {
 			fi.imports = append(fi.imports, dst.Clone(imp).(*dst.ImportSpec))

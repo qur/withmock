@@ -29,8 +29,12 @@ func (i *interfaceInfo) getMethods(ctx context.Context) ([]methodInfo, error) {
 		switch t := field.Type.(type) {
 		case *dst.SelectorExpr:
 			// this is probably a type from another package
-			if i, ok := t.X.(*dst.Ident); ok {
-				log.Printf("    NEED %s.%s", i, t.Sel)
+			if name, ok := t.X.(*dst.Ident); ok {
+				log.Printf("    NEED %s.%s", name, t.Sel)
+				_, err := i.file.findPackage(ctx, name.Name)
+				if err != nil {
+					return nil, err
+				}
 			}
 		case *dst.Ident:
 			if t.Path != "" {

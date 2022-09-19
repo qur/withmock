@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/armon/go-radix"
 	"github.com/pborman/uuid"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
@@ -19,12 +20,13 @@ import (
 )
 
 type modInfo struct {
-	mg   *MockGenerator
-	src  string
-	fset *token.FileSet
-	deps map[string]string
-	mods map[string]*modInfo
-	pkgs map[string]*pkgInfo
+	mg       *MockGenerator
+	src      string
+	fset     *token.FileSet
+	deps     map[string]string
+	depsTree *radix.Tree
+	mods     map[string]*modInfo
+	pkgs     map[string]*pkgInfo
 }
 
 func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod, ver string) (*modInfo, error) {
@@ -49,12 +51,13 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 	}
 
 	mi := &modInfo{
-		mg:   m,
-		src:  src,
-		fset: fset,
-		deps: map[string]string{},
-		mods: map[string]*modInfo{},
-		pkgs: map[string]*pkgInfo{},
+		mg:       m,
+		src:      src,
+		fset:     fset,
+		deps:     map[string]string{},
+		depsTree: radix.New(),
+		mods:     map[string]*modInfo{},
+		pkgs:     map[string]*pkgInfo{},
 	}
 
 	modFile := filepath.Join(src, "go.mod")
@@ -72,6 +75,7 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 		}
 		log.Printf("REQUIRE: %s", req.Mod)
 		mi.deps[req.Mod.Path] = req.Mod.Version[1:]
+		mi.depsTree.Insert(req.Mod.Path, req.Mod.Version[1:])
 	}
 
 	return mi, nil
@@ -164,4 +168,50 @@ func (mi *modInfo) resolveInterfaces(ctx context.Context, path string) (*pkgInfo
 	}
 	mi.pkgs[path] = pi
 	return pi, nil
+}
+
+func (mi *modInfo) findPackage(ctx context.Context, fullPath string) (*pkgInfo, error) {
+	if !isModulePath(fullPath) {
+		// looks to be a stdlib package
+		return mi.findStdlibPackage(ctx, fullPath)
+	}
+
+	mod, data, found := mi.depsTree.LongestPrefix(fullPath)
+	if !found {
+		return nil, fmt.Errorf("unknown package: %s", fullPath)
+	}
+	ver := data.(string)
+	info := mi.mods[mod]
+	if info == nil {
+		i, err := mi.mg.getModInfo(ctx, mi.fset, mod, ver)
+		if err != nil {
+			return nil, err
+		}
+		mi.mods[mod] = i
+		info = i
+	}
+	rel, err := filepath.Rel(mod, fullPath)
+	if err != nil {
+		return nil, err
+	}
+	pkg := mi.pkgs[rel]
+	if pkg == nil {
+		return nil, fmt.Errorf("unknown package: %s", fullPath)
+	}
+	return pkg, nil
+}
+
+func (mi *modInfo) findStdlibPackage(ctx context.Context, fullPath string) (*pkgInfo, error) {
+	return nil, fmt.Errorf("not yet implemented")
+}
+
+func isModulePath(path string) bool {
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return false
+	}
+	if strings.Contains(parts[0], ".") {
+		return true
+	}
+	return false
 }
