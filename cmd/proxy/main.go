@@ -32,15 +32,9 @@ func main() {
 
 	const mockPrefix = "gowm.in/mock/"
 
-	mg := codemod.NewMockGenerator(mockPrefix)
+	mg := mock.NewMockGenerator(mockPrefix, "scratch", uc)
 	mp := basic.NewPrefixStripper(mockPrefix, uc)
 	r.Add(mockPrefix, modify.NewInterfaceGenerator(mg, "scratch", mp))
-
-	const mock2Prefix = "gowm.in/mock2/"
-
-	m2g := mock.NewMockGenerator(mock2Prefix, "scratch", uc)
-	m2p := basic.NewPrefixStripper(mock2Prefix, uc)
-	r.Add(mock2Prefix, modify.NewInterfaceGenerator(m2g, "scratch", m2p))
 
 	server := &http.Server{
 		Addr:    ":4000",
