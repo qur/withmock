@@ -1,9 +1,10 @@
 package mock
 
+import "github.com/dave/dst"
+
 type interfaceInfo struct {
-	mod     *modInfo
-	pkg     *pkgInfo
 	file    *fileInfo
 	name    string
+	fields  []*dst.Field
 	methods []methodInfo
 }

@@ -2,7 +2,6 @@ package mock
 
 import (
 	"context"
-	"fmt"
 	"go/token"
 	"path/filepath"
 
@@ -99,5 +98,5 @@ func (m *MockGenerator) renderMocks(ctx context.Context, fset *token.FileSet, de
 			}
 		}
 	}
-	return fmt.Errorf("not yet implemented")
+	return nil
 }

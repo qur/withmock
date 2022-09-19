@@ -19,9 +19,11 @@ import (
 )
 
 type modInfo struct {
+	mg   *MockGenerator
 	src  string
 	fset *token.FileSet
 	deps map[string]string
+	mods map[string]*modInfo
 	pkgs map[string]*pkgInfo
 }
 
@@ -47,9 +49,12 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 	}
 
 	mi := &modInfo{
+		mg:   m,
 		src:  src,
 		fset: fset,
 		deps: map[string]string{},
+		mods: map[string]*modInfo{},
+		pkgs: map[string]*pkgInfo{},
 	}
 
 	modFile := filepath.Join(src, "go.mod")
@@ -105,7 +110,7 @@ func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
 		if err != nil || !d.IsDir() {
 			return err
 		}
-		if strings.HasPrefix(filepath.Base(path), ".") {
+		if strings.HasPrefix(filepath.Base(path), ".") || filepath.Base(path) == "internal" {
 			return fs.SkipDir
 		}
 		rel, err := filepath.Rel(mi.src, path)
@@ -138,13 +143,21 @@ func (mi *modInfo) resolveInterfaces(ctx context.Context, path string) (int, err
 		}
 		names = append(names, name)
 	}
-	if len(names) != 1 {
+	switch len(names) {
+	case 0:
+		// not a go package, ignore it
+		return 0, nil
+	case 1:
+		// this is what we want
+	default:
 		return 0, fmt.Errorf("don't know how to handle more than one package (got %s)", names)
 	}
 	name := names[0]
 	pi := &pkgInfo{
-		mod:  mi,
-		name: name,
+		mod:        mi,
+		name:       name,
+		files:      map[string]*fileInfo{},
+		interfaces: map[string]*interfaceInfo{},
 	}
 	n, err := pi.resolveInterfaces(ctx, pkgs[name])
 	if err != nil {
