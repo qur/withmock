@@ -14,6 +14,7 @@ import (
 
 	"github.com/armon/go-radix"
 	"github.com/pborman/uuid"
+	"github.com/qur/withmock/lib/env"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/zip"
@@ -22,6 +23,7 @@ import (
 type modInfo struct {
 	mg       *MockGenerator
 	src      string
+	path     string
 	fset     *token.FileSet
 	deps     map[string]string
 	depsTree *radix.Tree
@@ -53,6 +55,7 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 	mi := &modInfo{
 		mg:       m,
 		src:      src,
+		path:     mod,
 		fset:     fset,
 		deps:     map[string]string{},
 		depsTree: radix.New(),
@@ -123,15 +126,15 @@ func (mi *modInfo) discoverPackages(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := mi.parsePackage(ctx, rel); err != nil {
+		if err := mi.parsePackage(ctx, path, filepath.Join(mi.path, rel), rel); err != nil {
 			return fmt.Errorf("failed to resolve interfaces for %s: %w", rel, err)
 		}
 		return nil
 	})
 }
 
-func (mi *modInfo) parsePackage(ctx context.Context, path string) error {
-	pkgs, err := parser.ParseDir(mi.fset, filepath.Join(mi.src, path), nil, parser.ParseComments)
+func (mi *modInfo) parsePackage(ctx context.Context, src, path, relPath string) error {
+	pkgs, err := parser.ParseDir(mi.fset, src, nil, parser.ParseComments)
 	if err != nil {
 		return fmt.Errorf("failed to parse %s: %w", path, err)
 	}
@@ -155,20 +158,27 @@ func (mi *modInfo) parsePackage(ctx context.Context, path string) error {
 	pi := &pkgInfo{
 		mod:        mi,
 		name:       name,
+		path:       relPath,
+		fullPath:   path,
 		pkg:        pkgs[name],
 		files:      map[string]*fileInfo{},
 		interfaces: map[string]*interfaceInfo{},
 	}
 	mi.pkgs[path] = pi
 	return nil
+
 }
 
 func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
 	count := 0
 
 	for path, pkg := range mi.pkgs {
+		if !strings.HasPrefix(path, mi.path) {
+			// ignore external package
+			continue
+		}
 		if err := pkg.resolveInterfaces(ctx); err != nil {
-			return 0, fmt.Errorf("failed to process %s (%s): %w", path, pkg.name, err)
+			return 0, fmt.Errorf("failed to resolve interfaces for %s (%s): %w", path, pkg.name, err)
 		}
 		count += len(pkg.interfaces)
 	}
@@ -176,17 +186,23 @@ func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-func (mi *modInfo) findPackage(ctx context.Context, fullPath string) (*pkgInfo, error) {
-	if !isModulePath(fullPath) {
-		// looks to be a stdlib package
-		return mi.findStdlibPackage(ctx, fullPath)
+func (mi *modInfo) findPackage(ctx context.Context, path string) (*pkgInfo, error) {
+	pkg := mi.pkgs[path]
+	if pkg != nil {
+		return pkg, nil
 	}
 
-	mod, data, found := mi.depsTree.LongestPrefix(fullPath)
+	if !isModulePath(path) {
+		// looks to be a stdlib package
+		return mi.findStdlibPackage(ctx, path)
+	}
+
+	mod, data, found := mi.depsTree.LongestPrefix(path)
 	if !found {
-		return nil, fmt.Errorf("unknown package: %s", fullPath)
+		return nil, fmt.Errorf("unknown package: %s", path)
 	}
 	ver := data.(string)
+
 	info := mi.mods[mod]
 	if info == nil {
 		i, err := mi.mg.getModInfo(ctx, mi.fset, mod, ver)
@@ -196,19 +212,27 @@ func (mi *modInfo) findPackage(ctx context.Context, fullPath string) (*pkgInfo, 
 		mi.mods[mod] = i
 		info = i
 	}
-	rel, err := filepath.Rel(mod, fullPath)
-	if err != nil {
-		return nil, err
-	}
-	pkg := mi.pkgs[rel]
+
+	pkg = info.pkgs[path]
 	if pkg == nil {
-		return nil, fmt.Errorf("unknown package: %s", fullPath)
+		return nil, fmt.Errorf("unknown package: %s", path)
 	}
 	return pkg, nil
 }
 
-func (mi *modInfo) findStdlibPackage(ctx context.Context, fullPath string) (*pkgInfo, error) {
-	return nil, fmt.Errorf("not yet implemented")
+func (mi *modInfo) findStdlibPackage(ctx context.Context, path string) (*pkgInfo, error) {
+	env, err := env.GetEnv()
+	if err != nil {
+		return nil, err
+	}
+	src := filepath.Join(env["GOROOT"], "src")
+	log.Printf("FIND STDLIB: %s in %s", path, src)
+
+	if err := mi.parsePackage(ctx, filepath.Join(src, path), path, ""); err != nil {
+		return nil, err
+	}
+
+	return mi.pkgs[path], nil
 }
 
 func isModulePath(path string) bool {

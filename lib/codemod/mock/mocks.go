@@ -9,7 +9,7 @@ import (
 )
 
 func (m *MockGenerator) renderMocks(ctx context.Context, fset *token.FileSet, dest string, mi *modInfo) error {
-	for pkgPath, pkg := range mi.pkgs {
+	for _, pkg := range mi.pkgs {
 		for fileName, file := range pkg.files {
 			if err := ctx.Err(); err != nil {
 				// request cancelled, give up
@@ -92,7 +92,7 @@ func (m *MockGenerator) renderMocks(ctx context.Context, fset *token.FileSet, de
 				}
 			}
 
-			path := filepath.Join(dest, pkgPath, fileName)
+			path := filepath.Join(dest, pkg.path, fileName)
 			if err := m.save(path, fset, out); err != nil {
 				return err
 			}

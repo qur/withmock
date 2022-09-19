@@ -13,6 +13,8 @@ import (
 type pkgInfo struct {
 	mod        *modInfo
 	name       string
+	path       string
+	fullPath   string
 	pkg        *ast.Package
 	files      map[string]*fileInfo
 	interfaces map[string]*interfaceInfo

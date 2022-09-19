@@ -31,10 +31,18 @@ func (i *interfaceInfo) getMethods(ctx context.Context) ([]methodInfo, error) {
 			// this is probably a type from another package
 			if name, ok := t.X.(*dst.Ident); ok {
 				log.Printf("    NEED %s.%s", name, t.Sel)
-				_, err := i.file.findPackage(ctx, name.Name)
+				pkg, err := i.file.findPackage(ctx, name.Name)
 				if err != nil {
+					return nil, fmt.Errorf("failed to find package for %s: %w", name.Name, err)
+				}
+				if err := pkg.resolveInterfaces(ctx); err != nil {
 					return nil, err
 				}
+				iface := pkg.interfaces[t.Sel.Name]
+				if iface == nil {
+					return nil, fmt.Errorf("failed to find interface %s in %s", t.Sel.Name, pkg.fullPath)
+				}
+				i.methods = append(i.methods, iface.methods...)
 			}
 		case *dst.Ident:
 			if t.Path != "" {
