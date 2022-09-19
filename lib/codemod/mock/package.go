@@ -54,5 +54,10 @@ func (pi *pkgInfo) resolveInterfaces(ctx context.Context, pkg *ast.Package) erro
 			pi.interfaces[name] = ii
 		}
 	}
+	for _, iface := range pi.interfaces {
+		if _, err := iface.getMethods(ctx); err != nil {
+			return err
+		}
+	}
 	return nil
 }
