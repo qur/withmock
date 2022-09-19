@@ -19,7 +19,12 @@ type pkgInfo struct {
 	interfaces map[string]*interfaceInfo
 }
 
-func (pi *pkgInfo) resolveInterfaces(ctx context.Context) error {
+func (pi *pkgInfo) discoverInterfaces(ctx context.Context) error {
+	if pi.interfaces != nil {
+		return nil
+	}
+
+	pi.interfaces = map[string]*interfaceInfo{}
 	for path, f := range pi.pkg.Files {
 		if err := ctx.Err(); err != nil {
 			// request cancelled, give up
@@ -44,15 +49,26 @@ func (pi *pkgInfo) resolveInterfaces(ctx context.Context) error {
 		}
 		pi.files[filepath.Base(path)] = fi
 	}
+
 	for _, file := range pi.files {
 		for name, ii := range file.interfaces {
 			pi.interfaces[name] = ii
 		}
 	}
+
+	return nil
+}
+
+func (pi *pkgInfo) resolveInterfaces(ctx context.Context) error {
+	if err := pi.discoverInterfaces(ctx); err != nil {
+		return err
+	}
+
 	for _, iface := range pi.interfaces {
 		if _, err := iface.getMethods(ctx); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }

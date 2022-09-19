@@ -31,26 +31,22 @@ func (i *interfaceInfo) getMethods(ctx context.Context) ([]methodInfo, error) {
 			// this is probably a type from another package
 			if name, ok := t.X.(*dst.Ident); ok {
 				log.Printf("    NEED %s.%s", name, t.Sel)
-				pkg, err := i.file.findPackage(ctx, name.Name)
+				iface, err := i.findInterface(ctx, name.Name, t.Sel.Name)
 				if err != nil {
-					return nil, fmt.Errorf("failed to find package for %s: %w", name.Name, err)
-				}
-				if err := pkg.resolveInterfaces(ctx); err != nil {
 					return nil, err
-				}
-				iface := pkg.interfaces[t.Sel.Name]
-				if iface == nil {
-					return nil, fmt.Errorf("failed to find interface %s in %s", t.Sel.Name, pkg.fullPath)
 				}
 				if err := i.copyMethods(ctx, iface); err != nil {
 					return nil, err
 				}
+			} else {
+				log.Printf("    NEED ?.%s (%T)", t.Sel, t.X)
+				return nil, fmt.Errorf("don't know how to resolve package for %s (?.%s): found %T", i.name, t.Sel, t.X)
 			}
 		case *dst.Ident:
 			if t.Path != "" {
 				// this is probably a type from another package
 				log.Printf("    NEED %s", t)
-				continue
+				return nil, fmt.Errorf("don't know how to resolve interface for %s", t)
 			}
 			// this is probably a type from the same package?
 			embedded, found := i.file.pkg.interfaces[t.Name]
@@ -66,10 +62,27 @@ func (i *interfaceInfo) getMethods(ctx context.Context) ([]methodInfo, error) {
 				name:      field.Names[0].Name,
 				signature: t,
 			})
+		default:
+			return nil, fmt.Errorf("don't know how to handle interface field of type %T for %s", t, i.name)
 		}
 	}
 
 	return i.methods, nil
+}
+
+func (i *interfaceInfo) findInterface(ctx context.Context, in, name string) (*interfaceInfo, error) {
+	pkg, err := i.file.findPackage(ctx, in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find package for %s: %w", in, err)
+	}
+	if err := pkg.discoverInterfaces(ctx); err != nil {
+		return nil, err
+	}
+	iface := pkg.interfaces[name]
+	if iface == nil {
+		return nil, fmt.Errorf("failed to find interface %s in %s", name, pkg.fullPath)
+	}
+	return iface, nil
 }
 
 func (i *interfaceInfo) copyMethods(ctx context.Context, other *interfaceInfo) error {

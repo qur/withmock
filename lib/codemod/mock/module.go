@@ -156,13 +156,12 @@ func (mi *modInfo) parsePackage(ctx context.Context, src, path, relPath string) 
 	}
 	name := names[0]
 	pi := &pkgInfo{
-		mod:        mi,
-		name:       name,
-		path:       relPath,
-		fullPath:   path,
-		pkg:        pkgs[name],
-		files:      map[string]*fileInfo{},
-		interfaces: map[string]*interfaceInfo{},
+		mod:      mi,
+		name:     name,
+		path:     relPath,
+		fullPath: path,
+		pkg:      pkgs[name],
+		files:    map[string]*fileInfo{},
 	}
 	mi.pkgs[path] = pi
 	return nil
