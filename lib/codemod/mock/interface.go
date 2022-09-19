@@ -42,7 +42,9 @@ func (i *interfaceInfo) getMethods(ctx context.Context) ([]methodInfo, error) {
 				if iface == nil {
 					return nil, fmt.Errorf("failed to find interface %s in %s", t.Sel.Name, pkg.fullPath)
 				}
-				i.methods = append(i.methods, iface.methods...)
+				if err := i.copyMethods(ctx, iface); err != nil {
+					return nil, err
+				}
 			}
 		case *dst.Ident:
 			if t.Path != "" {
@@ -55,11 +57,9 @@ func (i *interfaceInfo) getMethods(ctx context.Context) ([]methodInfo, error) {
 			if !found {
 				return nil, fmt.Errorf("reference to unknown type: %s", t.Name)
 			}
-			methods, err := embedded.getMethods(ctx)
-			if err != nil {
+			if err := i.copyMethods(ctx, embedded); err != nil {
 				return nil, err
 			}
-			i.methods = append(i.methods, methods...)
 		case *dst.FuncType:
 			// this is already a method
 			i.methods = append(i.methods, methodInfo{
@@ -70,4 +70,18 @@ func (i *interfaceInfo) getMethods(ctx context.Context) ([]methodInfo, error) {
 	}
 
 	return i.methods, nil
+}
+
+func (i *interfaceInfo) copyMethods(ctx context.Context, other *interfaceInfo) error {
+	methods, err := other.getMethods(ctx)
+	if err != nil {
+		return err
+	}
+	for _, m := range methods {
+		i.methods = append(i.methods, methodInfo{
+			name:      m.name,
+			signature: dst.Clone(m.signature).(*dst.FuncType),
+		})
+	}
+	return nil
 }

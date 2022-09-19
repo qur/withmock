@@ -2,7 +2,6 @@ package mock
 
 import (
 	"context"
-	"fmt"
 	"go/ast"
 	"path/filepath"
 
@@ -43,11 +42,7 @@ func (pi *pkgInfo) resolveInterfaces(ctx context.Context) error {
 			// no mocks were found in file, so skip the whole file
 			continue
 		}
-		rel, err := filepath.Rel(pi.mod.src, path)
-		if err != nil {
-			return fmt.Errorf("failed to resolve extra path %s: %s", path, err)
-		}
-		pi.files[rel] = fi
+		pi.files[filepath.Base(path)] = fi
 	}
 	for _, file := range pi.files {
 		for name, ii := range file.interfaces {
