@@ -232,6 +232,55 @@ func (*MockGenerator) save(dest string, fset *token.FileSet, node *dst.File) err
 	return decorator.Fprint(f, node)
 }
 
+type method struct {
+	name      string
+	signature *dst.FuncType
+}
+
+type mock struct {
+	name    string
+	methods []method
+}
+
+func (i *MockGenerator) getMethods(ctx context.Context, pkg rawMockPackage, raw rawMock) (mock, error) {
+	m := mock{
+		name: raw.name,
+	}
+	for _, rm := range raw.methods {
+		switch t := rm.Type.(type) {
+		case *dst.SelectorExpr:
+			// this is probably a type from another package
+			if i, ok := t.X.(*dst.Ident); ok {
+				log.Printf("    NEED %s.%s", i, t.Sel)
+			}
+		case *dst.Ident:
+			if t.Path != "" {
+				// this is probably a type from another package
+				log.Printf("    NEED %s", t)
+				continue
+			}
+			// this is probably a type from the same package?
+			embedded, found := pkg.mocks[t.Name]
+			if !found {
+				return mock{}, fmt.Errorf("reference to unknown type: %s", t.Name)
+			}
+			log.Printf("    NEED %s (found: %s)", t.Name, embedded.name)
+			em, err := i.getMethods(ctx, pkg, embedded)
+			if err != nil {
+				return mock{}, err
+			}
+			m.methods = append(m.methods, em.methods...)
+		case *dst.FuncType:
+			// this is already a method
+			m.methods = append(m.methods, method{
+				name:      rm.Names[0].Name,
+				signature: t,
+			})
+		}
+	}
+	return m, nil
+}
+
 func (i *MockGenerator) resolveMocks(ctx context.Context, fset *token.FileSet, pkgs []rawMockPackage) ([]rawMockPackage, error) {
 	for _, pkg := range pkgs {
 		for _, file := range pkg.files {
@@ -243,26 +292,33 @@ func (i *MockGenerator) resolveMocks(ctx context.Context, fset *token.FileSet, p
 			for _, name := range file.mocks {
 				mock := pkg.mocks[name]
 				log.Printf("  TYPE: %s (%s)", name, mock.name)
-				for _, method := range mock.methods {
-					switch t := method.Type.(type) {
-					case *dst.SelectorExpr:
-						// this is probably a type from another package
-						if i, ok := t.X.(*dst.Ident); ok {
-							log.Printf("    NEED %s.%s", i, t.Sel)
-						}
-					case *dst.Ident:
-						if t.Path != "" {
-							// this is probably a type from another package
-							log.Printf("    NEED %s", t)
-							continue
-						}
-						// this is probably a type from the same package?
-						m := pkg.mocks[t.Name]
-						log.Printf("    NEED %s (found: %s)", t.Name, m.name)
-					case *dst.FuncType:
-						// this is already a method
-					}
+				r, err := i.getMethods(ctx, pkg, mock)
+				if err != nil {
+					return nil, err
 				}
+				for _, method := range r.methods {
+					log.Printf("    FOUND %s", method.name)
+				}
+				// for _, method := range mock.methods {
+				// 	switch t := method.Type.(type) {
+				// 	case *dst.SelectorExpr:
+				// 		// this is probably a type from another package
+				// 		if i, ok := t.X.(*dst.Ident); ok {
+				// 			log.Printf("    NEED %s.%s", i, t.Sel)
+				// 		}
+				// 	case *dst.Ident:
+				// 		if t.Path != "" {
+				// 			// this is probably a type from another package
+				// 			log.Printf("    NEED %s", t)
+				// 			continue
+				// 		}
+				// 		// this is probably a type from the same package?
+				// 		m := pkg.mocks[t.Name]
+				// 		log.Printf("    NEED %s (found: %s)", t.Name, m.name)
+				// 	case *dst.FuncType:
+				// 		// this is already a method
+				// 	}
+				// }
 			}
 		}
 	}
