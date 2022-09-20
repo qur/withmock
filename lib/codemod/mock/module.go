@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"go/parser"
@@ -9,26 +10,29 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/armon/go-radix"
 	"github.com/pborman/uuid"
-	"github.com/qur/withmock/lib/env"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/zip"
+
+	"github.com/qur/withmock/lib/env"
 )
 
 type modInfo struct {
-	mg       *MockGenerator
-	src      string
-	path     string
-	fset     *token.FileSet
-	deps     map[string]string
-	depsTree *radix.Tree
-	mods     map[string]*modInfo
-	pkgs     map[string]*pkgInfo
+	mg        *MockGenerator
+	src       string
+	path      string
+	goVersion string
+	fset      *token.FileSet
+	deps      map[string]string
+	depsTree  *radix.Tree
+	mods      map[string]*modInfo
+	pkgs      map[string]*pkgInfo
 }
 
 func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod, ver string) (*modInfo, error) {
@@ -79,6 +83,9 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 		log.Printf("REQUIRE: %s", req.Mod)
 		mi.deps[req.Mod.Path] = req.Mod.Version[1:]
 		mi.depsTree.Insert(req.Mod.Path, req.Mod.Version[1:])
+	}
+	if f.Go != nil {
+		mi.goVersion = f.Go.Version
 	}
 
 	if err := mi.discoverPackages(ctx); err != nil {
@@ -243,4 +250,41 @@ func isModulePath(path string) bool {
 		return true
 	}
 	return false
+}
+
+func (mi *modInfo) writeModFile(ctx context.Context, dest, mod string) error {
+	log.Printf("MODFILE: %s", dest)
+
+	mf := &modfile.File{}
+	if err := mf.AddModuleStmt(mod); err != nil {
+		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+	}
+	if mi.goVersion != "" {
+		if err := mf.AddGoStmt(mi.goVersion); err != nil {
+			return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+		}
+	}
+	data, err := mf.Format()
+	if err != nil {
+		return fmt.Errorf("failed to format go.mod for %s: %w", dest, err)
+	}
+
+	f, err := os.Create(filepath.Join(dest, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+	}
+	defer f.Close()
+	if _, err := f.Write(data); err != nil {
+		return fmt.Errorf("failed to write go.mod for %s: %w", dest, err)
+	}
+
+	buf := &bytes.Buffer{}
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = dest
+	cmd.Stdout = buf
+	cmd.Stderr = buf
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to tidy modfile for %s: %w:\n%s", dest, err, buf.String())
+	}
+	return nil
 }

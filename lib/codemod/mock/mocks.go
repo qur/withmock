@@ -8,7 +8,7 @@ import (
 	"github.com/dave/dst"
 )
 
-func (m *MockGenerator) renderMocks(ctx context.Context, fset *token.FileSet, dest string, mi *modInfo) error {
+func (mi *modInfo) renderMocks(ctx context.Context, dest string) error {
 	for _, pkg := range mi.pkgs {
 		for fileName, file := range pkg.files {
 			if err := ctx.Err(); err != nil {
@@ -33,7 +33,7 @@ func (m *MockGenerator) renderMocks(ctx context.Context, fset *token.FileSet, de
 					&dst.ImportSpec{
 						Path: &dst.BasicLit{
 							Kind:  token.STRING,
-							Value: `"gowm.in/ctrl/mock"`,
+							Value: `"github.com/stretchr/testify/mock"`,
 						},
 					},
 				},
@@ -93,7 +93,7 @@ func (m *MockGenerator) renderMocks(ctx context.Context, fset *token.FileSet, de
 			}
 
 			path := filepath.Join(dest, pkg.path, fileName)
-			if err := m.save(path, fset, out); err != nil {
+			if err := save(path, mi.fset, out); err != nil {
 				return err
 			}
 		}

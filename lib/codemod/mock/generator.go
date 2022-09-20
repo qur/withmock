@@ -80,17 +80,25 @@ func (m *MockGenerator) GenSource(ctx context.Context, mod, ver, zipfile, src, d
 		return api.UnknownVersion(mod, ver)
 	}
 
-	return m.renderMocks(ctx, fset, dest, mi)
-}
-
-func (i *MockGenerator) stripPrefix(mod string) (string, error) {
-	if !strings.HasPrefix(mod, i.prefix) {
-		return "", fmt.Errorf("module '%s' didn't have prefix '%s'", mod, i.prefix)
+	if err := mi.renderMocks(ctx, dest); err != nil {
+		return err
 	}
-	return mod[len(i.prefix):], nil
+
+	if err := mi.writeModFile(ctx, dest, mod); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (*MockGenerator) save(dest string, fset *token.FileSet, node *dst.File) error {
+func (m *MockGenerator) stripPrefix(mod string) (string, error) {
+	if !strings.HasPrefix(mod, m.prefix) {
+		return "", fmt.Errorf("module '%s' didn't have prefix '%s'", mod, m.prefix)
+	}
+	return mod[len(m.prefix):], nil
+}
+
+func save(dest string, fset *token.FileSet, node *dst.File) error {
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return err
 	}
