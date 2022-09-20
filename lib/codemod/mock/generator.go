@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"go/token"
@@ -10,10 +11,12 @@ import (
 
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
+	"golang.org/x/mod/modfile"
+	"golang.org/x/tools/imports"
+
 	"github.com/qur/withmock/lib/extras"
 	"github.com/qur/withmock/lib/proxy/api"
 	"github.com/qur/withmock/lib/proxy/modify"
-	"golang.org/x/mod/modfile"
 )
 
 type MockGenerator struct {
@@ -96,5 +99,16 @@ func (*MockGenerator) save(dest string, fset *token.FileSet, node *dst.File) err
 		return err
 	}
 	defer f.Close()
-	return decorator.Fprint(f, node)
+	buf := &bytes.Buffer{}
+	if err := decorator.Fprint(buf, node); err != nil {
+		return err
+	}
+	formatted, err := imports.Process(dest, buf.Bytes(), nil)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(formatted); err != nil {
+		return err
+	}
+	return nil
 }
