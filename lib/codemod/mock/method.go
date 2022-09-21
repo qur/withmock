@@ -42,66 +42,7 @@ func (mi *methodInfo) genFunc(name string) *dst.FuncDecl {
 	if mi.signature.Results == nil {
 		body = append(body, &dst.ExprStmt{X: called})
 	} else {
-		specs := []dst.Spec{}
-		results := []dst.Expr{}
-		types := []dst.Expr{}
-		for _, ret := range mi.signature.Results.List {
-			if len(ret.Names) == 0 {
-				results = append(results, dst.NewIdent(fmt.Sprintf("ret_%d", len(specs))))
-				specs = append(specs, &dst.ValueSpec{
-					Names: []*dst.Ident{dst.NewIdent(fmt.Sprintf("ret_%d", len(specs)))},
-					Type:  dst.Clone(ret.Type).(dst.Expr),
-				})
-				types = append(types, dst.Clone(ret.Type).(dst.Expr))
-			}
-			for range ret.Names {
-				results = append(results, dst.NewIdent(fmt.Sprintf("ret_%d", len(specs))))
-				specs = append(specs, &dst.ValueSpec{
-					Names: []*dst.Ident{dst.NewIdent(fmt.Sprintf("ret_%d", len(specs)))},
-					Type:  dst.Clone(ret.Type).(dst.Expr),
-				})
-				types = append(types, dst.Clone(ret.Type).(dst.Expr))
-			}
-		}
-		body = append(body, &dst.AssignStmt{
-			Lhs: []dst.Expr{dst.NewIdent("ret")},
-			Tok: token.DEFINE,
-			Rhs: []dst.Expr{called},
-		}, &dst.DeclStmt{
-			Decl: &dst.GenDecl{
-				Tok:   token.VAR,
-				Specs: specs,
-			},
-		})
-		for i, t := range types {
-			r := &dst.IndexExpr{
-				X: dst.NewIdent("ret"),
-				Index: &dst.BasicLit{
-					Kind:  token.INT,
-					Value: strconv.FormatInt(int64(i), 10),
-				},
-			}
-			body = append(body, &dst.IfStmt{
-				Cond: &dst.BinaryExpr{
-					X:  dst.Clone(r).(dst.Expr),
-					Op: token.NEQ,
-					Y:  dst.NewIdent("nil"),
-				},
-				Body: &dst.BlockStmt{
-					List: []dst.Stmt{
-						&dst.AssignStmt{
-							Lhs: []dst.Expr{dst.NewIdent(fmt.Sprintf("ret_%d", i))},
-							Tok: token.ASSIGN,
-							Rhs: []dst.Expr{&dst.TypeAssertExpr{
-								X:    dst.Clone(r).(dst.Expr),
-								Type: dst.Clone(t).(dst.Expr),
-							}},
-						},
-					},
-				},
-			})
-		}
-		body = append(body, &dst.ReturnStmt{Results: results})
+		body = append(body, mi.buildReturn(called)...)
 	}
 	return &dst.FuncDecl{
 		Recv: &dst.FieldList{
@@ -127,4 +68,74 @@ func (mi *methodInfo) genFunc(name string) *dst.FuncDecl {
 			},
 		},
 	}
+}
+
+func (mi *methodInfo) buildReturn(called dst.Expr) []dst.Stmt {
+	body := []dst.Stmt{}
+
+	types := []dst.Expr{}
+	for _, ret := range mi.signature.Results.List {
+		if len(ret.Names) == 0 {
+			types = append(types, dst.Clone(ret.Type).(dst.Expr))
+		}
+		for range ret.Names {
+			types = append(types, dst.Clone(ret.Type).(dst.Expr))
+		}
+	}
+
+	specs := []dst.Spec{}
+	results := []dst.Expr{}
+	for i, t := range types {
+		results = append(results, dst.NewIdent(fmt.Sprintf("ret_%d", i)))
+		specs = append(specs, &dst.ValueSpec{
+			Names: []*dst.Ident{dst.NewIdent(fmt.Sprintf("ret_%d", i))},
+			Type:  dst.Clone(t).(dst.Expr),
+		})
+	}
+
+	body = append(body, &dst.AssignStmt{
+		Lhs: []dst.Expr{dst.NewIdent("ret")},
+		Tok: token.DEFINE,
+		Rhs: []dst.Expr{called},
+	}, &dst.DeclStmt{
+		Decl: &dst.GenDecl{
+			Tok:   token.VAR,
+			Specs: specs,
+		},
+	})
+
+	for i, t := range types {
+		r := &dst.IndexExpr{
+			X: dst.NewIdent("ret"),
+			Index: &dst.BasicLit{
+				Kind:  token.INT,
+				Value: strconv.FormatInt(int64(i), 10),
+			},
+		}
+		body = append(body, &dst.IfStmt{
+			Cond: &dst.BinaryExpr{
+				X:  dst.Clone(r).(dst.Expr),
+				Op: token.NEQ,
+				Y:  dst.NewIdent("nil"),
+			},
+			Body: &dst.BlockStmt{
+				List: []dst.Stmt{
+					&dst.AssignStmt{
+						Lhs: []dst.Expr{dst.NewIdent(fmt.Sprintf("ret_%d", i))},
+						Tok: token.ASSIGN,
+						Rhs: []dst.Expr{&dst.TypeAssertExpr{
+							X:    dst.Clone(r).(dst.Expr),
+							Type: dst.Clone(t).(dst.Expr),
+						}},
+					},
+				},
+			},
+		})
+	}
+
+	body = append(body, &dst.ReturnStmt{
+		Results: results,
+	})
+
+	return body
 }
