@@ -73,22 +73,7 @@ func (mi *modInfo) renderMocks(ctx context.Context, dest string) error {
 					},
 				})
 				for _, method := range iface.methods {
-					out.Decls = append(out.Decls, &dst.FuncDecl{
-						Recv: &dst.FieldList{
-							List: []*dst.Field{
-								{
-									Names: []*dst.Ident{
-										dst.NewIdent("m"),
-									},
-									Type: &dst.StarExpr{
-										X: dst.NewIdent(name),
-									},
-								},
-							},
-						},
-						Name: dst.NewIdent(method.name),
-						Type: method.signature,
-					})
+					out.Decls = append(out.Decls, method.genFunc(name))
 				}
 			}
 
