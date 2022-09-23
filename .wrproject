@@ -1,7 +1,7 @@
-default = "1-18"
+default = "dev"
 
-[crates.1-18]
-  image = "qurx/withmock-dev:1.18"
+[crates.dev]
+  image = "qurx/withmock-dev:1.19"
   mount-home = true
   project-mount = "/project"
   working-dir = "project,match"
@@ -14,11 +14,3 @@ default = "1-18"
     "/usr/bin/np*",
   ]
 
-
-[crates.1-12]
-  image = "qurx/withmock-dev:1.12"
-  mount-home = false
-  project-mount = "/project"
-  working-dir = "project"
-  cap-add = ["SYS_PTRACE"]
-  shell = "/bin/sh"
