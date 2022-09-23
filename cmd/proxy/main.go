@@ -41,7 +41,7 @@ func main() {
 
 	const mockStdPrefix = "gowm.in/mock/std/"
 
-	s := stdlib.New(scratchDir)
+	s := stdlib.New("https://go.dev/dl", scratchDir)
 	sc := cache.NewDir("cache/stdlib", s)
 	sg := mock.NewMockGenerator(mockStdPrefix, scratchDir, sc)
 	sp := basic.NewPrefixStripper(mockStdPrefix, sc)

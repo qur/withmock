@@ -22,11 +22,13 @@ import (
 )
 
 type Store struct {
+	url     string
 	scratch string
 }
 
-func New(scratch string) *Store {
+func New(url, scratch string) *Store {
 	return &Store{
+		url:     url,
 		scratch: scratch,
 	}
 }
@@ -72,7 +74,7 @@ func (s *Store) ModFile(ctx context.Context, mod, ver string) (io.Reader, error)
 
 func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
 	version := strings.TrimSuffix(ver, ".0")
-	srcURL := fmt.Sprintf("https://go.dev/dl/go%s.src.tar.gz", version)
+	srcURL := fmt.Sprintf("%s/go%s.src.tar.gz", s.url, version)
 
 	resp, err := http.Get(srcURL)
 	if err != nil {
