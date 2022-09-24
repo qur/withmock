@@ -35,6 +35,7 @@ func main() {
 	handler := web.Register(c)
 
 	// add an input route to download the standard library as if it was a module
+	// s := stdlib.New("https://go.dev/dl", scratchDir)
 	s := stdlib.New("https://electron.quantumfyre.co.uk", scratchDir)
 	ur.AddExact("std", s)
 	ur.AddExact("gowm.in/std", basic.NewPrefixStripper("gowm.in/", s))
@@ -50,16 +51,6 @@ func main() {
 	mg := mock.NewMockGenerator(mockPrefix, scratchDir, uc)
 	mp := basic.NewPrefixStripper(mockPrefix, uc)
 	r.Add(mockPrefix, modify.NewInterfaceGenerator(mg, scratchDir, mp))
-
-	// const mockStdPrefix = "gowm.in/mock/std/"
-
-	// // s := stdlib.New("https://go.dev/dl", scratchDir)
-	// s := stdlib.New("https://electron.quantumfyre.co.uk", scratchDir)
-	// sc := cache.NewDir("cache/stdlib", s)
-	// sg := mock.NewMockGenerator(mockStdPrefix, scratchDir, sc)
-	// sp := basic.NewPrefixStripper(mockStdPrefix, sc)
-	// r.Add(mockStdPrefix, modify.NewInterfaceGenerator(sg, scratchDir, sp))
-	// r.AddExact("gowm.in/mock/std", modify.NewInterfaceGenerator(sg, scratchDir, sp))
 
 	server := &http.Server{
 		Addr:    ":4000",
