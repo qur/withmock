@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"go/ast"
+	"log"
 	"path/filepath"
 
 	"github.com/dave/dst"
@@ -29,6 +30,10 @@ func (pi *pkgInfo) discoverInterfaces(ctx context.Context) error {
 		if err := ctx.Err(); err != nil {
 			// request cancelled, give up
 			return err
+		}
+		if f.Name.Name != pi.name {
+			// ignore files with a different package name
+			continue
 		}
 		in, err := decorator.DecorateFile(pi.mod.fset, f)
 		if err != nil {

@@ -11,16 +11,18 @@ import (
 )
 
 type PrefixRouter struct {
-	def  api.Store
-	tree *radix.Tree
+	def   api.Store
+	exact map[string]api.Store
+	tree  *radix.Tree
 }
 
 var _ api.Store = (*PrefixRouter)(nil)
 
 func NewPrefixRouter(def api.Store) *PrefixRouter {
 	return &PrefixRouter{
-		def:  def,
-		tree: radix.New(),
+		def:   def,
+		exact: map[string]api.Store{},
+		tree:  radix.New(),
 	}
 }
 
@@ -41,15 +43,28 @@ func (r *PrefixRouter) Source(ctx context.Context, mod, ver string) (io.Reader, 
 }
 
 func (r *PrefixRouter) getStore(mod string) api.Store {
-	prefix, data, matched := r.tree.LongestPrefix(mod)
-	if !matched {
-		log.Printf("ROUTER: match miss (%s)", mod)
-		return r.def
+	// check for exact match
+	if store, ok := r.exact[mod]; ok {
+		log.Printf("ROUTER: match hit (%s): EXACT", mod)
+		return store
 	}
-	log.Printf("ROUTER: match hit (%s): %s", mod, prefix)
-	return data.(api.Store)
+
+	// check for longest prefix match
+	prefix, data, matched := r.tree.LongestPrefix(mod)
+	if matched {
+		log.Printf("ROUTER: match hit (%s): %s", mod, prefix)
+		return data.(api.Store)
+	}
+
+	// fall back to default
+	log.Printf("ROUTER: match miss (%s)", mod)
+	return r.def
 }
 
 func (r *PrefixRouter) Add(prefix string, store api.Store) {
 	r.tree.Insert(prefix, store)
+}
+
+func (r *PrefixRouter) AddExact(match string, store api.Store) {
+	r.exact[match] = store
 }

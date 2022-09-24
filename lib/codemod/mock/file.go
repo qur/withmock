@@ -59,15 +59,17 @@ func (fi *fileInfo) getPackages(ctx context.Context) error {
 		}
 		path := imp.Path.Value
 		log.Printf("RESOLVE IMPORT: %s", path)
-		pkg, err := fi.pkg.mod.findPackage(ctx, path[1:len(path)-1])
+		pkgs, err := fi.pkg.mod.findPackage(ctx, path[1:len(path)-1])
 		if err != nil {
 			return err
 		}
-		name := pkg.name
-		if imp.Name != nil {
-			name = imp.Name.Name
+		for _, pkg := range pkgs {
+			name := pkg.name
+			if imp.Name != nil {
+				name = imp.Name.Name
+			}
+			fi.pkgs[name] = pkg
 		}
-		fi.pkgs[name] = pkg
 	}
 	return nil
 }

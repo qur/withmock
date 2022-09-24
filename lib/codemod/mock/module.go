@@ -32,7 +32,7 @@ type modInfo struct {
 	deps      map[string]string
 	depsTree  *radix.Tree
 	mods      map[string]*modInfo
-	pkgs      map[string]*pkgInfo
+	pkgs      map[string][]*pkgInfo
 }
 
 func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod, ver string) (*modInfo, error) {
@@ -52,8 +52,8 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 	}
 
 	mv := module.Version{Path: mod, Version: "v" + ver}
-	if !isModulePath(mod) {
-		mv.Path = "gowm.in/std/" + mod
+	if mod == "std" {
+		mv.Path = "gowm.in/std"
 	}
 	if err := zip.Unzip(src, mv, zipfile); err != nil {
 		return nil, fmt.Errorf("failed to unpack zip %s: %w", zipfile, err)
@@ -67,7 +67,7 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 		deps:     map[string]string{},
 		depsTree: radix.New(),
 		mods:     map[string]*modInfo{},
-		pkgs:     map[string]*pkgInfo{},
+		pkgs:     map[string][]*pkgInfo{},
 	}
 
 	modFile := filepath.Join(src, "go.mod")
@@ -129,7 +129,7 @@ func (mi *modInfo) discoverPackages(ctx context.Context) error {
 		if err != nil || !d.IsDir() {
 			return err
 		}
-		if strings.HasPrefix(filepath.Base(path), ".") || filepath.Base(path) == "internal" {
+		if strings.HasPrefix(filepath.Base(path), ".") || filepath.Base(path) == "internal" || filepath.Base(path) == "testdata" {
 			return fs.SkipDir
 		}
 		rel, err := filepath.Rel(mi.src, path)
@@ -148,54 +148,51 @@ func (mi *modInfo) parsePackage(ctx context.Context, src, path, relPath string) 
 	if err != nil {
 		return fmt.Errorf("failed to parse %s: %w", path, err)
 	}
-	names := []string{}
-	for name := range pkgs {
-		if strings.HasSuffix(name, "_test") {
-			continue
-		}
-		names = append(names, name)
-	}
-	switch len(names) {
-	case 0:
+	if len(pkgs) == 0 {
 		// not a go package, ignore it
 		return nil
-	case 1:
-		// this is what we want
-	default:
-		return fmt.Errorf("don't know how to handle more than one package (got %s)", names)
 	}
-	name := names[0]
-	pi := &pkgInfo{
-		mod:      mi,
-		name:     name,
-		path:     relPath,
-		fullPath: path,
-		pkg:      pkgs[name],
-		files:    map[string]*fileInfo{},
+	for name, pkg := range pkgs {
+		pi := &pkgInfo{
+			mod:      mi,
+			name:     name,
+			path:     relPath,
+			fullPath: path,
+			pkg:      pkg,
+			files:    map[string]*fileInfo{},
+		}
+		mi.pkgs[path] = append(mi.pkgs[path], pi)
+		if mi.path == "std" {
+			// if we are processing the standard library, then add a second
+			// entry that points to the same info with the unprefixed name - so
+			// that we pull everything from the source we have downloaded
+			// instead of using our own standard library.
+			mi.pkgs[strings.TrimPrefix(path, "std/")] = append(mi.pkgs[path], pi)
+		}
 	}
-	mi.pkgs[path] = pi
 	return nil
-
 }
 
 func (mi *modInfo) resolveAllInterfaces(ctx context.Context) (int, error) {
 	count := 0
 
-	for path, pkg := range mi.pkgs {
-		if !strings.HasPrefix(path, mi.path) {
-			// ignore external package
-			continue
+	for path, pkgs := range mi.pkgs {
+		for _, pkg := range pkgs {
+			if !strings.HasPrefix(path, mi.path) {
+				// ignore external package
+				continue
+			}
+			if err := pkg.resolveInterfaces(ctx); err != nil {
+				return 0, fmt.Errorf("failed to resolve interfaces for %s (%s): %w", path, pkg.name, err)
+			}
+			count += len(pkg.interfaces)
 		}
-		if err := pkg.resolveInterfaces(ctx); err != nil {
-			return 0, fmt.Errorf("failed to resolve interfaces for %s (%s): %w", path, pkg.name, err)
-		}
-		count += len(pkg.interfaces)
 	}
 
 	return count, nil
 }
 
-func (mi *modInfo) findPackage(ctx context.Context, path string) (*pkgInfo, error) {
+func (mi *modInfo) findPackage(ctx context.Context, path string) ([]*pkgInfo, error) {
 	pkg := mi.pkgs[path]
 	if pkg != nil {
 		return pkg, nil
@@ -229,7 +226,7 @@ func (mi *modInfo) findPackage(ctx context.Context, path string) (*pkgInfo, erro
 	return pkg, nil
 }
 
-func (mi *modInfo) findStdlibPackage(ctx context.Context, path string) (*pkgInfo, error) {
+func (mi *modInfo) findStdlibPackage(ctx context.Context, path string) ([]*pkgInfo, error) {
 	env, err := env.GetEnv()
 	if err != nil {
 		return nil, err

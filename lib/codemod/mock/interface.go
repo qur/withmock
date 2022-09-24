@@ -48,7 +48,14 @@ func (i *interfaceInfo) getMethods(ctx context.Context) ([]methodInfo, error) {
 				log.Printf("    NEED %s", t)
 				return nil, fmt.Errorf("don't know how to resolve interface for %s", t)
 			}
-			// this is probably a type from the same package?
+			// first check for builtin types
+			if builtin, found := i.getBuiltin(t.Name); found {
+				if err := i.copyMethods(ctx, builtin); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			// then, this is probably a type from the same package?
 			embedded, found := i.file.pkg.interfaces[t.Name]
 			if !found {
 				return nil, fmt.Errorf("reference to unknown type: %s", t.Name)
@@ -97,4 +104,30 @@ func (i *interfaceInfo) copyMethods(ctx context.Context, other *interfaceInfo) e
 		})
 	}
 	return nil
+}
+
+func (i *interfaceInfo) getBuiltin(name string) (*interfaceInfo, bool) {
+	switch name {
+	case "any":
+		return &interfaceInfo{
+			name:    "any",
+			methods: []methodInfo{},
+		}, true
+	case "error":
+		return &interfaceInfo{
+			name: "error",
+			methods: []methodInfo{{
+				name: "Error",
+				signature: &dst.FuncType{
+					Results: &dst.FieldList{
+						List: []*dst.Field{{
+							Type: dst.NewIdent("string"),
+						}},
+					},
+				},
+			}},
+		}, true
+	default:
+		return nil, false
+	}
 }

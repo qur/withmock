@@ -40,6 +40,10 @@ func New(url, scratch string) *Store {
 var apiVersion = regexp.MustCompile(`go(\d+)(\.\d+)?\.txt`)
 
 func (s *Store) List(ctx context.Context, mod string) ([]string, error) {
+	if mod != "std" {
+		return nil, api.UnknownMod(mod)
+	}
+
 	env, err := env.GetEnv()
 	if err != nil {
 		return nil, err
@@ -77,6 +81,10 @@ func (s *Store) ModFile(ctx context.Context, mod, ver string) (io.Reader, error)
 }
 
 func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
+	if mod != "std" {
+		return nil, api.UnknownVersion(mod, ver)
+	}
+
 	version := strings.TrimSuffix(ver, ".0")
 	srcURL := fmt.Sprintf("%s/go%s.src.tar.gz", s.url, version)
 
@@ -105,12 +113,12 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 		return nil, fmt.Errorf("failed to unpack source tar (%s, %s): %w", mod, ver, err)
 	}
 
-	modPath := filepath.Join(scratch, "go", "src", mod)
+	modPath := filepath.Join(scratch, "go", "src")
 
 	switch dir, err := isDir(modPath); true {
 	case err != nil:
 		return nil, fmt.Errorf("failed to check mod exists (%s, %s): %w", mod, ver, err)
-	case dir == false:
+	case !dir:
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
@@ -119,7 +127,7 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 	}
 
 	pr, pw := io.Pipe()
-	mv := module.Version{Path: "gowm.in/std/" + mod, Version: "v" + ver}
+	mv := module.Version{Path: "gowm.in/std", Version: "v" + ver}
 
 	go func() {
 		err := zip.CreateFromDir(pw, mv, modPath)

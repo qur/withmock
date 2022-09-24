@@ -25,8 +25,11 @@ func main() {
 
 	m := codemod.NewDstModifier()
 
+	s := stdlib.New("https://electron.quantumfyre.co.uk", scratchDir)
 	u := upstream.NewStore("https://proxy.golang.org")
-	uc := cache.NewDir("cache/input", u)
+	ur := router.NewPrefixRouter(u)
+	ur.AddExact("std", s)
+	uc := cache.NewDir("cache/input", ur)
 	i := modify.NewInjector(m, scratchDir, uc)
 	r := router.NewPrefixRouter(i)
 	c := cache.NewDir("cache/output", r)
@@ -44,14 +47,15 @@ func main() {
 	mp := basic.NewPrefixStripper(mockPrefix, uc)
 	r.Add(mockPrefix, modify.NewInterfaceGenerator(mg, scratchDir, mp))
 
-	const mockStdPrefix = "gowm.in/mock/std/"
+	// const mockStdPrefix = "gowm.in/mock/std/"
 
-	// s := stdlib.New("https://go.dev/dl", scratchDir)
-	s := stdlib.New("https://electron.quantumfyre.co.uk", scratchDir)
-	sc := cache.NewDir("cache/stdlib", s)
-	sg := mock.NewMockGenerator(mockStdPrefix, scratchDir, sc)
-	sp := basic.NewPrefixStripper(mockStdPrefix, sc)
-	r.Add(mockStdPrefix, modify.NewInterfaceGenerator(sg, scratchDir, sp))
+	// // s := stdlib.New("https://go.dev/dl", scratchDir)
+	// s := stdlib.New("https://electron.quantumfyre.co.uk", scratchDir)
+	// sc := cache.NewDir("cache/stdlib", s)
+	// sg := mock.NewMockGenerator(mockStdPrefix, scratchDir, sc)
+	// sp := basic.NewPrefixStripper(mockStdPrefix, sc)
+	// r.Add(mockStdPrefix, modify.NewInterfaceGenerator(sg, scratchDir, sp))
+	// r.AddExact("gowm.in/mock/std", modify.NewInterfaceGenerator(sg, scratchDir, sp))
 
 	server := &http.Server{
 		Addr:    ":4000",
