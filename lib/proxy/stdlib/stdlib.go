@@ -52,7 +52,7 @@ func (s *Store) List(ctx context.Context, mod string) ([]string, error) {
 
 	v := []string{}
 	for version := range versions {
-		v = append(v, version)
+		v = append(v, "v"+version)
 	}
 	semver.Sort(v)
 
@@ -169,7 +169,7 @@ func getGoVersions() (map[string]bool, error) {
 		if len(m[2]) == 0 {
 			m[2] = ".0"
 		}
-		versions["v"+m[1]+m[2]+".0"] = true
+		versions[m[1]+m[2]+".0"] = true
 	}
 
 	return versions, nil
