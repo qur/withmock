@@ -219,6 +219,10 @@ func unpackTar(r io.Reader, base string) error {
 		}
 
 		f.Close()
+
+		if err := os.Chtimes(path, h.AccessTime, h.ModTime); err != nil {
+			return fmt.Errorf("failed to set file time for tar: %w", err)
+		}
 	}
 }
 
