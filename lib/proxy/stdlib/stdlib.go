@@ -95,32 +95,10 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
-	version := strings.TrimSuffix(ver, ".0")
-	srcURL := fmt.Sprintf("%s/go%s.src.tar.gz", s.url, version)
-
-	resp, err := http.Get(srcURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download src (%s, %s): %w", mod, ver, err)
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		return nil, api.UnknownVersion(mod, ver)
-	default:
-		return nil, fmt.Errorf("unexpected http status downloading src (%s, %s): %d %s", mod, ver, resp.StatusCode, resp.Status)
-	}
-
 	scratch := filepath.Join(s.scratch, mod, ver, uuid.New())
-	if err := os.MkdirAll(scratch, 0755); err != nil {
-		return nil, fmt.Errorf("failed to prep scratch space (%s, %s): %w", mod, ver, err)
-	}
 
-	log.Printf("DOWNLOAD GO: %s %s -> %s", mod, ver, srcURL)
-
-	if err := unpackTar(resp.Body, scratch); err != nil {
-		return nil, fmt.Errorf("failed to unpack source tar (%s, %s): %w", mod, ver, err)
+	if err := s.unpackGoSource(ver, scratch); err != nil {
+		return nil, err
 	}
 
 	modPath := filepath.Join(scratch, "go", "src")
@@ -132,6 +110,7 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
+	version := strings.TrimSuffix(ver, ".0")
 	if err := writeModFile(ctx, modPath, version); err != nil {
 		return nil, fmt.Errorf("failed to write mod file (%s, %s): %w", mod, ver, err)
 	}
@@ -145,6 +124,87 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 	}()
 
 	return pr, nil
+}
+
+func (s *Store) unpackGoSource(ver, dest string) error {
+	src, err := s.getGoSource(ver)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		return fmt.Errorf("failed to prep scratch space (%s, %s): %w", "std", ver, err)
+	}
+
+	if err := unpackTar(src, dest); err != nil {
+		return fmt.Errorf("failed to unpack source tar (%s, %s): %w", "std", ver, err)
+	}
+
+	return nil
+}
+
+func (s *Store) getGoSource(ver string) (io.ReadCloser, error) {
+	dir := filepath.Join(s.scratch, "std", ver, "go")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
+	path := filepath.Join(dir, "src.tgz")
+	f, err := os.Open(path)
+	if err == nil {
+		return f, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+
+	if err := s.downloadGoSource(ver, path); err != nil {
+		return nil, err
+	}
+
+	return os.Open(path)
+}
+
+func (s *Store) downloadGoSource(ver, dest string) error {
+	mod := "std"
+
+	version := strings.TrimSuffix(ver, ".0")
+	srcURL := fmt.Sprintf("%s/go%s.src.tar.gz", s.url, version)
+
+	log.Printf("DOWNLOAD GO: %s %s -> %s", mod, ver, srcURL)
+
+	resp, err := http.Get(srcURL)
+	if err != nil {
+		return fmt.Errorf("failed to download src (%s, %s): %w", mod, ver, err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return api.UnknownVersion(mod, ver)
+	default:
+		return fmt.Errorf("unexpected http status downloading src (%s, %s): %d %s", mod, ver, resp.StatusCode, resp.Status)
+	}
+
+	temp := filepath.Join(filepath.Dir(dest), "."+uuid.New()+"."+filepath.Base(dest))
+
+	f, err := os.Create(temp)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return fmt.Errorf("failed to save src (%s, %s): %w", mod, ver, err)
+	}
+
+	if err := os.Rename(temp, dest); err != nil {
+		os.Remove(temp)
+		return fmt.Errorf("failed to rename src (%s, %s): %w", mod, ver, err)
+	}
+
+	return nil
 }
 
 func getGoVersions() (map[string]bool, error) {
