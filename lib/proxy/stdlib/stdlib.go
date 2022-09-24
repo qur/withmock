@@ -69,7 +69,25 @@ func (s *Store) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
-	return nil, fmt.Errorf("not yet implemented")
+	scratch := filepath.Join(s.scratch, mod, ver, uuid.New())
+
+	if err := s.unpackGoSource(ver, scratch); err != nil {
+		return nil, err
+	}
+
+	versionFile := filepath.Join(scratch, "go", "VERSION")
+
+	f, err := os.Stat(versionFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat VERSION file (%s, %s): %w", mod, ver, err)
+	}
+
+	info := &api.Info{
+		Version: "v" + ver,
+		Time:    f.ModTime(),
+	}
+
+	return info, nil
 }
 
 func (s *Store) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
