@@ -2,6 +2,7 @@ package stdlib
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -44,44 +45,53 @@ func (s *Store) List(ctx context.Context, mod string) ([]string, error) {
 		return nil, api.UnknownMod(mod)
 	}
 
-	env, err := env.GetEnv()
-	if err != nil {
-		return nil, err
-	}
-	api := filepath.Join(env["GOROOT"], "api")
-	log.Printf("LIST STDLIB: %s", api)
-
-	entries, err := os.ReadDir(api)
+	versions, err := getGoVersions()
 	if err != nil {
 		return nil, err
 	}
 
-	versions := []string{}
-	for _, entry := range entries {
-		m := apiVersion.FindStringSubmatch(entry.Name())
-		if m == nil {
-			continue
-		}
-		if len(m[2]) == 0 {
-			m[2] = ".0"
-		}
-		versions = append(versions, "v"+m[1]+m[2]+".0")
+	v := []string{}
+	for version := range versions {
+		v = append(v, version)
 	}
-	semver.Sort(versions)
+	semver.Sort(v)
 
-	return versions, nil
+	return v, nil
 }
 
 func (s *Store) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
+	knownVersions, err := getGoVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	if mod != "std" || !knownVersions[ver] {
+		return nil, api.UnknownVersion(mod, ver)
+	}
+
 	return nil, fmt.Errorf("not yet implemented")
 }
 
 func (s *Store) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
-	return nil, fmt.Errorf("not yet implemented")
+	knownVersions, err := getGoVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	if mod != "std" || !knownVersions[ver] {
+		return nil, api.UnknownVersion(mod, ver)
+	}
+
+	return createModFile(strings.TrimSuffix(ver, ".0"))
 }
 
 func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
-	if mod != "std" {
+	knownVersions, err := getGoVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	if mod != "std" || !knownVersions[ver] {
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
@@ -122,7 +132,7 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
-	if err := writeModFile(ctx, modPath, mod, version); err != nil {
+	if err := writeModFile(ctx, modPath, version); err != nil {
 		return nil, fmt.Errorf("failed to write mod file (%s, %s): %w", mod, ver, err)
 	}
 
@@ -135,6 +145,34 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 	}()
 
 	return pr, nil
+}
+
+func getGoVersions() (map[string]bool, error) {
+	env, err := env.GetEnv()
+	if err != nil {
+		return nil, err
+	}
+	api := filepath.Join(env["GOROOT"], "api")
+	log.Printf("LIST STDLIB: %s", api)
+
+	entries, err := os.ReadDir(api)
+	if err != nil {
+		return nil, err
+	}
+
+	versions := map[string]bool{}
+	for _, entry := range entries {
+		m := apiVersion.FindStringSubmatch(entry.Name())
+		if m == nil {
+			continue
+		}
+		if len(m[2]) == 0 {
+			m[2] = ".0"
+		}
+		versions["v"+m[1]+m[2]+".0"] = true
+	}
+
+	return versions, nil
 }
 
 func unpackTar(r io.Reader, base string) error {
@@ -196,19 +234,28 @@ func isDir(path string) (bool, error) {
 	}
 }
 
-func writeModFile(ctx context.Context, dest, mod, goVersion string) error {
-	log.Printf("MODFILE: %s", dest)
-
+func createModFile(goVersion string) (*bytes.Buffer, error) {
 	mf := &modfile.File{}
-	if err := mf.AddModuleStmt(mod); err != nil {
-		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+	if err := mf.AddModuleStmt("gowm.in/std"); err != nil {
+		return nil, fmt.Errorf("failed to create go.mod for std: %w", err)
 	}
 	if err := mf.AddGoStmt(goVersion); err != nil {
-		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+		return nil, fmt.Errorf("failed to create go.mod for std: %w", err)
 	}
 	data, err := mf.Format()
 	if err != nil {
-		return fmt.Errorf("failed to format go.mod for %s: %w", dest, err)
+		return nil, fmt.Errorf("failed to format go.mod for std: %w", err)
+	}
+
+	return bytes.NewBuffer(data), nil
+}
+
+func writeModFile(ctx context.Context, dest, goVersion string) error {
+	log.Printf("MODFILE: %s", dest)
+
+	mf, err := createModFile(goVersion)
+	if err != nil {
+		return err
 	}
 
 	f, err := os.Create(filepath.Join(dest, "go.mod"))
@@ -216,7 +263,7 @@ func writeModFile(ctx context.Context, dest, mod, goVersion string) error {
 		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
 	}
 	defer f.Close()
-	if _, err := f.Write(data); err != nil {
+	if _, err := io.Copy(f, mf); err != nil {
 		return fmt.Errorf("failed to write go.mod for %s: %w", dest, err)
 	}
 
