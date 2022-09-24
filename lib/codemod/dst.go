@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
@@ -41,6 +42,10 @@ func (m *DstModifier) Modify(ctx context.Context, mod, ver, base string) ([]stri
 		if err := ctx.Err(); err != nil {
 			// request cancelled, give up
 			return err
+		}
+		b := filepath.Base(path)
+		if strings.HasPrefix(b, ".") || b == "internal" || b == "testdata" {
+			return fs.SkipDir
 		}
 		rel, err := filepath.Rel(filepath.Join(base, mod+"@v"+ver), path)
 		if err != nil {

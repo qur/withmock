@@ -129,7 +129,8 @@ func (mi *modInfo) discoverPackages(ctx context.Context) error {
 		if err != nil || !d.IsDir() {
 			return err
 		}
-		if strings.HasPrefix(filepath.Base(path), ".") || filepath.Base(path) == "internal" || filepath.Base(path) == "testdata" {
+		base := filepath.Base(path)
+		if strings.HasPrefix(base, ".") || base == "internal" || base == "testdata" {
 			return fs.SkipDir
 		}
 		rel, err := filepath.Rel(mi.src, path)
