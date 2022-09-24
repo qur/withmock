@@ -32,6 +32,7 @@ func (d *Dir) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
 	path := filepath.Join(d.cache, mod, ver, "info.json")
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
+		log.Printf("CACHE MISS: %s %s -> %s", mod, ver, path)
 		info, err := d.s.Info(ctx, mod, ver)
 		if err != nil {
 			return nil, err
@@ -50,6 +51,7 @@ func (d *Dir) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
 		return nil, fmt.Errorf("failed to read info cache (%s, %s): %w", mod, ver, err)
 	}
 	defer f.Close()
+	log.Printf("CACHE HIT: %s %s -> %s", mod, ver, path)
 	info := api.Info{}
 	if err := json.NewDecoder(f).Decode(&info); err != nil {
 		return nil, fmt.Errorf("failed to decode info cache (%s, %s): %w", mod, ver, err)
@@ -61,6 +63,7 @@ func (d *Dir) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
 	path := filepath.Join(d.cache, mod, ver, "go.mod")
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
+		log.Printf("CACHE MISS: %s %s -> %s", mod, ver, path)
 		mf, err := d.s.ModFile(ctx, mod, ver)
 		if err != nil {
 			return nil, err
@@ -70,6 +73,7 @@ func (d *Dir) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read mod cache (%s, %s): %w", mod, ver, err)
 	}
+	log.Printf("CACHE HIT: %s %s -> %s", mod, ver, path)
 	return f, nil
 }
 
