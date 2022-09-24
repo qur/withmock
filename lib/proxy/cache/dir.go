@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/pborman/uuid"
 	"github.com/qur/withmock/lib/proxy/api"
 )
 
@@ -75,6 +77,7 @@ func (d *Dir) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
 	path := filepath.Join(d.cache, mod, ver, "go.zip")
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
+		log.Printf("CACHE MISS: %s %s -> %s", mod, ver, path)
 		src, err := d.s.Source(ctx, mod, ver)
 		if err != nil {
 			return nil, err
@@ -84,6 +87,7 @@ func (d *Dir) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read mod cache (%s, %s): %w", mod, ver, err)
 	}
+	log.Printf("CACHE HIT: %s %s -> %s", mod, ver, path)
 	return f, nil
 }
 
@@ -101,7 +105,7 @@ var _ io.Writer = (*newFile)(nil)
 
 func (d *Dir) createEntry(mod, ver, filename string, src io.Reader) (*newFile, error) {
 	dir := filepath.Join(d.cache, mod, ver)
-	tempPath := filepath.Join(dir, "."+filename)
+	tempPath := filepath.Join(dir, "."+uuid.New()+"."+filename)
 	path := filepath.Join(dir, filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to prep cache (%s, %s): %w", mod, ver, err)
@@ -120,12 +124,19 @@ func (d *Dir) createEntry(mod, ver, filename string, src io.Reader) (*newFile, e
 }
 
 func (f *newFile) Write(p []byte) (int, error) {
-	return f.dst.Write(p)
+	n, err := f.dst.Write(p)
+	if err != nil {
+		f.errored = true
+	}
+	return n, err
 }
 
 func (f *newFile) Read(p []byte) (int, error) {
 	n, err := f.tee.Read(p)
 	if err != nil {
+		if !errors.Is(err, io.EOF) {
+			f.errored = true
+		}
 		return n, err
 	}
 	return n, nil
@@ -141,5 +152,6 @@ func (f *newFile) Close() error {
 	if !f.errored {
 		return os.Rename(f.temp, f.path)
 	}
+	os.Remove(f.temp)
 	return nil
 }

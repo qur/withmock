@@ -1,3 +1,3 @@
 FROM golang:1.19-alpine
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git gcc build-base

@@ -68,12 +68,12 @@ func (m *MockGenerator) GenSource(ctx context.Context, mod, ver, zipfile, src, d
 
 	mi, err := m.getModInfo(ctx, fset, origMod, ver)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get mod info (%s, %s): %w", origMod, ver, err)
 	}
 
 	interfaces, err := mi.resolveAllInterfaces(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve all interfaces: %w", err)
 	}
 
 	if interfaces == 0 {
@@ -81,11 +81,11 @@ func (m *MockGenerator) GenSource(ctx context.Context, mod, ver, zipfile, src, d
 	}
 
 	if err := mi.renderMocks(ctx, dest); err != nil {
-		return err
+		return fmt.Errorf("failed to render mocks: %w", err)
 	}
 
 	if err := mi.writeModFile(ctx, dest, mod); err != nil {
-		return err
+		return fmt.Errorf("failed to write mod file: %w", err)
 	}
 
 	return nil

@@ -2,4 +2,4 @@
 
 cd "$(dirname "$0")"
 
-exec docker buildx build --platform linux/amd64,linux/arm64 --pull -t qurx/withmock-dev:1.19 -f Dockerfile --push .
+exec docker buildx build --platform linux/amd64,linux/arm64 --pull -t qurx/withmock-dev:1.19_1 -f Dockerfile --push .

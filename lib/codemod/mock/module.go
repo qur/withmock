@@ -52,6 +52,9 @@ func (m *MockGenerator) getModInfo(ctx context.Context, fset *token.FileSet, mod
 	}
 
 	mv := module.Version{Path: mod, Version: "v" + ver}
+	if !isModulePath(mod) {
+		mv.Path = "gowm.in/std/" + mod
+	}
 	if err := zip.Unzip(src, mv, zipfile); err != nil {
 		return nil, fmt.Errorf("failed to unpack zip %s: %w", zipfile, err)
 	}

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +16,10 @@ import (
 	"strings"
 
 	"github.com/pborman/uuid"
+	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
+	"golang.org/x/mod/zip"
 
 	"github.com/qur/withmock/lib/env"
 	"github.com/qur/withmock/lib/proxy/api"
@@ -95,13 +99,34 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 		return nil, fmt.Errorf("failed to prep scratch space (%s, %s): %w", mod, ver, err)
 	}
 
-	log.Printf("DOWNLOAD GO: %s", srcURL)
+	log.Printf("DOWNLOAD GO: %s %s -> %s", mod, ver, srcURL)
 
 	if err := unpackTar(resp.Body, scratch); err != nil {
 		return nil, fmt.Errorf("failed to unpack source tar (%s, %s): %w", mod, ver, err)
 	}
 
-	return nil, fmt.Errorf("not yet implemented")
+	modPath := filepath.Join(scratch, "go", "src", mod)
+
+	switch dir, err := isDir(modPath); true {
+	case err != nil:
+		return nil, fmt.Errorf("failed to check mod exists (%s, %s): %w", mod, ver, err)
+	case dir == false:
+		return nil, api.UnknownVersion(mod, ver)
+	}
+
+	if err := writeModFile(ctx, modPath, mod, version); err != nil {
+		return nil, fmt.Errorf("failed to write mod file (%s, %s): %w", mod, ver, err)
+	}
+
+	pr, pw := io.Pipe()
+	mv := module.Version{Path: "gowm.in/std/" + mod, Version: "v" + ver}
+
+	go func() {
+		err := zip.CreateFromDir(pw, mv, modPath)
+		pw.CloseWithError(err)
+	}()
+
+	return pr, nil
 }
 
 func unpackTar(r io.Reader, base string) error {
@@ -149,4 +174,43 @@ func unpackTar(r io.Reader, base string) error {
 
 		f.Close()
 	}
+}
+
+func isDir(path string) (bool, error) {
+	s, err := os.Stat(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return false, nil
+	case err == nil:
+		return s.IsDir(), nil
+	default:
+		return false, err
+	}
+}
+
+func writeModFile(ctx context.Context, dest, mod, goVersion string) error {
+	log.Printf("MODFILE: %s", dest)
+
+	mf := &modfile.File{}
+	if err := mf.AddModuleStmt(mod); err != nil {
+		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+	}
+	if err := mf.AddGoStmt(goVersion); err != nil {
+		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+	}
+	data, err := mf.Format()
+	if err != nil {
+		return fmt.Errorf("failed to format go.mod for %s: %w", dest, err)
+	}
+
+	f, err := os.Create(filepath.Join(dest, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+	}
+	defer f.Close()
+	if _, err := f.Write(data); err != nil {
+		return fmt.Errorf("failed to write go.mod for %s: %w", dest, err)
+	}
+
+	return nil
 }

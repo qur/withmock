@@ -1,7 +1,7 @@
 default = "dev"
 
 [crates.dev]
-  image = "qurx/withmock-dev:1.19"
+  image = "qurx/withmock-dev:1.19_1"
   mount-home = true
   project-mount = "/project"
   working-dir = "project,match"

@@ -88,6 +88,9 @@ func (i *Injector) Source(ctx context.Context, mod, ver string) (io.Reader, erro
 }
 
 func save(dest string, src io.Reader) error {
+	if closer, ok := src.(io.Closer); ok {
+		defer closer.Close()
+	}
 	f, err := os.Create(dest)
 	if err != nil {
 		return err

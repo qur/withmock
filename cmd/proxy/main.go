@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/qur/withmock/lib/codemod"
 	"github.com/qur/withmock/lib/codemod/mock"
@@ -18,6 +19,10 @@ import (
 const scratchDir = "scratch"
 
 func main() {
+	if err := os.Chdir(os.Args[1]); err != nil {
+		log.Fatalf("failed to change dir to %s: %s", os.Args[1], err)
+	}
+
 	m := codemod.NewDstModifier()
 
 	u := upstream.NewStore("https://proxy.golang.org")
@@ -41,7 +46,8 @@ func main() {
 
 	const mockStdPrefix = "gowm.in/mock/std/"
 
-	s := stdlib.New("https://go.dev/dl", scratchDir)
+	// s := stdlib.New("https://go.dev/dl", scratchDir)
+	s := stdlib.New("https://electron.quantumfyre.co.uk", scratchDir)
 	sc := cache.NewDir("cache/stdlib", s)
 	sg := mock.NewMockGenerator(mockStdPrefix, scratchDir, sc)
 	sp := basic.NewPrefixStripper(mockStdPrefix, sc)
@@ -51,6 +57,8 @@ func main() {
 		Addr:    ":4000",
 		Handler: handler,
 	}
+
+	log.Printf("START SERVER")
 
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("listen failed: %s", err)
