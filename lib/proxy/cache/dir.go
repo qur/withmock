@@ -28,39 +28,34 @@ func (d *Dir) List(ctx context.Context, mod string) ([]string, error) {
 	return d.s.List(ctx, mod)
 }
 
-func (d *Dir) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
-	path := filepath.Join(d.cache, mod, ver, "info.json")
-	f, err := os.Open(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		log.Printf("CACHE MISS: %s %s -> %s", mod, ver, path)
-		info, err := d.s.Info(ctx, mod, ver)
-		if err != nil {
-			return nil, err
-		}
-		f, err := d.createEntry(mod, ver, "info.json", nil)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		if err := json.NewEncoder(f).Encode(info); err != nil {
-			return nil, fmt.Errorf("failed to write info cache (%s, %s): %w", mod, ver, err)
-		}
-		return info, nil
+func (d *Dir) getInfo(ctx context.Context, mod, ver string) (io.Reader, error) {
+	info, err := d.s.Info(ctx, mod, ver)
+	if err != nil {
+		return nil, err
 	}
+	r, w := io.Pipe()
+	go func() {
+		err := json.NewEncoder(w).Encode(info)
+		w.CloseWithError(err)
+	}()
+	return r, nil
+}
+
+func (d *Dir) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
+	r, err := d.entry(ctx, mod, ver, "info.json", d.getInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read info cache (%s, %s): %w", mod, ver, err)
 	}
-	defer f.Close()
-	log.Printf("CACHE HIT: %s %s -> %s", mod, ver, path)
+	defer r.Close()
 	info := api.Info{}
-	if err := json.NewDecoder(f).Decode(&info); err != nil {
+	if err := json.NewDecoder(r).Decode(&info); err != nil {
 		return nil, fmt.Errorf("failed to decode info cache (%s, %s): %w", mod, ver, err)
 	}
 	return &info, nil
 }
 
 func (d *Dir) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
-	r, err := d.entry(ctx, mod, ver, "go.zip", d.s.ModFile)
+	r, err := d.entry(ctx, mod, ver, "go.mod", d.s.ModFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read mod cache (%s, %s): %w", mod, ver, err)
 	}
@@ -75,7 +70,7 @@ func (d *Dir) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
 	return r, nil
 }
 
-func (d *Dir) entry(ctx context.Context, mod, ver, name string, download func(context.Context, string, string) (io.Reader, error)) (io.Reader, error) {
+func (d *Dir) entry(ctx context.Context, mod, ver, name string, download func(context.Context, string, string) (io.Reader, error)) (io.ReadCloser, error) {
 	path := filepath.Join(d.cache, mod, ver, name)
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
