@@ -60,36 +60,34 @@ func (d *Dir) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
 }
 
 func (d *Dir) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
-	path := filepath.Join(d.cache, mod, ver, "go.mod")
-	f, err := os.Open(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		log.Printf("CACHE MISS: %s %s -> %s", mod, ver, path)
-		mf, err := d.s.ModFile(ctx, mod, ver)
-		if err != nil {
-			return nil, err
-		}
-		return d.createEntry(mod, ver, "go.mod", mf)
-	}
+	r, err := d.entry(ctx, mod, ver, "go.zip", d.s.ModFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read mod cache (%s, %s): %w", mod, ver, err)
 	}
-	log.Printf("CACHE HIT: %s %s -> %s", mod, ver, path)
-	return f, nil
+	return r, nil
 }
 
 func (d *Dir) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
-	path := filepath.Join(d.cache, mod, ver, "go.zip")
+	r, err := d.entry(ctx, mod, ver, "go.zip", d.s.Source)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read source cache (%s, %s): %w", mod, ver, err)
+	}
+	return r, nil
+}
+
+func (d *Dir) entry(ctx context.Context, mod, ver, name string, download func(context.Context, string, string) (io.Reader, error)) (io.Reader, error) {
+	path := filepath.Join(d.cache, mod, ver, name)
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		log.Printf("CACHE MISS: %s %s -> %s", mod, ver, path)
-		src, err := d.s.Source(ctx, mod, ver)
+		src, err := download(ctx, mod, ver)
 		if err != nil {
 			return nil, err
 		}
-		return d.createEntry(mod, ver, "go.zip", src)
+		return d.createEntry(mod, ver, name, src)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to read mod cache (%s, %s): %w", mod, ver, err)
+		return nil, err
 	}
 	log.Printf("CACHE HIT: %s %s -> %s", mod, ver, path)
 	return f, nil
