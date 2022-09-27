@@ -19,7 +19,6 @@ import (
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
 	"github.com/qur/withmock/lib/extras"
-	"github.com/qur/withmock/lib/proxy/modify"
 )
 
 type InterfaceGenerator struct {
@@ -31,10 +30,6 @@ func NewInterfaceGenerator(prefix string) *InterfaceGenerator {
 	return &InterfaceGenerator{
 		prefix: prefix,
 	}
-}
-
-func (i *InterfaceGenerator) GenModMode() modify.GenModMode {
-	return modify.GenModFromModfile
 }
 
 func (i *InterfaceGenerator) GenMod(ctx context.Context, mod, ver, src, dest string) error {

@@ -14,7 +14,6 @@ import (
 	"golang.org/x/tools/imports"
 
 	"github.com/qur/withmock/lib/proxy/api"
-	"github.com/qur/withmock/lib/proxy/modify"
 )
 
 type MockGenerator struct {
@@ -29,21 +28,6 @@ func NewMockGenerator(prefix, scratch string, s api.Store) *MockGenerator {
 		scratch: scratch,
 		s:       s,
 	}
-}
-
-func (m *MockGenerator) GenModMode() modify.GenModMode {
-	return modify.GenModFromModfile
-}
-
-func (m *MockGenerator) GenMod(ctx context.Context, mod, ver, _, dest string) error {
-	return api.ErrModFromSource
-	// temp := filepath.Join(m.scratch, mod, ver, uuid.New())
-
-	// if err := m.GenSource(ctx, mod, ver, "", "", temp); err != nil {
-	// 	return err
-	// }
-
-	// return os.Rename(filepath.Join(temp, "go.mod"), dest)
 }
 
 func (m *MockGenerator) GenSource(ctx context.Context, mod, ver, _, _, dest string) error {
