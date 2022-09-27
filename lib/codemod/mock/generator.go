@@ -11,10 +11,9 @@ import (
 
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
-	"golang.org/x/mod/modfile"
+	"github.com/pborman/uuid"
 	"golang.org/x/tools/imports"
 
-	"github.com/qur/withmock/lib/extras"
 	"github.com/qur/withmock/lib/proxy/api"
 	"github.com/qur/withmock/lib/proxy/modify"
 )
@@ -37,28 +36,17 @@ func (m *MockGenerator) GenModMode() modify.GenModMode {
 	return modify.GenModFromModfile
 }
 
-func (m *MockGenerator) GenMod(ctx context.Context, mod, ver, src, dest string) error {
-	data, err := os.ReadFile(src)
-	if err != nil {
+func (m *MockGenerator) GenMod(ctx context.Context, mod, ver, _, dest string) error {
+	temp := filepath.Join(m.scratch, mod, ver, uuid.New())
+
+	if err := m.GenSource(ctx, mod, ver, "", "", temp); err != nil {
 		return err
 	}
-	mf, err := modfile.Parse(src, data, nil)
-	if err != nil {
-		return fmt.Errorf("failed to parse %s: %w", src, err)
-	}
-	f, err := os.Create(dest)
-	if err != nil {
-		return fmt.Errorf("failed to create %s: %w", dest, err)
-	}
-	defer f.Close()
-	if err := extras.InterfaceModFile(mod, ver, mf.Go.Version, f); err != nil {
-		f.Close()
-		return fmt.Errorf("failed to write %s: %w", dest, err)
-	}
-	return nil
+
+	return os.Rename(filepath.Join(temp, "go.mod"), dest)
 }
 
-func (m *MockGenerator) GenSource(ctx context.Context, mod, ver, zipfile, src, dest string) error {
+func (m *MockGenerator) GenSource(ctx context.Context, mod, ver, _, _, dest string) error {
 	origMod, err := m.stripPrefix(mod)
 	if err != nil {
 		return err
