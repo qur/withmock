@@ -55,7 +55,7 @@ func (d *Dir) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
 }
 
 func (d *Dir) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
-	r, err := d.entry(ctx, mod, ver, "go.mod", d.s.ModFile)
+	r, err := d.entry(ctx, mod, ver, "go.mod", d.getModFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read mod cache (%s, %s): %w", mod, ver, err)
 	}
@@ -86,6 +86,18 @@ func (d *Dir) entry(ctx context.Context, mod, ver, name string, download func(co
 	}
 	log.Printf("CACHE HIT: %s %s -> %s", mod, ver, path)
 	return f, nil
+}
+
+func (d *Dir) getModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
+	mf, err := d.s.ModFile(ctx, mod, ver)
+	if !errors.Is(err, api.ErrModFromSource) {
+		return mf, err
+	}
+	src, err := d.Source(ctx, mod, ver)
+	if err != nil {
+		return nil, err
+	}
+	return extractModFile(src, d.cache, mod, ver)
 }
 
 type newFile struct {

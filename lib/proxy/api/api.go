@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -32,3 +33,5 @@ func UnknownVersion(mod, ver string) NotExist {
 func (n NotExist) Error() string {
 	return fmt.Sprintf("not found: %s", string(n))
 }
+
+var ErrModFromSource = errors.New("mod should be extracted from source")

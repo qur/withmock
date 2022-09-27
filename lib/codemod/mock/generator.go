@@ -11,7 +11,6 @@ import (
 
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
-	"github.com/pborman/uuid"
 	"golang.org/x/tools/imports"
 
 	"github.com/qur/withmock/lib/proxy/api"
@@ -37,13 +36,14 @@ func (m *MockGenerator) GenModMode() modify.GenModMode {
 }
 
 func (m *MockGenerator) GenMod(ctx context.Context, mod, ver, _, dest string) error {
-	temp := filepath.Join(m.scratch, mod, ver, uuid.New())
+	return api.ErrModFromSource
+	// temp := filepath.Join(m.scratch, mod, ver, uuid.New())
 
-	if err := m.GenSource(ctx, mod, ver, "", "", temp); err != nil {
-		return err
-	}
+	// if err := m.GenSource(ctx, mod, ver, "", "", temp); err != nil {
+	// 	return err
+	// }
 
-	return os.Rename(filepath.Join(temp, "go.mod"), dest)
+	// return os.Rename(filepath.Join(temp, "go.mod"), dest)
 }
 
 func (m *MockGenerator) GenSource(ctx context.Context, mod, ver, _, _, dest string) error {
