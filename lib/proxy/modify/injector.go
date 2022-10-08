@@ -87,19 +87,6 @@ func (i *Injector) Source(ctx context.Context, mod, ver string) (io.Reader, erro
 	return f, nil
 }
 
-func save(dest string, src io.Reader) error {
-	if closer, ok := src.(io.Closer); ok {
-		defer closer.Close()
-	}
-	f, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = io.Copy(f, src)
-	return err
-}
-
 func unpack(filename, path string) ([]zip.FileHeader, error) {
 	r, err := zip.OpenReader(filename)
 	if err != nil {

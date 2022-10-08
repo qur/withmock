@@ -12,13 +12,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/zip"
 
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
-	"github.com/qur/withmock/lib/extras"
 )
 
 type InterfaceGenerator struct {
@@ -30,27 +28,6 @@ func NewInterfaceGenerator(prefix string) *InterfaceGenerator {
 	return &InterfaceGenerator{
 		prefix: prefix,
 	}
-}
-
-func (i *InterfaceGenerator) GenMod(ctx context.Context, mod, ver, src, dest string) error {
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	mf, err := modfile.Parse(src, data, nil)
-	if err != nil {
-		return fmt.Errorf("failed to parse %s: %w", src, err)
-	}
-	f, err := os.Create(dest)
-	if err != nil {
-		return fmt.Errorf("failed to create %s: %w", dest, err)
-	}
-	defer f.Close()
-	if err := extras.InterfaceModFile(mod, ver, mf.Go.Version, f); err != nil {
-		f.Close()
-		return fmt.Errorf("failed to write %s: %w", dest, err)
-	}
-	return nil
 }
 
 func (i *InterfaceGenerator) GenSource(ctx context.Context, mod, ver, zipfile, src, dest string) error {

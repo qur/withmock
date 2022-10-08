@@ -3,7 +3,6 @@ package mock
 import (
 	"context"
 	"go/ast"
-	"log"
 	"path/filepath"
 
 	"github.com/dave/dst"
