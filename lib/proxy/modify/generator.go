@@ -19,43 +19,43 @@ type Generator interface {
 	GenSource(ctx context.Context, mod, ver, zipfile, src, dest string) error
 }
 
-type InterfaceGenerator struct {
-	g Generator
-	d string
-	s api.Store
+type SourceGenerator struct {
+	g       Generator
+	scratch string
+	s       api.Store
 }
 
-var _ api.Store = (*InterfaceGenerator)(nil)
+var _ api.Store = (*SourceGenerator)(nil)
 
-func NewInterfaceGenerator(generate Generator, scratchDir string, s api.Store) *InterfaceGenerator {
-	return &InterfaceGenerator{
-		g: generate,
-		d: scratchDir,
-		s: s,
+func NewSourceGenerator(generate Generator, scratchDir string, s api.Store) *SourceGenerator {
+	return &SourceGenerator{
+		g:       generate,
+		scratch: scratchDir,
+		s:       s,
 	}
 }
 
-func (i *InterfaceGenerator) List(ctx context.Context, mod string) ([]string, error) {
-	return i.s.List(ctx, mod)
+func (s *SourceGenerator) List(ctx context.Context, mod string) ([]string, error) {
+	return s.s.List(ctx, mod)
 }
 
-func (i *InterfaceGenerator) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
-	return i.s.Info(ctx, mod, ver)
+func (s *SourceGenerator) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
+	return s.s.Info(ctx, mod, ver)
 }
 
-func (i *InterfaceGenerator) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
+func (s *SourceGenerator) ModFile(ctx context.Context, mod, ver string) (io.Reader, error) {
 	return nil, api.ErrModFromSource
 }
 
-func (i *InterfaceGenerator) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
-	r, err := i.s.Source(ctx, mod, ver)
+func (s *SourceGenerator) Source(ctx context.Context, mod, ver string) (io.Reader, error) {
+	r, err := s.s.Source(ctx, mod, ver)
 	if err != nil {
 		return nil, err
 	}
 	if closer, ok := r.(io.Closer); ok {
 		defer closer.Close()
 	}
-	dir := filepath.Join(i.d, mod, ver, uuid.New())
+	dir := filepath.Join(s.scratch, mod, ver, uuid.New())
 	log.Printf("GENERATE SOURCE: %s %s -> %s", mod, ver, dir)
 	input := filepath.Join(dir, "source.zip")
 	src := filepath.Join(dir, "src")
@@ -68,7 +68,7 @@ func (i *InterfaceGenerator) Source(ctx context.Context, mod, ver string) (io.Re
 	if err := save(input, r); err != nil {
 		return nil, fmt.Errorf("failed to save zip (%s, %s): %w", mod, ver, err)
 	}
-	if err := i.g.GenSource(ctx, mod, ver, input, src, dest); err != nil {
+	if err := s.g.GenSource(ctx, mod, ver, input, src, dest); err != nil {
 		return nil, fmt.Errorf("failed to modify zip (%s, %s): %w", mod, ver, err)
 	}
 	f, err := os.Create(output)

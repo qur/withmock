@@ -44,13 +44,13 @@ func main() {
 	const ifPrefix = "gowm.in/if/"
 	ig := codemod.NewInterfaceGenerator(ifPrefix)
 	ip := basic.NewPrefixStripper(ifPrefix, uc)
-	r.Add(ifPrefix, modify.NewInterfaceGenerator(ig, scratchDir, ip))
+	r.Add(ifPrefix, modify.NewSourceGenerator(ig, scratchDir, ip))
 
 	// add an output route to create mock implementations
 	const mockPrefix = "gowm.in/mock/"
 	mg := mock.NewMockGenerator(mockPrefix, scratchDir, uc)
 	mp := basic.NewPrefixStripper(mockPrefix, uc)
-	r.Add(mockPrefix, modify.NewInterfaceGenerator(mg, scratchDir, mp))
+	r.Add(mockPrefix, modify.NewSourceGenerator(mg, scratchDir, mp))
 
 	server := &http.Server{
 		Addr:    ":4000",
