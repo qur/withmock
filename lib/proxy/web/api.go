@@ -100,7 +100,7 @@ func (a apiProvider) zip(w http.ResponseWriter, r *http.Request) {
 	if closer, ok := src.(io.Closer); ok {
 		defer closer.Close()
 	}
-	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+	w.Header().Set("Content-Type", "application/zip")
 	if _, err := io.Copy(w, src); err != nil {
 		log.Printf("ERROR: failed to copy source (%s, %s): %s", mod, ver, err)
 	}
