@@ -66,6 +66,7 @@ func (s *Store) Info(ctx context.Context, mod, ver string) (*api.Info, error) {
 	}
 
 	if mod != "std" || !knownVersions[ver] {
+		log.Printf("stdlib Info UNKNOWN: %s@v%s", mod, ver)
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
@@ -97,6 +98,7 @@ func (s *Store) ModFile(ctx context.Context, mod, ver string) (io.Reader, error)
 	}
 
 	if mod != "std" || !knownVersions[ver] {
+		log.Printf("stdlib ModFile UNKNOWN: %s@v%s", mod, ver)
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
@@ -110,6 +112,7 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 	}
 
 	if mod != "std" || !knownVersions[ver] {
+		log.Printf("stdlib Source UNKNOWN: %s@v%s", mod, ver)
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
@@ -125,6 +128,7 @@ func (s *Store) Source(ctx context.Context, mod, ver string) (io.Reader, error) 
 	case err != nil:
 		return nil, fmt.Errorf("failed to check mod exists (%s, %s): %w", mod, ver, err)
 	case !dir:
+		log.Printf("stdlib Source UNKNOWN: %s@v%s", mod, ver)
 		return nil, api.UnknownVersion(mod, ver)
 	}
 
@@ -200,6 +204,7 @@ func (s *Store) downloadGoSource(ver, dest string) error {
 	switch resp.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
+		log.Printf("stdlib UNKNOWN: %s@v%s", mod, ver)
 		return api.UnknownVersion(mod, ver)
 	default:
 		return fmt.Errorf("unexpected http status downloading src (%s, %s): %d %s", mod, ver, resp.StatusCode, resp.Status)

@@ -25,7 +25,7 @@ func main() {
 
 	m := codemod.NewDstModifier()
 
-	// built the default route - create modified versions of packages
+	// build the default route - create modified versions of packages
 	u := upstream.NewStore("https://proxy.golang.org")
 	ur := router.NewPrefixRouter(u)
 	uc := cache.NewDir("cache/input", ur)

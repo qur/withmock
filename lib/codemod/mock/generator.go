@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"go/token"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,6 +50,7 @@ func (m *MockGenerator) GenSource(ctx context.Context, mod, ver, _, _, dest stri
 	}
 
 	if interfaces == 0 {
+		log.Printf("Mock - no interfaces found: %s@v%s", mod, ver)
 		return api.UnknownVersion(mod, ver)
 	}
 

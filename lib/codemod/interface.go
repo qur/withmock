@@ -1,6 +1,7 @@
 package codemod
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"go/ast"
@@ -9,9 +10,11 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/zip"
 
@@ -42,7 +45,7 @@ func (i *InterfaceGenerator) GenSource(ctx context.Context, mod, ver, zipfile, s
 
 	log.Printf("GENERATE INTERFACE: %s", src)
 	fset := token.NewFileSet()
-	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err := ctx.Err(); err != nil {
 			// request cancelled, give up
 			return err
@@ -63,7 +66,10 @@ func (i *InterfaceGenerator) GenSource(ctx context.Context, mod, ver, zipfile, s
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return i.writeModFile(ctx, dest, mod)
 }
 
 func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.FileSet, mod, path, src, dest string, pkg *ast.Package) error {
@@ -73,6 +79,10 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 	}
 	pkgPath := filepath.Join(mod, rel)
 	for path, f := range pkg.Files {
+		if strings.HasSuffix(path, "_test.go") {
+			// ignore test files
+			continue
+		}
 		in, err := decorator.DecorateFile(fset, f)
 		if err != nil {
 			return err
@@ -243,4 +253,36 @@ func (*InterfaceGenerator) save(dest string, fset *token.FileSet, node *dst.File
 	}
 	defer f.Close()
 	return decorator.Fprint(f, node)
+}
+
+func (*InterfaceGenerator) writeModFile(ctx context.Context, dest, mod string) error {
+	log.Printf("MODFILE: %s", dest)
+
+	mf := &modfile.File{}
+	if err := mf.AddModuleStmt(mod); err != nil {
+		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+	}
+	data, err := mf.Format()
+	if err != nil {
+		return fmt.Errorf("failed to format go.mod for %s: %w", dest, err)
+	}
+
+	f, err := os.Create(filepath.Join(dest, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+	}
+	defer f.Close()
+	if _, err := f.Write(data); err != nil {
+		return fmt.Errorf("failed to write go.mod for %s: %w", dest, err)
+	}
+
+	buf := &bytes.Buffer{}
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = dest
+	cmd.Stdout = buf
+	cmd.Stderr = buf
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to tidy modfile for %s: %w:\n%s", dest, err, buf.String())
+	}
+	return nil
 }
