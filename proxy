@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e
+
+mkdir -p ~/tmp/withmock
+
+rm -rf ~/tmp/withmock/{scratch,cache}
+
+exec go run ./cmd/proxy ~/tmp/withmock "$@"
+
+#CGO_ENABLED=0 go build -a -tags netgo -installsuffix . -o ~/tmp/withmock/proxy ./cmd/proxy
+
+#cd ~/tmp/withmock/
+
+#exec ./proxy "$@"
