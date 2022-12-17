@@ -107,6 +107,13 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 						Value: `"` + pkgPath + `"`,
 					},
 				},
+				&dst.ImportSpec{
+					Name: dst.NewIdent("wmqe_mock"),
+					Path: &dst.BasicLit{
+						Kind:  token.STRING,
+						Value: `"github.com/stretchr/testify/mock"`,
+					},
+				},
 			},
 			Decs: dst.GenDeclDecorations{
 				NodeDecs: dst.NodeDecs{
@@ -124,12 +131,87 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 			}
 			switch n := node.(type) {
 			case *dst.FuncDecl:
-				if !n.Name.IsExported() || n.Recv != nil {
-					// ignore private functions or methods
+				if !n.Name.IsExported() {
+					// ignore private functions and methods
 					continue
 				}
+				if n.Recv == nil {
+					t := dst.Clone(n.Type).(*dst.FuncType)
+					args := []dst.Expr{}
+					for _, arg := range t.Params.List {
+						for _, name := range arg.Names {
+							args = append(args, dst.NewIdent(name.Name))
+						}
+					}
+					body := []dst.Stmt{}
+					call := &dst.CallExpr{
+						Fun: &dst.SelectorExpr{
+							X:   dst.NewIdent(origPkg),
+							Sel: dst.NewIdent(n.Name.Name),
+						},
+						Args: args,
+					}
+					if n.Type.Results != nil {
+						body = append(body, &dst.ReturnStmt{
+							Results: []dst.Expr{call},
+						})
+					} else {
+						body = append(body, &dst.ExprStmt{
+							X: call,
+						})
+					}
+					out.Decls = append(out.Decls, &dst.FuncDecl{
+						Name: dst.NewIdent(n.Name.Name),
+						Type: t,
+						Body: &dst.BlockStmt{
+							List: body,
+						},
+						Decs: dst.FuncDeclDecorations{
+							NodeDecs: dst.NodeDecs{
+								After: dst.EmptyLine,
+							},
+						},
+					})
+				}
 				t := dst.Clone(n.Type).(*dst.FuncType)
-				args := []dst.Expr{}
+				t.Results = &dst.FieldList{
+					List: []*dst.Field{
+						{
+							Type: &dst.StarExpr{
+								X: &dst.SelectorExpr{
+									X:   dst.NewIdent("wmqe_mock"),
+									Sel: dst.NewIdent("Call"),
+								},
+							},
+						},
+					},
+				}
+				typeName := ""
+				if n.Recv != nil && len(n.Recv.List) > 0 {
+					t := n.Recv.List[0].Type
+					if st, ok := t.(*dst.StarExpr); ok {
+						t = st.X
+					}
+					if i, ok := t.(*dst.Ident); ok {
+						typeName = i.Name
+					} else {
+						return fmt.Errorf("unhandled recv expr type: %T", t)
+					}
+				}
+				args := []dst.Expr{
+					&dst.SelectorExpr{
+						X:   dst.NewIdent("m"),
+						Sel: dst.NewIdent("value"),
+					},
+					&dst.BasicLit{
+						Kind:  token.STRING,
+						Value: `"` + typeName + `"`,
+					},
+					&dst.BasicLit{
+						Kind:  token.STRING,
+						Value: `"` + n.Name.Name + `"`,
+					},
+				}
 				for _, arg := range t.Params.List {
 					for _, name := range arg.Names {
 						args = append(args, dst.NewIdent(name.Name))
@@ -138,21 +220,32 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 				body := []dst.Stmt{}
 				call := &dst.CallExpr{
 					Fun: &dst.SelectorExpr{
-						X:   dst.NewIdent(origPkg),
+						X:   dst.NewIdent("m"),
 						Sel: dst.NewIdent(n.Name.Name),
 					},
 					Args: args,
 				}
-				if n.Type.Results != nil {
-					body = append(body, &dst.ReturnStmt{
-						Results: []dst.Expr{call},
-					})
+				body = append(body, &dst.ReturnStmt{
+					Results: []dst.Expr{call},
+				})
+				r := &dst.Field{
+					Names: []*dst.Ident{
+						dst.NewIdent("m"),
+					},
+				}
+				if typeName == "" {
+					r.Type = &dst.StarExpr{
+						X: dst.NewIdent("mockPackage"),
+					}
 				} else {
-					body = append(body, &dst.ExprStmt{
-						X: call,
-					})
+					r.Type = &dst.StarExpr{
+						X: dst.NewIdent("mock" + typeName),
+					}
 				}
 				out.Decls = append(out.Decls, &dst.FuncDecl{
+					Recv: &dst.FieldList{
+						List: []*dst.Field{r},
+					},
 					Name: dst.NewIdent(n.Name.Name),
 					Type: t,
 					Body: &dst.BlockStmt{
