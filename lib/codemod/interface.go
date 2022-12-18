@@ -203,6 +203,7 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 						X:   dst.NewIdent("m"),
 						Sel: dst.NewIdent("value"),
 					},
+					dst.NewIdent("wmqe_package"),
 					&dst.BasicLit{
 						Kind:  token.STRING,
 						Value: `"` + typeName + `"`,
@@ -220,8 +221,8 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 				body := []dst.Stmt{}
 				call := &dst.CallExpr{
 					Fun: &dst.SelectorExpr{
-						X:   dst.NewIdent("m"),
-						Sel: dst.NewIdent(n.Name.Name),
+						X:   dst.NewIdent("wmqe_main_controller"),
+						Sel: dst.NewIdent("On"),
 					},
 					Args: args,
 				}
@@ -326,7 +327,7 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 			return fmt.Errorf("failed to format %s: %w", path, err)
 		}
 	}
-	return nil
+	return i.writeExtras(ctx, fset, mod, path, src, dest, pkg)
 }
 
 func (i *InterfaceGenerator) stripPrefix(mod string) (string, error) {
@@ -346,6 +347,94 @@ func (*InterfaceGenerator) save(dest string, fset *token.FileSet, node *dst.File
 	}
 	defer f.Close()
 	return decorator.Fprint(f, node)
+}
+
+func (i *InterfaceGenerator) writeExtras(ctx context.Context, fset *token.FileSet, mod, path, src, dest string, pkg *ast.Package) error {
+	rel, err := filepath.Rel(src, path)
+	if err != nil {
+		return err
+	}
+	pkgPath := filepath.Join(mod, rel)
+	origPkg := "wmqe_orig_" + pkg.Name
+	out := &dst.File{
+		Name: dst.NewIdent(pkg.Name),
+	}
+	out.Decls = append(out.Decls,
+		&dst.GenDecl{
+			Tok: token.IMPORT,
+			Specs: []dst.Spec{
+				&dst.ImportSpec{
+					Name: dst.NewIdent(origPkg),
+					Path: &dst.BasicLit{
+						Kind:  token.STRING,
+						Value: `"` + pkgPath + `"`,
+					},
+				},
+				&dst.ImportSpec{
+					Name: dst.NewIdent("wmqe_ctrl"),
+					Path: &dst.BasicLit{
+						Kind:  token.STRING,
+						Value: `"github.com/stretchr/testify/mock"`,
+						// Value: `"gowm.in/ctrl"`,
+					},
+				},
+			},
+			Decs: dst.GenDeclDecorations{
+				NodeDecs: dst.NodeDecs{
+					Before: dst.EmptyLine,
+					After:  dst.EmptyLine,
+				},
+			},
+		},
+		&dst.GenDecl{
+			Tok: token.VAR,
+			Specs: []dst.Spec{
+				&dst.ValueSpec{
+					Names: []*dst.Ident{
+						dst.NewIdent("wmqe_main_controller"),
+					},
+					Values: []dst.Expr{
+						&dst.CallExpr{
+							Fun: &dst.SelectorExpr{
+								X:   dst.NewIdent("wmqe_ctrl"),
+								Sel: dst.NewIdent("DefaultController"),
+							},
+						},
+					},
+				},
+			},
+		},
+		&dst.FuncDecl{
+			Name: dst.NewIdent("init"),
+			Type: &dst.FuncType{
+				Params: &dst.FieldList{},
+			},
+			Body: &dst.BlockStmt{
+				List: []dst.Stmt{
+					&dst.ExprStmt{
+						X: &dst.CallExpr{
+							Fun: &dst.SelectorExpr{
+								X:   dst.NewIdent(origPkg),
+								Sel: dst.NewIdent("WMQE_SetController"),
+							},
+							Args: []dst.Expr{
+								&dst.CallExpr{
+									Fun: &dst.SelectorExpr{
+										X:   dst.NewIdent("wmqe_ctrl"),
+										Sel: dst.NewIdent("DefaultController"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+	if err := i.save(filepath.Join(dest, "wmqe_extras_"+pkg.Name+".go"), fset, out); err != nil {
+		return fmt.Errorf("failed to format %s: %w", path, err)
+	}
+	return nil
 }
 
 func (*InterfaceGenerator) writeModFile(ctx context.Context, dest, mod string) error {
