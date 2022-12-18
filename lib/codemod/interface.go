@@ -186,11 +186,23 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 						},
 					},
 				}
+				var value dst.Expr = &dst.BasicLit{
+					Kind:  token.STRING,
+					Value: "nil",
+				}
 				typeName := ""
 				if n.Recv != nil && len(n.Recv.List) > 0 {
+					value = &dst.SelectorExpr{
+						X:   dst.NewIdent("m"),
+						Sel: dst.NewIdent("value"),
+					}
 					t := n.Recv.List[0].Type
 					if st, ok := t.(*dst.StarExpr); ok {
 						t = st.X
+					} else {
+						value = &dst.StarExpr{
+							X: value,
+						}
 					}
 					if i, ok := t.(*dst.Ident); ok {
 						typeName = i.Name
@@ -199,10 +211,7 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 					}
 				}
 				args := []dst.Expr{
-					&dst.SelectorExpr{
-						X:   dst.NewIdent("m"),
-						Sel: dst.NewIdent("value"),
-					},
+					value,
 					dst.NewIdent("wmqe_package"),
 					&dst.BasicLit{
 						Kind:  token.STRING,
@@ -265,6 +274,202 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 				case token.TYPE:
 					for _, spec := range n.Specs {
 						t := spec.(*dst.TypeSpec)
+						out.Decls = append(out.Decls,
+							&dst.FuncDecl{
+								Recv: &dst.FieldList{
+									List: []*dst.Field{
+										{
+											Type: &dst.StarExpr{
+												X: dst.NewIdent("wmqe_mock"),
+											},
+										},
+									},
+								},
+								Name: dst.NewIdent("This" + t.Name.Name),
+								Type: &dst.FuncType{
+									Params: &dst.FieldList{
+										List: []*dst.Field{
+											{
+												Names: []*dst.Ident{
+													dst.NewIdent("value"),
+												},
+												Type: &dst.StarExpr{
+													X: dst.NewIdent(t.Name.Name),
+												},
+											},
+										},
+									},
+									Results: &dst.FieldList{
+										List: []*dst.Field{
+											{
+												Type: &dst.StarExpr{
+													X: dst.NewIdent("mock" + t.Name.Name),
+												},
+											},
+										},
+									},
+								},
+								Body: &dst.BlockStmt{
+									List: []dst.Stmt{
+										&dst.ReturnStmt{
+											Results: []dst.Expr{
+												&dst.UnaryExpr{
+													Op: token.AND,
+													X: &dst.CompositeLit{
+														Type: dst.NewIdent("mock" + t.Name.Name),
+														Elts: []dst.Expr{
+															&dst.KeyValueExpr{
+																Key:   dst.NewIdent("value"),
+																Value: dst.NewIdent("value"),
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							&dst.FuncDecl{
+								Recv: &dst.FieldList{
+									List: []*dst.Field{
+										{
+											Type: &dst.StarExpr{
+												X: dst.NewIdent("wmqe_mock"),
+											},
+										},
+									},
+								},
+								Name: dst.NewIdent("Any" + t.Name.Name),
+								Type: &dst.FuncType{
+									Params: &dst.FieldList{},
+									Results: &dst.FieldList{
+										List: []*dst.Field{
+											{
+												Type: &dst.StarExpr{
+													X: dst.NewIdent("mock" + t.Name.Name),
+												},
+											},
+										},
+									},
+								},
+								Body: &dst.BlockStmt{
+									List: []dst.Stmt{
+										&dst.ReturnStmt{
+											Results: []dst.Expr{
+												&dst.UnaryExpr{
+													Op: token.AND,
+													X: &dst.CompositeLit{
+														Type: dst.NewIdent("mock" + t.Name.Name),
+														Elts: []dst.Expr{
+															&dst.KeyValueExpr{
+																Key:   dst.NewIdent("value"),
+																Value: dst.NewIdent("nil"),
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							&dst.FuncDecl{
+								Recv: &dst.FieldList{
+									List: []*dst.Field{
+										{
+											Names: []*dst.Ident{
+												dst.NewIdent("m"),
+											},
+											Type: &dst.StarExpr{
+												X: dst.NewIdent("mock" + t.Name.Name),
+											},
+										},
+									},
+								},
+								Name: dst.NewIdent("On"),
+								Type: &dst.FuncType{
+									Params: &dst.FieldList{
+										List: []*dst.Field{
+											{
+												Names: []*dst.Ident{
+													dst.NewIdent("method"),
+												},
+												Type: dst.NewIdent("string"),
+											},
+											{
+												Names: []*dst.Ident{
+													dst.NewIdent("args"),
+												},
+												Type: &dst.Ellipsis{
+													Elt: dst.NewIdent("any"),
+												},
+											},
+										},
+									},
+									Results: &dst.FieldList{
+										List: []*dst.Field{
+											{
+												Type: &dst.StarExpr{
+													X: &dst.SelectorExpr{
+														X:   dst.NewIdent("wmqe_mock"),
+														Sel: dst.NewIdent("Call"),
+													},
+												},
+											},
+										},
+									},
+								},
+								Body: &dst.BlockStmt{
+									List: []dst.Stmt{
+										&dst.ReturnStmt{
+											Results: []dst.Expr{
+												&dst.CallExpr{
+													Fun: &dst.SelectorExpr{
+														X:   dst.NewIdent("wmqe_main_controller"),
+														Sel: dst.NewIdent("On"),
+													},
+													Args: []dst.Expr{
+														&dst.SelectorExpr{
+															X:   dst.NewIdent("m"),
+															Sel: dst.NewIdent("value"),
+														},
+														dst.NewIdent("wmqe_package"),
+														&dst.BasicLit{
+															Kind:  token.STRING,
+															Value: `"` + t.Name.Name + `"`,
+														},
+														dst.NewIdent("method"),
+														dst.NewIdent("args"),
+													},
+													Ellipsis: true,
+												},
+											},
+										},
+									},
+								},
+							},
+						)
+						s = append(s, &dst.TypeSpec{
+							Name: dst.NewIdent("mock" + t.Name.Name),
+							Type: &dst.StructType{
+								Fields: &dst.FieldList{
+									List: []*dst.Field{
+										{
+											Names: []*dst.Ident{
+												dst.NewIdent("value"),
+											},
+											Type: &dst.StarExpr{
+												X: &dst.SelectorExpr{
+													X:   dst.NewIdent(origPkg),
+													Sel: dst.NewIdent(t.Name.Name),
+												},
+											},
+										},
+									},
+								},
+							},
+						})
 						if !t.Name.IsExported() {
 							continue
 						}
