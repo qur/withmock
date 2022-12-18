@@ -186,10 +186,7 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 						},
 					},
 				}
-				var value dst.Expr = &dst.BasicLit{
-					Kind:  token.STRING,
-					Value: "nil",
-				}
+				var value dst.Expr = dst.NewIdent("nil")
 				typeName := ""
 				if n.Recv != nil && len(n.Recv.List) > 0 {
 					value = &dst.SelectorExpr{
