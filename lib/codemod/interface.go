@@ -316,6 +316,10 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 														Type: dst.NewIdent("mock" + t.Name.Name),
 														Elts: []dst.Expr{
 															&dst.KeyValueExpr{
+																Key:   dst.NewIdent("any"),
+																Value: dst.NewIdent("false"),
+															},
+															&dst.KeyValueExpr{
 																Key:   dst.NewIdent("value"),
 																Value: dst.NewIdent("value"),
 															},
@@ -359,6 +363,10 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 													X: &dst.CompositeLit{
 														Type: dst.NewIdent("mock" + t.Name.Name),
 														Elts: []dst.Expr{
+															&dst.KeyValueExpr{
+																Key:   dst.NewIdent("any"),
+																Value: dst.NewIdent("true"),
+															},
 															&dst.KeyValueExpr{
 																Key:   dst.NewIdent("value"),
 																Value: dst.NewIdent("nil"),
@@ -419,6 +427,40 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 								},
 								Body: &dst.BlockStmt{
 									List: []dst.Stmt{
+										&dst.IfStmt{
+											Cond: &dst.SelectorExpr{
+												X:   dst.NewIdent("m"),
+												Sel: dst.NewIdent("any"),
+											},
+											Body: &dst.BlockStmt{
+												List: []dst.Stmt{
+													&dst.ReturnStmt{
+														Results: []dst.Expr{
+															&dst.CallExpr{
+																Fun: &dst.SelectorExpr{
+																	X:   dst.NewIdent("wmqe_main_controller"),
+																	Sel: dst.NewIdent("On"),
+																},
+																Args: []dst.Expr{
+																	&dst.SelectorExpr{
+																		X:   dst.NewIdent("wmqe_mock"),
+																		Sel: dst.NewIdent("Anything"),
+																	},
+																	dst.NewIdent("wmqe_package"),
+																	&dst.BasicLit{
+																		Kind:  token.STRING,
+																		Value: `"` + t.Name.Name + `"`,
+																	},
+																	dst.NewIdent("method"),
+																	dst.NewIdent("args"),
+																},
+																Ellipsis: true,
+															},
+														},
+													},
+												},
+											},
+										},
 										&dst.ReturnStmt{
 											Results: []dst.Expr{
 												&dst.CallExpr{
@@ -452,6 +494,12 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 							Type: &dst.StructType{
 								Fields: &dst.FieldList{
 									List: []*dst.Field{
+										{
+											Names: []*dst.Ident{
+												dst.NewIdent("any"),
+											},
+											Type: dst.NewIdent("bool"),
+										},
 										{
 											Names: []*dst.Ident{
 												dst.NewIdent("value"),
