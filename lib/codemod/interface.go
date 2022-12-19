@@ -646,7 +646,7 @@ func (i *InterfaceGenerator) writeExtras(ctx context.Context, fset *token.FileSe
 					Name: dst.NewIdent("wmqe_ctrl"),
 					Path: &dst.BasicLit{
 						Kind:  token.STRING,
-						Value: `"github.com/stretchr/testify/mock"`,
+						Value: `"github.com/qur/withmock/lib/ctrl"`,
 						// Value: `"gowm.in/ctrl"`,
 					},
 				},
@@ -715,6 +715,9 @@ func (*InterfaceGenerator) writeModFile(ctx context.Context, dest, mod string) e
 	mf := &modfile.File{}
 	if err := mf.AddModuleStmt(mod); err != nil {
 		return fmt.Errorf("failed to create go.mod for %s: %w", dest, err)
+	}
+	if err := mf.AddRequire("github.com/qur/withmock", "modules"); err != nil {
+		return fmt.Errorf("failed to add require to %s: %w", dest, err)
 	}
 	data, err := mf.Format()
 	if err != nil {
