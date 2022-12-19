@@ -232,9 +232,31 @@ func (i *InterfaceGenerator) processPackage(ctx context.Context, fset *token.Fil
 					},
 					Args: args,
 				}
-				body = append(body, &dst.ReturnStmt{
-					Results: []dst.Expr{call},
-				})
+				anyCall := dst.Clone(call).(*dst.CallExpr)
+				anyCall.Args[0] = &dst.SelectorExpr{
+					X:   dst.NewIdent("wmqe_mock"),
+					Sel: dst.NewIdent("Anything"),
+				}
+				body = append(body,
+					&dst.IfStmt{
+						Cond: &dst.SelectorExpr{
+							X:   dst.NewIdent("m"),
+							Sel: dst.NewIdent("any"),
+						},
+						Body: &dst.BlockStmt{
+							List: []dst.Stmt{
+								&dst.ReturnStmt{
+									Results: []dst.Expr{
+										anyCall,
+									},
+								},
+							},
+						},
+					},
+					&dst.ReturnStmt{
+						Results: []dst.Expr{call},
+					},
+				)
 				r := &dst.Field{
 					Names: []*dst.Ident{
 						dst.NewIdent("m"),
